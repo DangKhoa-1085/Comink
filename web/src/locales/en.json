@@ -1,0 +1,25 @@
+{
+  "app": {
+    "title": "Comink",
+    "subtitle": "Real-time social platform for students & small communities",
+    "status": "Phase 0 — Initialized successfully",
+    "welcome": "Welcome to Comink",
+    "description": "A micro social network centered around real-time messaging and high-fidelity voice/video calls.",
+    "backend_status": "Backend Status",
+    "backend_connecting": "Connecting to backend...",
+    "backend_online": "Backend is active",
+    "backend_offline": "Cannot connect to Backend (please start dotnet run in /backend/src/Comink.Api)",
+    "check_health": "Check Connection",
+    "features_title": "Core Modules",
+    "feature_identity": "Auth & Profile",
+    "feature_identity_desc": "Registration, dual-token JWT auth, session security and student profiles.",
+    "feature_social": "Social Network",
+    "feature_social_desc": "Friend requests, follow, post updates with media attachments, comments and reactions.",
+    "feature_messaging": "Real-time Messaging",
+    "feature_messaging_desc": "Instant 1-on-1 and group chat via SignalR, persistent message history with cursor pagination.",
+    "feature_calls": "Voice & Video Calls",
+    "feature_calls_desc": "High-fidelity WebRTC calls powered by LiveKit and integrated TURN.",
+    "switch_lang": "Language",
+    "toggle_theme": "Toggle Theme"
+  }
+}

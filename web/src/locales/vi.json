@@ -1,0 +1,25 @@
+{
+  "app": {
+    "title": "Comink",
+    "subtitle": "Mạng xã hội thời gian thực cho sinh viên & cộng đồng nhỏ",
+    "status": "Giai đoạn 0 — Khởi tạo thành công",
+    "welcome": "Chào mừng đến với Comink",
+    "description": "Nền tảng mạng xã hội thu nhỏ tập trung vào trải nghiệm nhắn tin thời gian thực và gọi thoại / video chất lượng cao.",
+    "backend_status": "Trạng thái Backend",
+    "backend_connecting": "Đang kết nối backend...",
+    "backend_online": "Backend đang hoạt động",
+    "backend_offline": "Chưa kết nối được Backend (hãy chạy dotnet run ở /backend/src/Comink.Api)",
+    "check_health": "Kiểm tra kết nối",
+    "features_title": "Các khối tính năng chính",
+    "feature_identity": "Tài khoản & Hồ sơ",
+    "feature_identity_desc": "Đăng ký, xác thực JWT hai tầng, bảo mật khóa phiên và hồ sơ sinh viên.",
+    "feature_social": "Mạng xã hội",
+    "feature_social_desc": "Kết bạn, theo dõi, đăng bài viết kèm hình ảnh, tương tác bình luận, cảm xúc.",
+    "feature_messaging": "Nhắn tin Real-time",
+    "feature_messaging_desc": "Chat 1-1, chat nhóm tức thời qua SignalR, lưu trữ tin nhắn với phân trang cursor.",
+    "feature_calls": "Gọi thoại & Video",
+    "feature_calls_desc": "Cuộc gọi chất lượng cao với LiveKit WebRTC và máy chủ TURN.",
+    "switch_lang": "Ngôn ngữ",
+    "toggle_theme": "Đổi giao diện"
+  }
+}

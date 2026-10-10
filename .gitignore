@@ -1,0 +1,80 @@
+# ========================
+# Secrets — KHÔNG BAO GIỜ commit
+# ========================
+.env
+.env.local
+.env.*.local
+*.user.json
+
+# ========================
+# .NET / ASP.NET Core
+# ========================
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+TestResults/
+*.log
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+dotnet-tools.json.bak
+# User secrets (không commit)
+**/secrets.json
+# EF Core migration bundles
+efbundle
+
+# ========================
+# Node / Web (React + Vite)
+# ========================
+node_modules/
+dist/
+.cache/
+.parcel-cache/
+*.local
+.eslintcache
+web/.env
+web/.env.local
+
+# ========================
+# Flutter / Dart
+# ========================
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+mobile/.env
+mobile/.env.local
+
+# ========================
+# Docker / Infra
+# ========================
+infra/.env
+infra/livekit-data/
+postgres-data/
+redis-data/
+
+# ========================
+# IDE / Editor
+# ========================
+.idea/
+.vscode/settings.json
+.vscode/launch.json
+*.swp
+*.swo
+Thumbs.db
+.DS_Store
+
+# ========================
+# Rider / JetBrains
+# ========================
+.idea/
+*.sln.iml

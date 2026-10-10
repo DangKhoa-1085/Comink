@@ -1,0 +1,103 @@
+# Docker Compose — Môi trường phát triển Comink
+# Chạy: docker compose -f infra/docker-compose.yml up -d
+# Dừng: docker compose -f infra/docker-compose.yml down
+#
+# Lưu ý: file này KHÔNG bao gồm backend và web — chạy trực tiếp để debug thuận tiện hơn.
+
+services:
+  # -------------------------------------------------
+  # PostgreSQL 17
+  # -------------------------------------------------
+  postgres:
+    image: postgres:17-alpine
+    container_name: comink_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-comink}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+      POSTGRES_DB: ${POSTGRES_DB:-comink}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-comink} -d ${POSTGRES_DB:-comink}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - comink_net
+
+  # -------------------------------------------------
+  # Redis 7
+  # -------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: comink_redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-devredispass}
+      --save 60 1
+      --loglevel warning
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-devredispass}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - comink_net
+
+  # -------------------------------------------------
+  # Mailpit — Email dev server (SMTP + Web UI)
+  # UI: http://localhost:8025
+  # SMTP: localhost:1025
+  # -------------------------------------------------
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: comink_mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_SMTP_AUTH_ACCEPT_ANY: true
+      MP_SMTP_AUTH_ALLOW_INSECURE: true
+    networks:
+      - comink_net
+
+  # -------------------------------------------------
+  # LiveKit — Media server cho gọi thoại/video (chế độ dev)
+  # API/WS: localhost:7880
+  # TURN/TCP: localhost:7881
+  # TURN/UDP: localhost:7882
+  # -------------------------------------------------
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: comink_livekit
+    restart: unless-stopped
+    command: --config /etc/livekit/livekit.yaml
+    ports:
+      - "7880:7880"   # HTTP API + WebSocket
+      - "7881:7881"   # TURN/TCP
+      - "7882:7882/udp" # TURN/UDP
+    volumes:
+      - ./livekit.yaml:/etc/livekit/livekit.yaml:ro
+    networks:
+      - comink_net
+
+volumes:
+  postgres_data:
+    name: comink_postgres_data
+  redis_data:
+    name: comink_redis_data
+
+networks:
+  comink_net:
+    name: comink_network
+    driver: bridge
