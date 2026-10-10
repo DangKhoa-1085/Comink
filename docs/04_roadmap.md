@@ -54,14 +54,14 @@ Mỗi giai đoạn gồm: **mục tiêu**, **phụ thuộc** và **checklist ho�
 **Mục tiêu:** hai người cùng chạy được dự án rỗng trên máy mình; mọi quyết định công nghệ đã chốt.
 **Phụ thuộc:** không.
 
-- [ ] Repo monorepo có `README` hướng dẫn chạy từ đầu
-- [ ] `docker-compose` chạy được PostgreSQL, Redis, Mailpit, LiveKit (chế độ dev)
-- [ ] Khung backend theo Clean Architecture (Domain, Application, Infrastructure, Api) build được
-- [ ] Khung web (Vite + React + TS) và khung app (Flutter) chạy được "Hello"
-- [ ] CI chạy build + test + lint cho từng thành phần trên mỗi Pull Request
-- [ ] Quy tắc nhánh Git, commit, review, migration đã thống nhất
-- [ ] Đã chốt các mục ❓ còn lại ở `02_tech_stack_decisions.md` (nhà cung cấp gọi, nơi lưu tệp, LLM mặc định, thư viện UI)
-- [ ] Đã rà soát và chốt `03_database_design.md`; có migration M0 chạy thành công
+- [x] Repo monorepo có `README` hướng dẫn chạy từ đầu
+- [x] `docker-compose` chạy được PostgreSQL, Redis, Mailpit, LiveKit (chế độ dev)
+- [x] Khung backend theo Clean Architecture (Domain, Application, Infrastructure, Api) build được
+- [x] Khung web (Vite + React + TS) và khung app (Flutter) chạy được "Hello"
+- [x] CI chạy build + test + lint cho từng thành phần trên mỗi Pull Request
+- [x] Quy tắc nhánh Git, commit, review, migration đã thống nhất
+- [x] Đã chốt các mục ❓ còn lại ở `02_tech_stack_decisions.md` (nhà cung cấp gọi, nơi lưu tệp, LLM mặc định, thư viện UI)
+- [x] Đã rà soát và chốt `03_database_design.md`; có migration M0 chạy thành công
 
 ### Giai đoạn 1: Nền tảng và Tài khoản (Bảo mật CB)
 

@@ -1,8 +1,7 @@
 # Comink — Thiết kế cơ sở dữ liệu (PostgreSQL)
 
 > Tài liệu 03, dựa trên `COMINK_SPEC.md` và `02_tech_stack_decisions.md`. Mô tả toàn bộ schema PostgreSQL, quan hệ, enum, chỉ mục và cách quản lý migration.
->
-> Trạng thái: **bản nháp v1 (2026-10-10)** để hai thành viên rà soát trước khi tạo migration đầu tiên. Mọi chỗ ghi 💡 là đề xuất, có thể đổi.
+> Trạng thái: **Đã chốt (2026-10-10)**; migration M0 (Identity: `20261010_Identity_InitialCreate`) đã được sinh thành công trong `Persistence/Migrations/`.
 
 ---
 
