@@ -115,19 +115,22 @@ Gọi nhóm chỉ là room có nhiều thành viên, dùng chung luồng trên.
 
 | Hạng mục | Công nghệ | Trạng thái |
 |---|---|---|
-| Framework | ASP.NET Core (.NET LTS mới nhất) | Đã chốt |
-| Real-time | SignalR | Đã chốt |
-| ORM / truy cập dữ liệu | EF Core + Npgsql, migrations | Đề xuất |
-| Cơ sở dữ liệu | PostgreSQL | Đã chốt |
-| Cache, presence, rate limit, backplane | Redis (StackExchange.Redis) | Đã chốt |
-| Xác thực | ASP.NET Core Identity + JWT access token + refresh token xoay vòng | Đề xuất |
-| Phân quyền | Role (User/Admin) + policy theo tài nguyên (thành viên hội thoại, chủ bài viết) | Đề xuất |
-| Validation | FluentValidation | Đề xuất |
-| Rate limiting | `AddRateLimiter` có sẵn của ASP.NET Core, kết hợp Redis khi nhiều instance | Đề xuất |
-| Tác vụ nền | `BackgroundService` / hosted service (cân nhắc Hangfire nếu cần lên lịch phức tạp) | Đề xuất |
-| Log | Serilog (console + file, có correlation id) | Đề xuất |
-| Tài liệu API | Swagger / OpenAPI | Đề xuất |
-| Kiểm thử | xUnit + Testcontainers (PostgreSQL, Redis thật) | Đề xuất |
+| Framework | ASP.NET Core (.NET 10, LTS/Current - ghim bằng `global.json`) | Đã chốt ✅ |
+| Kiến trúc | Monolith Clean Architecture (Domain, Application, Infrastructure, Api) | Đã chốt ✅ |
+| API Style | Minimal API (tổ chức vertical slice theo endpoint groups) | Đã chốt ✅ |
+| Error Handling | Exceptions kết hợp ProblemDetails (chuẩn RFC 7807) | Đã chốt ✅ |
+| Real-time | SignalR | Đã chốt ✅ |
+| ORM / truy cập dữ liệu | EF Core + Npgsql, code-first migrations (snake_case) | Đã chốt ✅ |
+| Cơ sở dữ liệu | PostgreSQL | Đã chốt ✅ |
+| Cache, presence, rate limit | Redis (StackExchange.Redis) | Đã chốt ✅ |
+| Xác thực | ASP.NET Core Identity + JWT access token + refresh token xoay vòng | Đã chốt ✅ |
+| Phân quyền | Role (User/Admin) + policy theo tài nguyên | Đã chốt ✅ |
+| Validation | FluentValidation | Đã chốt ✅ |
+| Rate limiting | `AddRateLimiter` có sẵn của ASP.NET Core, kết hợp Redis khi nhiều instance | Đề xuất 💡 |
+| Tác vụ nền | `BackgroundService` / hosted service | Đề xuất 💡 |
+| Log | Serilog (console + file, có correlation id) | Đã chốt ✅ |
+| Tài liệu API | Swagger / OpenAPI (`Microsoft.AspNetCore.OpenApi`) | Đã chốt ✅ |
+| Kiểm thử | xUnit + Testcontainers (PostgreSQL, Redis thật) | Đã chốt ✅ |
 
 <!-- Lưu ý khi chọn thư viện: kiểm tra **giấy phép** trước khi dùng (một số thư viện .NET phổ biến đã chuyển sang bản thương mại). Ưu tiên tự viết lớp use case đơn giản thay vì thêm thư viện trung gian không cần thiết. -->
 
@@ -135,43 +138,46 @@ Gọi nhóm chỉ là room có nhiều thành viên, dùng chung luồng trên.
 
 | Hạng mục | Công nghệ | Trạng thái |
 |---|---|---|
-| Ngôn ngữ / build | React + TypeScript (strict) + Vite | Đã chốt |
-| Định tuyến | React Router | Đề xuất |
-| Dữ liệu từ server | TanStack Query | Đề xuất |
-| State phía client | Zustand (chỉ cho trạng thái giao diện, phiên, kết nối) | Đề xuất |
-| Real-time | `@microsoft/signalr` | Đã chốt (SignalR) |
-| Gọi thoại/video | SDK của nhà cung cấp (LiveKit: `livekit-client`, `@livekit/components-react`) | Đề xuất |
-| Đa ngôn ngữ | i18next (vi, en) | Đề xuất |
-| Giao diện | Tailwind CSS v4 + shadcn/ui | Đã chốt |
-| Form / validate | React Hook Form + Zod | Đề xuất |
-| Client API | Sinh tự động từ OpenAPI (ví dụ `orval` hoặc `openapi-typescript`) | Đề xuất |
-| Push | Firebase Cloud Messaging + service worker | Đã chốt (push) |
+| Ngôn ngữ / build | React + TypeScript (strict) + Vite | Đã chốt ✅ |
+| Giao diện | Tailwind CSS v4 + shadcn/ui | Đã chốt ✅ |
+| Định tuyến | React Router | Đã chốt ✅ |
+| Dữ liệu từ server | TanStack Query | Đã chốt ✅ |
+| State phía client | Zustand (chỉ cho trạng thái giao diện, phiên, kết nối) | Đã chốt ✅ |
+| Real-time | `@microsoft/signalr` | Đã chốt ✅ |
+| Gọi thoại/video | LiveKit SDK (`livekit-client`, `@livekit/components-react`) | Đã chốt ✅ |
+| Đa ngôn ngữ | i18next (vi, en) | Đã chốt ✅ |
+| Form / validate | React Hook Form + Zod | Đã chốt ✅ |
+| Client API | Fetch wrapper có kiểm soát / OpenAPI generator | Đề xuất 💡 |
+| Push | Firebase Cloud Messaging + service worker | Đã chốt ✅ |
 
 ### 2.3. Mobile (Flutter)
 
 | Hạng mục | Công nghệ | Trạng thái |
 |---|---|---|
-| Framework | Flutter (stable) | Đã chốt |
-| Quản lý state | Riverpod | Đề xuất |
-| HTTP | dio (interceptor tự refresh token) | Đề xuất |
-| Điều hướng | go_router | Đề xuất |
-| Real-time | package SignalR cho Dart (ví dụ `signalr_netcore`) | Đã chốt (SignalR) |
-| Gọi thoại/video | SDK Flutter của nhà cung cấp (LiveKit: `livekit_client`) | Đã chốt |
-| Lưu token | `flutter_secure_storage` | Đề xuất |
-| Đa ngôn ngữ | `flutter_localizations` + `intl` (hoặc `slang`) | Đề xuất |
-| Push | `firebase_messaging` (FCM, thêm `flutter_local_notifications` để hiển thị) | Đã chốt (push) |
-| Client API | Sinh từ OpenAPI (openapi-generator cho Dart) hoặc viết tay có kiểm soát | Đề xuất |
+| Framework | Flutter (stable) | Đã chốt ✅ |
+| Quản lý state | Riverpod | Đã chốt ✅ |
+| HTTP | dio (interceptor tự refresh token) | Đã chốt ✅ |
+| Điều hướng | go_router | Đã chốt ✅ |
+| Real-time | package SignalR cho Dart (`signalr_netcore`) | Đã chốt ✅ |
+| Gọi thoại/video | SDK Flutter LiveKit (`livekit_client`) | Đã chốt ✅ |
+| Lưu token | `flutter_secure_storage` | Đã chốt ✅ |
+| Đa ngôn ngữ | `flutter_localizations` + `intl` | Đã chốt ✅ |
+| Push | `firebase_messaging` (FCM) + `flutter_local_notifications` | Đã chốt ✅ |
+| Client API | Sinh từ OpenAPI hoặc viết tay có kiểm soát | Đề xuất 💡 |
 
 ### 2.4. Hạ tầng và công cụ
 
 | Hạng mục | Công nghệ | Trạng thái |
 |---|---|---|
-| Container | Docker + Docker Compose | Đã chốt |
-| CI/CD | GitHub Actions (build, test, lint; sau đó build image, deploy) | Đã chốt |
-| Quản lý mã nguồn | Git, 1 Monorepo (`comink/`) | Đã chốt |
-| Email dev | Mailpit (nhận mail thử, chạy trong Compose cổng 1025/8025) | Đã chốt |
-| Email production | Resend (tài khoản đã có, cấu hình qua SMTP/API) | Đã chốt |
-| Reverse proxy / HTTPS | Caddy hoặc Nginx khi triển khai Internet | Đề xuất |
+| Quản lý mã nguồn | Git, 1 Monorepo (`comink/`) | Đã chốt ✅ |
+| Container | Docker + Docker Compose | Đã chốt ✅ |
+| CI/CD | GitHub Actions (build, test, lint cho cả backend & web) | Đã chốt ✅ |
+| Lưu trữ media | Cloudinary (upload qua signed URL từ backend) | Đã chốt ✅ |
+| Máy chủ cuộc gọi | LiveKit (self-hosted dev với TURN tích hợp; port 7880) | Đã chốt ✅ |
+| Email dev | Mailpit (chạy trong Compose cổng 1025/8025) | Đã chốt ✅ |
+| Email production | Resend (tài khoản đã có, cấu hình qua SMTP/API) | Đã chốt ✅ |
+| Trí tuệ nhân tạo (AI) | Trừu tượng hóa qua `IAiProvider`, sẵn sàng switch LLM trả phí | Đã chốt ✅ |
+| Reverse proxy / HTTPS | Caddy hoặc Nginx khi triển khai Internet | Đề xuất 💡 |
 
 **Docker Compose cho môi trường dev** nên có sẵn: `postgres`, `redis`, `mailpit`, `livekit` (bản self-host chế độ dev), còn backend và frontend có thể chạy trực tiếp ngoài Docker để debug thuận tiện.
 

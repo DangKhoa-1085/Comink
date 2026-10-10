@@ -220,8 +220,15 @@ Các mức nâng cao có thể xen kẽ vào bất kỳ giai đoạn nào miễn
 
 ---
 
-## 8. Điểm cần chốt thêm
+## 8. Các quyết định đã chốt (Hoàn thành Giai đoạn 0)
 
-- Chọn cụ thể nhà cung cấp gọi thoại / video (LiveKit, Agora hay Twilio) và dịch vụ lưu trữ tệp (Cloudinary hay Firebase)
-- Chia việc chi tiết giữa hai thành viên
-- Thống nhất dịch vụ gửi email (xác minh email, đặt lại mật khẩu) và dịch vụ push notification cho web và mobile
+Toàn bộ các điểm mở đã được thống nhất và đưa vào thực thi:
+- **Nhà cung cấp gọi thoại / video:** LiveKit (self-hosted dev với TURN tích hợp; trừu tượng hóa qua `ICallProvider` cho phép switch sang Cloud/Agora sau này).
+- **Lưu trữ tệp & media:** Cloudinary (upload qua signed URL do backend cấp; trừu tượng hóa qua `IMediaStorage`).
+- **Dịch vụ gửi email:** Mailpit khi local dev (localhost:1025); Resend qua SMTP/API cho production.
+- **Push notification:** Firebase Cloud Messaging (FCM) cho cả Web và Mobile.
+- **Nhà cung cấp AI:** Sẵn sàng switch LLM trả phí trong tương lai; trừu tượng hóa qua `IAiProvider`.
+- **Phân chia công việc giữa 2 thành viên:**
+  - **Dev A:** Tài khoản & Bảo mật, Mạng xã hội, Ảnh/tệp, Quản trị.
+  - **Dev B:** Nhắn tin real-time, Gọi thoại/video trực tuyến, Thông báo/Push.
+  - **Chung:** Hạ tầng dev, CI/CD, tài liệu, tích hợp, kiểm thử, báo cáo.
