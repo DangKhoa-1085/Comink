@@ -1,0 +1,35 @@
+# LiveKit Server — Cấu hình môi trường phát triển
+# Tham khảo: https://docs.livekit.io/home/self-hosting/deployment/
+#
+# Lưu ý: api_key và api_secret dùng giá trị dev cố định.
+# KHÔNG dùng cấu hình này cho production.
+
+port: 7880
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+  # Cho phép kết nối từ localhost khi dev
+  use_external_ip: false
+
+keys:
+  # devkey: devsecret — chỉ dùng cho môi trường phát triển
+  devkey: devsecret
+
+logging:
+  level: info
+  json: false
+
+# TURN tích hợp sẵn (cho phép kết nối qua NAT khi dev)
+turn:
+  enabled: true
+  domain: localhost
+  tls_port: 5349
+  udp_port: 3478
+  external_tls: false
+
+# Webhook để nhận sự kiện (room kết thúc, người rời, v.v.)
+# Sẽ cấu hình sau khi backend có endpoint webhook
+# webhook:
+#   urls:
+#     - http://host.docker.internal:5001/api/webhooks/livekit
+#   api_key: devkey

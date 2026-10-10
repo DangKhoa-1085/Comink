@@ -142,7 +142,7 @@ Gọi nhóm chỉ là room có nhiều thành viên, dùng chung luồng trên.
 | Real-time | `@microsoft/signalr` | Đã chốt (SignalR) |
 | Gọi thoại/video | SDK của nhà cung cấp (LiveKit: `livekit-client`, `@livekit/components-react`) | Đề xuất |
 | Đa ngôn ngữ | i18next (vi, en) | Đề xuất |
-| Giao diện | Tailwind CSS + bộ component có sẵn (ví dụ shadcn/ui) | Cần chốt |
+| Giao diện | Tailwind CSS v4 + shadcn/ui | Đã chốt |
 | Form / validate | React Hook Form + Zod | Đề xuất |
 | Client API | Sinh tự động từ OpenAPI (ví dụ `orval` hoặc `openapi-typescript`) | Đề xuất |
 | Push | Firebase Cloud Messaging + service worker | Đã chốt (push) |
@@ -156,7 +156,7 @@ Gọi nhóm chỉ là room có nhiều thành viên, dùng chung luồng trên.
 | HTTP | dio (interceptor tự refresh token) | Đề xuất |
 | Điều hướng | go_router | Đề xuất |
 | Real-time | package SignalR cho Dart (ví dụ `signalr_netcore`) | Đã chốt (SignalR) |
-| Gọi thoại/video | SDK Flutter của nhà cung cấp (LiveKit: `livekit_client`) | Đề xuất |
+| Gọi thoại/video | SDK Flutter của nhà cung cấp (LiveKit: `livekit_client`) | Đã chốt |
 | Lưu token | `flutter_secure_storage` | Đề xuất |
 | Đa ngôn ngữ | `flutter_localizations` + `intl` (hoặc `slang`) | Đề xuất |
 | Push | `firebase_messaging` (FCM, thêm `flutter_local_notifications` để hiển thị) | Đã chốt (push) |
@@ -167,10 +167,10 @@ Gọi nhóm chỉ là room có nhiều thành viên, dùng chung luồng trên.
 | Hạng mục | Công nghệ | Trạng thái |
 |---|---|---|
 | Container | Docker + Docker Compose | Đã chốt |
-| CI/CD | GitHub Actions (build, test, lint; sau đó build image, deploy) | Đã chốt (có CI/CD) / Đề xuất (GitHub Actions) |
-| Quản lý mã nguồn | Git, 1 monorepo hoặc 3 repo | Cần chốt |
-| Email dev | Mailpit (nhận mail thử, chạy trong Compose) | Đề xuất |
-| Email production | Dịch vụ gửi mail (SendGrid, Resend, Brevo...) hoặc SMTP | Cần chốt |
+| CI/CD | GitHub Actions (build, test, lint; sau đó build image, deploy) | Đã chốt |
+| Quản lý mã nguồn | Git, 1 Monorepo (`comink/`) | Đã chốt |
+| Email dev | Mailpit (nhận mail thử, chạy trong Compose cổng 1025/8025) | Đã chốt |
+| Email production | Resend (tài khoản đã có, cấu hình qua SMTP/API) | Đã chốt |
 | Reverse proxy / HTTPS | Caddy hoặc Nginx khi triển khai Internet | Đề xuất |
 
 **Docker Compose cho môi trường dev** nên có sẵn: `postgres`, `redis`, `mailpit`, `livekit` (bản self-host chế độ dev), còn backend và frontend có thể chạy trực tiếp ngoài Docker để debug thuận tiện.
@@ -372,23 +372,29 @@ Mỗi khi chốt hoặc đổi quyết định, thêm một dòng ở đây.
 | 2026-10-09 | Lưu tệp ở cloud (Cloudinary/Firebase) | Không tự quản lý lưu trữ | Nhóm |
 | 2026-10-09 | AI qua API ngoài | Không chạy mô hình cục bộ | Nhóm |
 | 2026-10-09 | Docker Compose + CI/CD | Môi trường đồng nhất cho 2 người | Nhóm |
-| _(chờ xác nhận)_ | LiveKit làm nhà cung cấp gọi | Xem mục 3.3 | |
-| _(chờ xác nhận)_ | Cloudinary làm nơi lưu tệp | Xem mục 3.4 | |
+| 2026-10-10 | LiveKit làm nhà cung cấp gọi | Chạy dev tự host có TURN, đồng nhất SDK Web/Flutter | Nhóm |
+| 2026-10-10 | Cloudinary làm nơi lưu tệp | Hỗ trợ upload trực tiếp signed, quản lý ảnh/video mạnh mẽ | Nhóm |
+| 2026-10-10 | Monorepo (`comink/`) | Đồng bộ hợp đồng API, dễ quản lý CI/CD và tài liệu | Nhóm |
+| 2026-10-10 | Tailwind CSS v4 + shadcn/ui cho Web | Giao diện hiện đại, tối ưu hóa CSS, hỗ trợ component linh hoạt | Nhóm |
+| 2026-10-10 | Minimal API + Exception & ProblemDetails | Code gọn gàng, hiệu năng cao, chuẩn RFC 7807 | Nhóm |
+| 2026-10-10 | Mailpit (dev) + Resend (production) | Test cục bộ dễ dàng và đã sẵn có tài khoản Resend | Nhóm |
+| 2026-10-10 | Sẵn sàng switch LLM trả phí trong tương lai | Trừu tượng hóa qua `IAiProvider` | Nhóm |
+| 2026-10-10 | .NET 10 | Phiên bản SDK mới nhất, thống nhất qua `global.json` | Nhóm |
 
 ---
 
-## 7. Việc cần chốt trước khi bắt đầu code
+## 7. Các quyết định đã chốt trước khi bắt đầu code
 
-| # | Nội dung | Gợi ý |
-|---|---|---|
-| 1 | Nhà cung cấp gọi: LiveKit, Agora hay Twilio | LiveKit (mục 3.3) |
-| 2 | Nơi lưu tệp: Cloudinary hay Firebase Storage | Cloudinary (mục 3.4) |
-| 3 | LLM mặc định cho tính năng AI và ngân sách | Chọn một, có interface để đổi |
-| 4 | Dịch vụ gửi email thật (production) | Dùng Mailpit khi dev, chọn dịch vụ sau |
-| 5 | Monorepo hay nhiều repo | Monorepo |
-| 6 | Thư viện giao diện web | Tailwind + shadcn/ui hoặc bộ khác nhóm quen |
-| 7 | Cách chia việc cụ thể giữa hai người (theo bảng tính năng) | Chia theo nhóm tính năng ở mục 1.3 |
-| 8 | Kế hoạch HTTPS cho demo qua LAN | `mkcert` hoặc tunnel (mục 3.8) |
-| 9 | Chuẩn commit, quy tắc review | Conventional Commits + review chéo |
+Toàn bộ 9 mục đã được thống nhất và đưa vào thực thi trong Milestone 0:
+1. **Nhà cung cấp gọi:** LiveKit (self-hosted dev với TURN tích hợp; SDK `livekit-client`, `livekit_client`).
+2. **Nơi lưu tệp:** Cloudinary (upload qua signed URL, interface `IMediaStorage`).
+3. **LLM:** Sẵn sàng switch LLM trả phí trong tương lai, hiện tại dùng interface `IAiProvider`.
+4. **Email:** Mailpit khi local dev (localhost:1025), Resend cho production.
+5. **Cấu trúc repo:** Monorepo (`comink/`).
+6. **Thư viện giao diện web:** Tailwind CSS v4 + shadcn/ui, i18next, TanStack Query, Zustand.
+7. **Phân chia công việc:** Theo 2 phân hệ (Dev A: Tài khoản, Mạng xã hội, Ảnh/tệp, Admin; Dev B: Nhắn tin, Gọi thoại/video, Push).
+8. **HTTPS cho demo:** `mkcert` hoặc tunnel khi demo qua mạng LAN.
+9. **Quy tắc Git:** Conventional Commits, branch `feature/<name>`, review qua Pull Request, CI tự động.
+
 
 ---

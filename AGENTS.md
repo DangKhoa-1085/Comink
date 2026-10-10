@@ -216,37 +216,39 @@ Follow `docs/03_database_design.md`. Key points:
 
 ---
 
-## 13. Open decisions (ask before choosing)
+## 13. Decided choices (previously open)
 
-These are not decided. If a task depends on one of them, ask the user and wait for the answer.
-
-- API style: controllers or Minimal API.
-- Error handling style: exceptions vs. a result type for expected failures.
-- Web UI library (for example Tailwind with shadcn/ui, or another).
-- Call provider (LiveKit proposed), media storage (Cloudinary proposed), default LLM and budget.
-- Monorepo vs. multiple repositories (the layout in section 4 assumes a monorepo).
-- Email provider for production.
-
-Once the user decides, add the answer here as a one-line rule and remove it from this list.
+- **Architecture:** Monorepo (backend/, web/, mobile/, infra/).
+- **API style:** Minimal API (tổ chức theo endpoint groups / vertical slice).
+- **Error handling:** Exceptions kết hợp ProblemDetails middleware cho các lỗi được trả về chuẩn RFC 7807.
+- **Web UI library:** Tailwind CSS v4 kết hợp shadcn/ui.
+- **Call provider:** LiveKit self-hosted dev (TURN tích hợp), interface `ICallProvider` cho phép switch sang Cloud/Agora sau này.
+- **Media storage:** Cloudinary (upload qua signed URL từ backend), interface `IMediaStorage`.
+- **Email provider:** Mailpit khi local dev (SMTP localhost:1025); Resend qua SMTP/API cho production.
+- **AI provider:** Tương lai switch sang LLM trả phí; hiện tại trừu tượng hóa qua `IAiProvider`.
+- **.NET SDK:** .NET 10 (LTS/Current, pinned bằng `global.json` version 10.0.400).
 
 ---
 
-## 14. Commands
+## 14. Verified commands
 
-Scaffolding does not exist yet, so the real commands are not defined. **Do not invent or assume commands.** When scaffolding is created, fill this table in. Expected commands, to be verified at that time:
+Các lệnh đã được kiểm chứng hoạt động trong repository:
 
-| Task | Command (to be confirmed) |
-|---|---|
-| Start infra | `docker compose -f infra/docker-compose.yml up -d` |
-| Build backend | `dotnet build` |
-| Test backend | `dotnet test` |
-| Format backend | `dotnet format` |
-| Create migration | `dotnet ef migrations add <Name>` |
-| Apply migrations (local) | `dotnet ef database update` |
-| Web dev / build / lint / test | `npm run dev` / `npm run build` / `npm run lint` / `npm test` |
-| Mobile analyze / test | `flutter analyze` / `flutter test` |
-
-If a command listed above fails because it does not exist yet, tell the user instead of working around it.
+| Task | Command | Thư mục làm việc |
+|---|---|---|
+| Khởi động hạ tầng dev | `docker compose -f infra/docker-compose.yml up -d` | Gốc (`Comink/`) |
+| Dừng hạ tầng dev | `docker compose -f infra/docker-compose.yml down` | Gốc (`Comink/`) |
+| Build backend | `dotnet build` | `backend/` |
+| Test backend | `dotnet test` | `backend/` |
+| Format backend | `dotnet format` | `backend/` |
+| Chạy backend API | `dotnet run --project src/Comink.Api` | `backend/` |
+| Tạo migration EF Core | `dotnet ef migrations add <Name> --project src/Comink.Infrastructure --startup-project src/Comink.Api --output-dir Persistence/Migrations` | `backend/` |
+| Áp dụng migration DB | `dotnet ef database update --project src/Comink.Infrastructure --startup-project src/Comink.Api` | `backend/` |
+| Cài đặt gói web | `npm install` | `web/` |
+| Chạy web dev server | `npm run dev` | `web/` |
+| Build web production | `npm run build` | `web/` |
+| Lint web | `npm run lint` | `web/` |
+| Phân tích / test mobile | `flutter analyze` / `flutter test` | `mobile/` (sau khi cài Flutter SDK) |
 
 ---
 
