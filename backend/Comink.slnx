@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Comink.Api/Comink.Api.csproj" />
+    <Project Path="src/Comink.Application/Comink.Application.csproj" />
+    <Project Path="src/Comink.Domain/Comink.Domain.csproj" />
+    <Project Path="src/Comink.Infrastructure/Comink.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Comink.Api.IntegrationTests/Comink.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Comink.Application.Tests/Comink.Application.Tests.csproj" />
+    <Project Path="tests/Comink.Domain.Tests/Comink.Domain.Tests.csproj" />
+  </Folder>
+</Solution>
