@@ -6,13 +6,13 @@ Rules for AI coding agents working in this repository. Read this file fully befo
 
 ## 1. Project at a glance
 
-**Comink** is a small social network for students and small communities, with **real-time messaging and voice/video calls as the core experience**. It is a university specialization project (đồ án chuyên ngành phần mềm).
+**Comink** is a small social network for students and small communities, with **real-time messaging and voice/video calls as the core experience**. It is a university software engineering capstone / specialization project.
 
 - Team: 2 full-stack developers, 3 months.
 - Platforms: Web (React) first, then a mobile app (Flutter). Both use one shared backend.
 - Development rule: **basic level (CB) of a feature group first, advanced level (NC) later.** Web before mobile. AI features last.
 
-The repository is currently **empty of code** (only `docs/` exists). Scaffolding will be created step by step following `docs/04_roadmap.md`.
+Phase 0 (project setup & architecture scaffolding for backend, web, mobile, and infra) is completed. Implementation proceeds step by step following `docs/04_roadmap.md`.
 
 ---
 
@@ -22,7 +22,7 @@ All project documents are in `docs/` and are written in Vietnamese.
 
 | File | Purpose | Read when |
 |---|---|---|
-| `docs/COMINK_SPEC.md` | Product scope and features (CB / NC) | Always, at the start of a task |
+| `docs/01_COMINK_SPEC.md` | Product scope and features (CB / NC) | Always, at the start of a task |
 | `docs/02_tech_stack_decisions.md` | Architecture, tech stack, development principles | Before writing any code |
 | `docs/03_database_design.md` | PostgreSQL schema, enums, indexes, migrations | Before touching data, entities, or migrations |
 | `docs/04_roadmap.md` | Phases, checklists, current priorities | Before starting a feature, to check phase order |
@@ -44,7 +44,7 @@ Rules:
 | Commit messages | English (Conventional Commits) |
 | Code comments | **Vietnamese** |
 | API error codes and SignalR event names | English constants (e.g. `AUTH_INVALID_CREDENTIALS`); the clients translate them for display |
-| Project documents in `docs/` | Vietnamese |
+| Project documents in `docs/` (including `docs/tasks/`) | Vietnamese |
 | User-facing UI text | Never hard-coded; always through i18n (`vi` and `en`) |
 
 ---
@@ -55,6 +55,7 @@ Rules:
 comink/
 ├── AGENTS.md
 ├── docs/                  # project documents (source of truth)
+│   └── tasks/             # phase task breakdown files (phase<N>_<name>.md)
 ├── backend/               # ASP.NET Core solution (Clean Architecture)
 ├── web/                   # React + TypeScript + Vite
 ├── mobile/                # Flutter
@@ -118,9 +119,13 @@ If a task seems to require any of the above, **stop and ask the user first**. Ap
    - Advanced (NC) work is allowed at any time, but only after the CB of **that same group** is done.
    - Web before mobile. AI features only after the main features are stable.
    - Login and authorization come before everything else (documented exception).
-3. Work in small, reviewable steps. Prefer several small changes over one large one.
-4. Before large changes, briefly state your plan and the files you will touch, then proceed.
-5. Do not invent endpoints, tables, enums, or events that are not in the documents. If something is needed, propose it, then ask.
+3. **Phase task breakdown (Phase 1 onwards):** When commencing or receiving a new roadmap phase (starting from Phase 1), before implementing any feature code, create a dedicated task breakdown file at `docs/tasks/phase<N>_<name>.md` (e.g., `docs/tasks/phase1_foundation_auth.md`).
+   - Written in Vietnamese (consistent with all project documents in `docs/`).
+   - Granularly break down the objectives, dependencies, and checklist items from `docs/04_roadmap.md` into trackable tasks with clear acceptance criteria and status checkboxes (`- [ ]`).
+   - Keep this task file actively updated as progress is made throughout the phase.
+4. Work in small, reviewable steps. Prefer several small changes over one large one.
+5. Before large changes, briefly state your plan and the files you will touch, then proceed.
+6. Do not invent endpoints, tables, enums, or events that are not in the documents. If something is needed, propose it, then ask.
 
 ---
 
@@ -219,36 +224,36 @@ Follow `docs/03_database_design.md`. Key points:
 ## 13. Decided choices (previously open)
 
 - **Architecture:** Monorepo (backend/, web/, mobile/, infra/).
-- **API style:** Minimal API (tổ chức theo endpoint groups / vertical slice).
-- **Error handling:** Exceptions kết hợp ProblemDetails middleware cho các lỗi được trả về chuẩn RFC 7807.
-- **Web UI library:** Tailwind CSS v4 kết hợp shadcn/ui.
-- **Call provider:** LiveKit self-hosted dev (TURN tích hợp), interface `ICallProvider` cho phép switch sang Cloud/Agora sau này.
-- **Media storage:** Cloudinary (upload qua signed URL từ backend), interface `IMediaStorage`.
-- **Email provider:** Mailpit khi local dev (SMTP localhost:1025); Resend qua SMTP/API cho production.
-- **AI provider:** Tương lai switch sang LLM trả phí; hiện tại trừu tượng hóa qua `IAiProvider`.
-- **.NET SDK:** .NET 10 (LTS/Current, pinned bằng `global.json` version 10.0.400).
+- **API style:** Minimal API (organized by vertical slices / endpoint groups).
+- **Error handling:** Domain/Application exceptions combined with ProblemDetails middleware for RFC 7807 compliant error responses.
+- **Web UI library:** Tailwind CSS v4 combined with shadcn/ui.
+- **Call provider:** Self-hosted LiveKit in local dev (integrated TURN), abstracted via `ICallProvider` interface to allow switching to LiveKit Cloud or Agora later.
+- **Media storage:** Cloudinary (direct upload via backend-generated signed URLs), abstracted via `IMediaStorage` interface.
+- **Email provider:** Mailpit for local dev (SMTP localhost:1025); Resend via SMTP/API for production.
+- **AI provider:** Abstracted via `IAiProvider` interface; ready to plug in paid LLM providers later.
+- **.NET SDK:** .NET 10 (LTS/Current, pinned via `global.json` version 10.0.400).
 
 ---
 
 ## 14. Verified commands
 
-Các lệnh đã được kiểm chứng hoạt động trong repository:
+Commands verified to work in the repository:
 
-| Task | Command | Thư mục làm việc |
+| Task | Command | Working directory |
 |---|---|---|
-| Khởi động hạ tầng dev | `docker compose -f infra/docker-compose.yml up -d` | Gốc (`Comink/`) |
-| Dừng hạ tầng dev | `docker compose -f infra/docker-compose.yml down` | Gốc (`Comink/`) |
+| Start dev infrastructure | `docker compose -f infra/docker-compose.yml up -d` | Root (`Comink/`) |
+| Stop dev infrastructure | `docker compose -f infra/docker-compose.yml down` | Root (`Comink/`) |
 | Build backend | `dotnet build` | `backend/` |
 | Test backend | `dotnet test` | `backend/` |
 | Format backend | `dotnet format` | `backend/` |
-| Chạy backend API | `dotnet run --project src/Comink.Api` | `backend/` |
-| Tạo migration EF Core | `dotnet ef migrations add <Name> --project src/Comink.Infrastructure --startup-project src/Comink.Api --output-dir Persistence/Migrations` | `backend/` |
-| Áp dụng migration DB | `dotnet ef database update --project src/Comink.Infrastructure --startup-project src/Comink.Api` | `backend/` |
-| Cài đặt gói web | `npm install` | `web/` |
-| Chạy web dev server | `npm run dev` | `web/` |
-| Build web production | `npm run build` | `web/` |
+| Run backend API | `dotnet run --project src/Comink.Api` | `backend/` |
+| Create EF Core migration | `dotnet ef migrations add <Name> --project src/Comink.Infrastructure --startup-project src/Comink.Api --output-dir Persistence/Migrations` | `backend/` |
+| Apply DB migrations | `dotnet ef database update --project src/Comink.Infrastructure --startup-project src/Comink.Api` | `backend/` |
+| Install web packages | `npm install` | `web/` |
+| Run web dev server | `npm run dev` | `web/` |
+| Build web production bundle | `npm run build` | `web/` |
 | Lint web | `npm run lint` | `web/` |
-| Phân tích / test mobile | `flutter analyze` / `flutter test` | `mobile/` (sau khi cài Flutter SDK) |
+| Analyze / test mobile | `flutter analyze` / `flutter test` | `mobile/` (after installing Flutter SDK) |
 
 ---
 
@@ -267,7 +272,7 @@ Các lệnh đã được kiểm chứng hoạt động trong repository:
 
 A task is done only when all of these hold:
 
-- [ ] It works according to `docs/COMINK_SPEC.md` and was tried with at least two accounts where relevant.
+- [ ] It works according to `docs/01_COMINK_SPEC.md` and was tried with at least two accounts where relevant.
 - [ ] Input validation and authorization are enforced on the backend.
 - [ ] Loading, empty and error states exist in the UI; all text goes through i18n.
 - [ ] Tests for important business logic exist and pass; lint passes.

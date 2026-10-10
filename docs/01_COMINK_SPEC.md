@@ -228,7 +228,3 @@ Toàn bộ các điểm mở đã được thống nhất và đưa vào thực 
 - **Dịch vụ gửi email:** Mailpit khi local dev (localhost:1025); Resend qua SMTP/API cho production.
 - **Push notification:** Firebase Cloud Messaging (FCM) cho cả Web và Mobile.
 - **Nhà cung cấp AI:** Sẵn sàng switch LLM trả phí trong tương lai; trừu tượng hóa qua `IAiProvider`.
-- **Phân chia công việc giữa 2 thành viên:**
-  - **Dev A:** Tài khoản & Bảo mật, Mạng xã hội, Ảnh/tệp, Quản trị.
-  - **Dev B:** Nhắn tin real-time, Gọi thoại/video trực tuyến, Thông báo/Push.
-  - **Chung:** Hạ tầng dev, CI/CD, tài liệu, tích hợp, kiểm thử, báo cáo.
