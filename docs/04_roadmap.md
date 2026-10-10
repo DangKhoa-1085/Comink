@@ -54,7 +54,7 @@ Mỗi giai đoạn gồm: **mục tiêu**, **phụ thuộc** và **checklist ho�
 **Mục tiêu:** hai người cùng chạy được dự án rỗng trên máy mình; mọi quyết định công nghệ đã chốt.
 **Phụ thuộc:** không.
 
-- [ ] Repo (monorepo hoặc nhiều repo) có `README` hướng dẫn chạy từ đầu
+- [ ] Repo monorepo có `README` hướng dẫn chạy từ đầu
 - [ ] `docker-compose` chạy được PostgreSQL, Redis, Mailpit, LiveKit (chế độ dev)
 - [ ] Khung backend theo Clean Architecture (Domain, Application, Infrastructure, Api) build được
 - [ ] Khung web (Vite + React + TS) và khung app (Flutter) chạy được "Hello"
@@ -245,5 +245,3 @@ Một tính năng chỉ được coi là **xong** khi thỏa tất cả:
 | GĐ 5 | M5 (phần quản trị cơ bản dùng sẵn cột trên `users` từ M0) |
 | GĐ 6 | M4 (thiết bị push, thông báo) |
 | GĐ 7 | Các migration N-x và nhóm AI cuối cùng |
-
-Tài liệu tiếp theo gợi ý: `05_api_and_realtime_contract.md` (endpoint REST, sự kiện SignalR, mã lỗi), nên hoàn thành **trước GĐ 2** để hai người cùng thống nhất cách giao tiếp giữa backend, web và app.

@@ -1001,4 +1001,3 @@ Không đổi tên cột/bảng trực tiếp trên dữ liệu thật mà khôn
 
 - `COMINK_SPEC.md`: tính năng và phạm vi
 - `02_tech_stack_decisions.md`: công nghệ, kiến trúc, nguyên tắc phát triển
-- `04_api_and_realtime_contract.md` _(sắp tới)_: endpoint REST, sự kiện SignalR, mã lỗi, dựa trên các bảng ở tài liệu này
