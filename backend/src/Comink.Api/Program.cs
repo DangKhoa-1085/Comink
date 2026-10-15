@@ -9,6 +9,20 @@ Log.Logger = new LoggerConfiguration()
 
 try
 {
+    // --- Nạp biến môi trường từ file .env ở thư mục gốc repository ---
+    // File .env là tuỳ chọn: thiếu file thì ứng dụng dùng appsettings/user-secrets.
+    // Biến môi trường đã có sẵn trong hệ điều hành KHÔNG bị ghi đè.
+    var envFilePath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
+    if (File.Exists(envFilePath))
+    {
+        DotNetEnv.Env.Load(envFilePath);
+        Log.Information("Đã nạp cấu hình từ {EnvFile}", envFilePath);
+    }
+    else
+    {
+        Log.Information("Không tìm thấy {EnvFile} — dùng appsettings và user-secrets", envFilePath);
+    }
+
     var builder = WebApplication.CreateBuilder(args);
 
     // --- Serilog ---

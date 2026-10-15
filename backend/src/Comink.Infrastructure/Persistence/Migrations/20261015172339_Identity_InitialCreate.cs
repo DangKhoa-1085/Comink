@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -7,11 +7,23 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Comink.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class _20261010_Identity_InitialCreate : Migration
+    public partial class Identity_InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // --- Extension và hàm hỗ trợ tìm kiếm (03_database_design.md, mục 5.1) ---
+            migrationBuilder.Sql("CREATE EXTENSION IF NOT EXISTS pg_trgm;");
+            migrationBuilder.Sql("CREATE EXTENSION IF NOT EXISTS unaccent;");
+
+            // unaccent() mặc định không IMMUTABLE nên không dùng được trong chỉ mục/cột sinh;
+            // hàm bọc IMMUTABLE này dùng cho tìm kiếm tiếng Việt không dấu.
+            migrationBuilder.Sql("""
+                CREATE OR REPLACE FUNCTION immutable_unaccent(text)
+                RETURNS text LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT AS
+                $$ SELECT public.unaccent('public.unaccent', $1) $$;
+                """);
+
             migrationBuilder.CreateTable(
                 name: "roles",
                 columns: table => new
@@ -37,8 +49,9 @@ namespace Comink.Infrastructure.Persistence.Migrations
                     locked_by = table.Column<Guid>(type: "uuid", nullable: true),
                     last_active_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    user_name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    normalized_user_name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    user_name = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: true),
+                    normalized_user_name = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: true),
                     email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     normalized_email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     email_confirmed = table.Column<bool>(type: "boolean", nullable: false),
@@ -212,6 +225,7 @@ namespace Comink.Infrastructure.Persistence.Migrations
                     who_can_call = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false, defaultValue: "Friends"),
                     show_online_status = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
                     show_read_receipts = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
+                    notification_settings = table.Column<string>(type: "jsonb", nullable: false, defaultValue: "{\"friendRequest\":true,\"friendAccepted\":true,\"newFollower\":true,\"postLiked\":true,\"postCommented\":true,\"commentReplied\":true,\"postShared\":true,\"mentioned\":true,\"missedCall\":true,\"addedToGroup\":true,\"adminAction\":true}"),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
@@ -331,6 +345,11 @@ namespace Comink.Infrastructure.Persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "users");
+
+            // --- Gỡ hàm và extension tìm kiếm (đối xứng với phần Up) ---
+            migrationBuilder.Sql("DROP FUNCTION IF EXISTS immutable_unaccent(text);");
+            migrationBuilder.Sql("DROP EXTENSION IF EXISTS unaccent;");
+            migrationBuilder.Sql("DROP EXTENSION IF EXISTS pg_trgm;");
         }
     }
 }

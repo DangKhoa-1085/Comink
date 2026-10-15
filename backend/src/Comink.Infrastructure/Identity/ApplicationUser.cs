@@ -23,6 +23,9 @@ public class ApplicationUser : IdentityUser<Guid>
     // Thời điểm tạo tài khoản
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
+    // Thời điểm cập nhật tài khoản gần nhất
+    public DateTimeOffset? UpdatedAt { get; set; }
+
     // Navigation properties
     public UserProfile? Profile { get; set; }
     public UserSettings? Settings { get; set; }
@@ -79,7 +82,19 @@ public class UserSettings
     public bool ShowOnlineStatus { get; set; } = true;
     public bool ShowReadReceipts { get; set; } = true;
 
+    // Cài đặt bật/tắt từng loại thông báo, lưu dạng jsonb.
+    // Mặc định bật hết (mục 3.1 của 03_database_design.md).
+    public string NotificationSettings { get; set; } = DefaultNotificationSettings;
+
     public DateTimeOffset? UpdatedAt { get; set; }
+
+    /// <summary>
+    /// Giá trị mặc định của <see cref="NotificationSettings"/>: bật tất cả loại thông báo.
+    /// </summary>
+    public const string DefaultNotificationSettings =
+        "{\"friendRequest\":true,\"friendAccepted\":true,\"newFollower\":true,\"postLiked\":true," +
+        "\"postCommented\":true,\"commentReplied\":true,\"postShared\":true,\"mentioned\":true," +
+        "\"missedCall\":true,\"addedToGroup\":true,\"adminAction\":true}";
 }
 
 /// <summary>

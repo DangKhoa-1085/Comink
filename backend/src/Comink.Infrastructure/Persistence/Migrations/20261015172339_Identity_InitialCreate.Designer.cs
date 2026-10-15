@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Comink.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20261010140738_20261010_Identity_InitialCreate")]
-    partial class _20261010_Identity_InitialCreate
+    [Migration("20261015172339_Identity_InitialCreate")]
+    partial class Identity_InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -92,8 +92,8 @@ namespace Comink.Infrastructure.Persistence.Migrations
                         .HasColumnName("normalized_email");
 
                     b.Property<string>("NormalizedUserName")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
                         .HasColumnName("normalized_user_name");
 
                     b.Property<string>("PasswordHash")
@@ -116,9 +116,13 @@ namespace Comink.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("two_factor_enabled");
 
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
                     b.Property<string>("UserName")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
                         .HasColumnName("user_name");
 
                     b.HasKey("Id")
@@ -295,6 +299,13 @@ namespace Comink.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(5)")
                         .HasDefaultValue("vi")
                         .HasColumnName("language");
+
+                    b.Property<string>("NotificationSettings")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValue("{\"friendRequest\":true,\"friendAccepted\":true,\"newFollower\":true,\"postLiked\":true,\"postCommented\":true,\"commentReplied\":true,\"postShared\":true,\"mentioned\":true,\"missedCall\":true,\"addedToGroup\":true,\"adminAction\":true}")
+                        .HasColumnName("notification_settings");
 
                     b.Property<string>("ProfileVisibility")
                         .IsRequired()

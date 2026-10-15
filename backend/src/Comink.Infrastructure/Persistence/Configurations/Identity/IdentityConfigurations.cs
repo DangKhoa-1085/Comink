@@ -26,6 +26,13 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
         builder.Property(u => u.LockedReason).HasMaxLength(500);
         builder.Property(u => u.CreatedAt).IsRequired();
 
+        // users.updated_at: cột chuẩn khi tài khoản được cập nhật (mục 1.2 tài liệu thiết kế)
+        builder.Property(u => u.UpdatedAt);
+
+        // user_name: tài liệu 03_database_design.md mục 3.1 quy định varchar(32)
+        builder.Property(u => u.UserName).HasMaxLength(32);
+        builder.Property(u => u.NormalizedUserName).HasMaxLength(32);
+
         // Quan hệ 1-1 với UserProfile
         builder.HasOne(u => u.Profile)
             .WithOne(p => p.User)
@@ -82,6 +89,12 @@ public class UserSettingsConfiguration : IEntityTypeConfiguration<UserSettings>
         builder.Property(s => s.WhoCanCall).HasMaxLength(16).IsRequired().HasDefaultValue("Friends");
         builder.Property(s => s.ShowOnlineStatus).IsRequired().HasDefaultValue(true);
         builder.Property(s => s.ShowReadReceipts).IsRequired().HasDefaultValue(true);
+
+        // Bật/tắt từng loại thông báo — jsonb, mặc định bật hết
+        builder.Property(s => s.NotificationSettings)
+            .HasColumnType("jsonb")
+            .IsRequired()
+            .HasDefaultValue(UserSettings.DefaultNotificationSettings);
     }
 }
 

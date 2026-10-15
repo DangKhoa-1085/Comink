@@ -1,0 +1,119 @@
+#!/bin/sh
+# ============================================================
+# Comink — hook pre-commit chặn bí mật lọt vào Git
+# ============================================================
+# Mục đích: chặn các commit vô tình chứa khoá API, mật khẩu, token, private key.
+# Đây là kết quả của việc rà soát rủi ro bảo mật ở Giai đoạn 0
+# (xem docs/tasks/phase0_remediation.md).
+#
+# CÀI ĐẶT (mỗi lập trình viên chạy một lần sau khi clone):
+#     git config core.hooksPath .githooks
+#     chmod +x .githooks/pre-commit      (macOS/Linux)
+#
+# Bỏ qua trong trường hợp khẩn cấp (chỉ khi đã tự kiểm tra bằng mắt):
+#     git commit --no-verify
+# ============================================================
+
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+cd "$ROOT" || exit 0
+
+# File được phép chứa chuỗi mẫu hoặc là tài liệu hướng dẫn
+SKIP_FILES='^\.env\.example$|\.md$|\.example$|^docs/'
+
+# File bị cấm commit hoàn toàn
+BLOCKED_FILES='(^|/)\.env$|(^|/)\.env\.local$|(^|/)\.env\.[^/]*\.local$|service-?[Aa]ccount.*\.json$|(^|/)appsettings\.(Local|.*\.local)\.json$|\.(jks|keystore)$'
+
+# Nhóm A — mẫu cấu hình: bỏ qua được nếu giá trị là placeholder rõ ràng
+PATTERNS_CONFIG='[Aa]pi[_-]?[Kk]ey[[:space:]]*=[[:space:]]*[A-Za-z0-9/+=_-]{20,}
+[Aa]pi[_-]?[Ss]ecret[[:space:]]*=[[:space:]]*[A-Za-z0-9/+=_-]{12,}
+[Pp]assword[[:space:]]*=[[:space:]]*[^;[:space:]"]{6,}
+"[Pp]assword"[[:space:]]*:[[:space:]]*"[^"]{6,}"
+"[Ss]ecret"[[:space:]]*:[[:space:]]*"[^"]{12,}"'
+
+# Nhóm B — định dạng khoá đặc trưng: KHÔNG được bỏ qua chỉ vì có chữ "example",
+# vì chuỗi khoá thật có thể chứa chính chữ đó (ví dụ AKIA...EXAMPLE).
+PATTERNS_STRICT='BEGIN [A-Z ]*PRIVATE KEY
+AKIA[0-9A-Z]{16}
+sk-[A-Za-z0-9_-]{20,}
+AIza[0-9A-Za-z_-]{35}
+xox[baprs]-[0-9A-Za-z-]{10,}
+gh[pousr]_[A-Za-z0-9]{36,}'
+
+# Giá trị placeholder được phép
+ALLOWLIST_CONFIG='change_me|your_|placeholder|dummy|CHANGE_ME|YOUR_KEY_HERE|<[^>]*>|xxxx'
+
+# Chuỗi dev cố định đã biết là vô hại
+ALLOWLIST_DEV='devpassword|devredispass|devkey|devsecret|dev_only_|firebase-adminsdk-xxxx|Admin@123456!|not-for-production'
+
+STATUS=0
+TMP=$(mktemp) || TMP="/tmp/comink-precommit-$$"
+trap 'rm -f "$TMP"' EXIT
+
+# ------------------------------------------------------------
+# 1. Chặn các file không bao giờ được commit
+# ------------------------------------------------------------
+for f in $(git diff --cached --name-only --diff-filter=ACMR); do
+  if printf '%s' "$f" | grep -Eq "$BLOCKED_FILES"; then
+    echo "[pre-commit] CHẶN: file bị cấm commit: $f" >&2
+    STATUS=1
+  fi
+done
+
+# ------------------------------------------------------------
+# 2. Quét nội dung các dòng mới thêm
+# ------------------------------------------------------------
+for f in $(git diff --cached --name-only --diff-filter=ACMR); do
+  if printf '%s' "$f" | grep -Eq "$SKIP_FILES"; then
+    continue
+  fi
+
+  # Chỉ lấy dòng được THÊM vào, bỏ phần header và dòng bị xoá
+  git diff --cached -U0 --no-color -- "$f" 2>/dev/null \
+    | grep -E '^\+' | grep -vE '^\+\+\+' > "$TMP" || true
+  [ -s "$TMP" ] || continue
+
+  # Dùng here-document để vòng lặp chạy trong shell hiện tại
+  # (nếu dùng pipe, `exit 1` chỉ thoát subshell và mất mã thoát).
+  # --- Nhóm A: có allowlist placeholder ---
+  while IFS= read -r pat; do
+    [ -z "$pat" ] && continue
+    hits=$(grep -nE -- "$pat" "$TMP" 2>/dev/null | grep -viE -- "$ALLOWLIST_DEV" | grep -viE -- "$ALLOWLIST_CONFIG" || true)
+    if [ -n "$hits" ]; then
+      echo "" >&2
+      echo "[pre-commit] CẢNH BÁO: $f có thể chứa bí mật (mẫu: $pat)" >&2
+      printf '%s\n' "$hits" | sed 's/^/    /' >&2
+      echo "    -> Nếu là giá trị mẫu thật, thay bằng placeholder hoặc đặt trong user-secrets/.env" >&2
+      echo "    -> Nếu chắc chắn không phải bí mật: git commit --no-verify" >&2
+      STATUS=1
+    fi
+  done <<PATTERNS_A
+$PATTERNS_CONFIG
+PATTERNS_A
+
+  # --- Nhóm B: chỉ allowlist chuỗi dev ---
+  while IFS= read -r pat; do
+    [ -z "$pat" ] && continue
+    hits=$(grep -nE -- "$pat" "$TMP" 2>/dev/null | grep -viE -- "$ALLOWLIST_DEV" || true)
+    if [ -n "$hits" ]; then
+      echo "" >&2
+      echo "[pre-commit] CẢNH BÁO: $f có thể chứa bí mật (mẫu: $pat)" >&2
+      printf '%s\n' "$hits" | sed 's/^/    /' >&2
+      echo "    -> Nếu là giá trị mẫu thật, thay bằng placeholder hoặc đặt trong user-secrets/.env" >&2
+      echo "    -> Nếu chắc chắn không phải bí mật: git commit --no-verify" >&2
+      STATUS=1
+    fi
+  done <<PATTERNS_B
+$PATTERNS_STRICT
+PATTERNS_B
+
+  [ "$STATUS" -ne 0 ] && break
+done
+
+if [ "$STATUS" -ne 0 ]; then
+  echo "" >&2
+  echo "[pre-commit] Commit bị huỷ. Xem hướng dẫn ở trên." >&2
+  exit 1
+fi
+
+echo "[pre-commit] OK: không phát hiện bí mật."
+exit 0
