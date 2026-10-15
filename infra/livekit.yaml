@@ -1,7 +1,8 @@
 # LiveKit Server — Cấu hình môi trường phát triển
 # Tham khảo: https://docs.livekit.io/home/self-hosting/deployment/
 #
-# Lưu ý: api_key và api_secret dùng giá trị dev cố định.
+# Lưu ý: api_key và api_secret là giá trị dev, dùng chung với backend
+# (xem backend/src/Comink.Api/appsettings.Development.json mục LiveKit).
 # KHÔNG dùng cấu hình này cho production.
 
 port: 7880
@@ -12,24 +13,36 @@ rtc:
   use_external_ip: false
 
 keys:
-  # devkey: devsecret — chỉ dùng cho môi trường phát triển
-  devkey: devsecret
+  # Khóa dev — LiveKit yêu cầu api_secret dài tối thiểu 32 ký tự; nếu ngắn hơn
+  # thì server thoát ngay khi khởi động (ExitCode=1).
+  devkey: SyIgXn46XZgezLiVzrNjWBbIdwBgIkGSZuSt4k0AlRBvWkoM
 
 logging:
   level: info
   json: false
 
-# TURN tích hợp sẵn (cho phép kết nối qua NAT khi dev)
-turn:
-  enabled: true
-  domain: localhost
-  tls_port: 5349
-  udp_port: 3478
-  external_tls: false
+# TURN tích hợp sẵn: CHƯA BẬT khi dev.
+#
+# Lý do:
+#   1. TURN cần một domain hợp lệ; giá trị `localhost` bị LiveKit từ chối
+#      ("TURN domain is not correct") làm container thoát ngay.
+#   2. Cổng TURN mặc định (UDP 3478 / TLS 5349) chưa được publish trong
+#      infra/docker-compose.yml nên dù bật cũng không truy cập được từ máy host.
+#   3. Dev trên máy cá nhân không cần TURN (không có NAT giữa hai máy).
+#
+# Việc bật TURN đúng cách thuộc Giai đoạn 4 (Gọi trực tuyến CB) — xem
+# docs/04_roadmap.md: cần domain thật hoặc IP LAN, publish cổng UDP/TCP
+# tương ứng trong docker-compose, và dùng secret dài >= 32 ký tự.
+# turn:
+#   enabled: true
+#   domain: <domain-that-hoac-ip-lan>
+#   tls_port: 5349
+#   udp_port: 3478
+#   external_tls: false
 
 # Webhook để nhận sự kiện (room kết thúc, người rời, v.v.)
 # Sẽ cấu hình sau khi backend có endpoint webhook
 # webhook:
 #   urls:
-#     - http://host.docker.internal:5001/api/webhooks/livekit
+#     - http://host.docker.internal:5117/api/webhooks/livekit
 #   api_key: devkey

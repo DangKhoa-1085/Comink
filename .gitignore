@@ -1,10 +1,23 @@
 # ========================
 # Secrets — KHÔNG BAO GIỜ commit
 # ========================
+# .env (đã bị bỏ qua) chứa cấu hình thật; .env.example là file mẫu được commit.
 .env
 .env.local
 .env.*.local
 *.user.json
+
+# Cấu hình ghi đè cục bộ cho từng máy (chứa bí mật, không commit)
+appsettings.*.local.json
+appsettings.Local.json
+
+# Khoá bí mật thô (ví dụ Firebase service account JSON)
+*.pem
+*.key
+*.p12
+*.pfx
+*serviceAccount*.json
+*service-account*.json
 
 # ========================
 # .NET / ASP.NET Core
