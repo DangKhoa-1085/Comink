@@ -9,8 +9,8 @@ namespace Comink.Api.IntegrationTests;
 /// <summary>Khởi động một container PostgreSQL 17 dùng chung cho cả lớp test.</summary>
 public class PostgresFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
-        .WithImage("postgres:17-alpine")
+    // Dùng constructor có tham số image: constructor không tham số đã bị đánh dấu obsolete.
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:17-alpine")
         .Build();
 
     public string ConnectionString => _container.GetConnectionString();
