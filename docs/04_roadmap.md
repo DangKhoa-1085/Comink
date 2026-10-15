@@ -63,6 +63,9 @@ Mỗi giai đoạn gồm: **mục tiêu**, **phụ thuộc** và **checklist ho�
 - [x] Đã chốt các mục ❓ còn lại ở `02_tech_stack_decisions.md` (nhà cung cấp gọi, nơi lưu tệp, LLM mặc định, thư viện UI)
 - [x] Đã rà soát và chốt `03_database_design.md`; có migration M0 chạy thành công
 
+> **Trạng thái (cập nhật 2026-10-15):** cả 8 mục đã được kiểm chứng bằng cách chạy thật trên máy phát triển: backend build 7/7 project, `flutter analyze` sạch, `npm run build` thành công, `docker compose` chạy 4/4 service, migration M0 đã áp lên PostgreSQL 17 và seed role/tài khoản admin hoạt động, hook chặn bí mật đã bật. Chi tiết và các mục chuyển tiếp ở `docs/tasks/phase0_remediation.md`.
+> *Lưu ý:* mục CI mới chỉ được xác nhận là **đã có workflow** (`build + test + lint`); chưa có lần chạy thật trên GitHub Actions vì chưa mở Pull Request nào sau khi Phase 0 hoàn tất.
+
 ### Giai đoạn 1: Nền tảng và Tài khoản (Bảo mật CB)
 
 **Mục tiêu:** người dùng đăng ký, đăng nhập và có hồ sơ; hệ thống phân quyền hoạt động.
