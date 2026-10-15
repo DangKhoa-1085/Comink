@@ -327,7 +327,7 @@ Lớp `ApplicationUser : IdentityUser<Guid>`, đổi tên bảng Identity sang `
 |---|---|---|
 | `id` | uuid | PK |
 | `user_name` / `normalized_user_name` | varchar(32) | NN, UQ trên cột chuẩn hóa. Tên đăng nhập/handle hiển thị dạng `@ten` |
-| `email` / `normalized_email` | varchar(256) | NN, UQ trên cột chuẩn hóa |
+| `email` / `normalized_email` | varchar(256) | NN, UQ trên cột chuẩn hóa. **Lưu ý:** Identity chỉ tạo `EmailIndex` không unique — chỉ mục unique phải khai báo tường minh trong `ApplicationUserConfiguration` (migration `20261015_Identity_UniqueEmailIndex`) |
 | `email_confirmed` | bool | NN, mặc định `false` (xác minh email **[NC]**) |
 | `password_hash` | text | Do Identity băm |
 | `security_stamp`, `concurrency_stamp` | text | Cột chuẩn của Identity |

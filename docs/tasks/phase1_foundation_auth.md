@@ -3,7 +3,7 @@
 > Tài liệu 05, phân rã từ `docs/04_roadmap.md` (Giai đoạn 1) theo yêu cầu ở `AGENTS.md` mục 7.3.
 > **Mục tiêu:** người dùng đăng ký, đăng nhập và có hồ sơ; hệ thống phân quyền hoạt động.
 > **Phụ thuộc:** Giai đoạn 0 — **đã hoàn tất** (xem `docs/tasks/phase0_remediation.md`).
-> **Trạng thái:** chưa bắt đầu.
+> **Trạng thái:** **backend đã xong** (đã kiểm chứng bằng 29 test + 39 kiểm tra end-to-end + 4 kiểm tra SignalR); **web chưa bắt đầu**.
 > **Ước lượng:** tuần 1–2 theo roadmap.
 
 ---
@@ -51,34 +51,34 @@ Theo `docs/02_tech_stack_decisions.md` mục 4.1 ("hợp đồng API trước, c
 
 ### 3.1. Backend — Domain
 
-- [ ] Thực thể/giá trị cho tài khoản đã có `ApplicationUser` (Infrastructure, do Identity); bổ sung phần Domain cần thiết (ví dụ quy tắc trạng thái tài khoản) nếu cần
-- [ ] Enum `AccountStatus` dùng chung (hiện là `string` + `CHECK` trong DB) — quyết định có tạo enum C# hay giữ hằng số
+- [x] Thực thể/giá trị cho tài khoản đã có `ApplicationUser` (Infrastructure, do Identity); bổ sung phần Domain cần thiết (ví dụ quy tắc trạng thái tài khoản) nếu cần
+- [x] Enum `AccountStatus` dùng chung (hiện là `string` + `CHECK` trong DB) — quyết định có tạo enum C# hay giữ hằng số
 
 ### 3.2. Backend — Application
 
-- [ ] `Identity/` — use case đăng ký (`RegisterCommand` + validator)
-- [ ] `Identity/` — use case đăng nhập (`LoginCommand`), phát access token + refresh token
-- [ ] `Identity/` — use case làm mới token (`RefreshTokenCommand`), có phát hiện dùng lại token cũ và thu hồi cả `family_id`
-- [ ] `Identity/` — use case đăng xuất (thu hồi refresh token)
-- [ ] `Identity/` — `ITokenService` (sinh access token JWT) khai báo ở Application
-- [ ] `Social/` — use case lấy và sửa hồ sơ cá nhân
-- [ ] `Common/` — quy ước mã lỗi và exception nghiệp vụ (dùng chung ProblemDetails)
-- [ ] DTO cho mọi request/response (không trả entity — `AGENTS.md` mục 8.1)
+- [x] `Identity/` — use case đăng ký (`RegisterCommand` + validator)
+- [x] `Identity/` — use case đăng nhập (`LoginCommand`), phát access token + refresh token
+- [x] `Identity/` — use case làm mới token (`RefreshTokenCommand`), có phát hiện dùng lại token cũ và thu hồi cả `family_id`
+- [x] `Identity/` — use case đăng xuất (thu hồi refresh token)
+- [x] `Identity/` — `ITokenService` (sinh access token JWT) khai báo ở Application
+- [x] `Social/` — use case lấy và sửa hồ sơ cá nhân
+- [x] `Common/` — quy ước mã lỗi và exception nghiệp vụ (dùng chung ProblemDetails)
+- [x] DTO cho mọi request/response (không trả entity — `AGENTS.md` mục 8.1)
 
 ### 3.3. Backend — Infrastructure
 
-- [ ] `JwtTokenService` sinh access token từ `Jwt:*` trong cấu hình
-- [ ] Lưu refresh token **dạng băm** vào `refresh_tokens` (đã có schema từ M0)
-- [ ] Cấu hình `AddAuthentication` + `AddJwtBearer` (đọc `Jwt:Issuer`, `Jwt:Audience`, `Jwt:Secret`)
-- [ ] Chính sách phân quyền: policy cho role `Admin`
-- [ ] Kiểm tra `account_status`: tài khoản `Locked` không đăng nhập được; thu hồi refresh token khi bị khóa
+- [x] `JwtTokenService` sinh access token từ `Jwt:*` trong cấu hình
+- [x] Lưu refresh token **dạng băm** vào `refresh_tokens` (đã có schema từ M0)
+- [x] Cấu hình `AddAuthentication` + `AddJwtBearer` (đọc `Jwt:Issuer`, `Jwt:Audience`, `Jwt:Secret`)
+- [x] Chính sách phân quyền: policy cho role `Admin`
+- [x] Kiểm tra `account_status`: tài khoản `Locked` không đăng nhập được; thu hồi refresh token khi bị khóa
 
 ### 3.4. Backend — Api
 
-- [ ] Nhóm endpoint Minimal API cho `auth` và `users/me` (vertical slice)
-- [ ] Middleware ProblemDetails trả mã lỗi thống nhất cho exception nghiệp vụ và lỗi validate
-- [ ] Hub SignalR đầu tiên, xác thực bằng access token qua query string `access_token`
-- [ ] `Jwt__Secret` phải là chuỗi ngẫu nhiên ≥ 32 ký tự (hiện `.env` còn giá trị tạm — xem `docs/tasks/phase0_remediation.md` mục 4)
+- [x] Nhóm endpoint Minimal API cho `auth` và `users/me` (vertical slice)
+- [x] Middleware ProblemDetails trả mã lỗi thống nhất cho exception nghiệp vụ và lỗi validate
+- [x] Hub SignalR đầu tiên, xác thực bằng access token qua query string `access_token`
+- [x] `Jwt__Secret` phải là chuỗi ngẫu nhiên ≥ 32 ký tự (hiện `.env` còn giá trị tạm — xem `docs/tasks/phase0_remediation.md` mục 4)
 
 ### 3.5. Web
 
@@ -93,36 +93,36 @@ Theo `docs/02_tech_stack_decisions.md` mục 4.1 ("hợp đồng API trước, c
 
 ### 3.6. Cơ sở dữ liệu
 
-- [ ] Không cần migration mới: `users`, `user_profiles`, `user_settings`, `refresh_tokens` đã có từ M0
-- [ ] Kiểm tra lại các chỉ mục phục vụ đăng nhập: `users.normalized_email`, `users.normalized_user_name`, `refresh_tokens.token_hash` (đã có)
-- [ ] Xác nhận có cần bổ sung cột/bảng nào không (nếu có → cập nhật `docs/03_database_design.md` cùng lúc)
+- [x] Không cần migration mới: `users`, `user_profiles`, `user_settings`, `refresh_tokens` đã có từ M0
+- [x] Kiểm tra lại các chỉ mục phục vụ đăng nhập: `users.normalized_email`, `users.normalized_user_name`, `refresh_tokens.token_hash` (đã có)
+- [x] Xác nhận có cần bổ sung cột/bảng nào không (nếu có → cập nhật `docs/03_database_design.md` cùng lúc)
 
 ### 3.7. Kiểm thử
 
-- [ ] Unit test: đăng nhập sai mật khẩu, tài khoản bị khóa, refresh token hết hạn, **phát hiện dùng lại refresh token → thu hồi cả họ**
-- [ ] Unit test: phân quyền (người thường gọi endpoint admin → 403)
-- [ ] Integration test (Testcontainers PostgreSQL + Redis): luồng đăng ký → đăng nhập → gọi endpoint cần xác thực
-- [ ] Thay thế 3 test `UnitTest1` placeholder hiện có
-- [ ] Thử thủ công bằng **ít nhất 2 tài khoản** (một `User`, một `Admin`) theo `AGENTS.md` mục 16
+- [x] Unit test: đăng nhập sai mật khẩu, tài khoản bị khóa, refresh token hết hạn, **phát hiện dùng lại refresh token → thu hồi cả họ**
+- [x] Unit test: phân quyền (người thường gọi endpoint admin → 403)
+- [x] Integration test (Testcontainers PostgreSQL + Redis): luồng đăng ký → đăng nhập → gọi endpoint cần xác thực
+- [x] Thay thế 3 test `UnitTest1` placeholder hiện có
+- [x] Thử thủ công bằng **ít nhất 2 tài khoản** (một `User`, một `Admin`) theo `AGENTS.md` mục 16
 
 ### 3.8. Tài liệu
 
-- [ ] Cập nhật `docs/03_database_design.md` nếu schema đổi
-- [ ] Ghi danh sách endpoint + mã lỗi + sự kiện SignalR vào tài liệu hợp đồng API (chưa có file — cần tạo, ví dụ `docs/05_api_contract.md`)
-- [ ] Cập nhật `README.md` nếu thêm bước chạy mới
+- [x] Cập nhật `docs/03_database_design.md` nếu schema đổi
+- [x] Ghi danh sách endpoint + mã lỗi + sự kiện SignalR vào tài liệu hợp đồng API (chưa có file — cần tạo, ví dụ `docs/05_api_contract.md`)
+- [x] Cập nhật `README.md` nếu thêm bước chạy mới
 
 ---
 
 ## 4. Tiêu chí hoàn thành (lấy từ `docs/04_roadmap.md` Giai đoạn 1)
 
-- [ ] Đăng ký, đăng nhập, đăng xuất, làm mới token hoạt động trên web
-- [ ] Phân quyền hai vai trò `User` và `Admin`; endpoint chỉ-admin bị chặn với người thường
-- [ ] Kiểm tra dữ liệu đầu vào ở backend cho mọi endpoint hiện có (trả mã lỗi thống nhất)
-- [ ] Hồ sơ cá nhân: xem và sửa tên hiển thị, tiểu sử
-- [ ] Có tài khoản admin đầu tiên (seed từ cấu hình) — **đã có sẵn từ GĐ 0**, cần kiểm chứng lại
-- [ ] Khung đa ngôn ngữ Việt/Anh chạy trên web (mọi chuỗi hiển thị đi qua i18n) — khung có từ GĐ 0, cần bổ sung chuỗi mới
-- [ ] SignalR kết nối được và xác thực bằng token (chưa cần nghiệp vụ)
-- [ ] Có test cho đăng nhập và phân quyền; bí mật/khóa API không nằm trong Git
+- [ ] Đăng ký, đăng nhập, đăng xuất, làm mới token hoạt động trên web — *backend đã xong và đã kiểm chứng qua HTTP; **web chưa làm***
+- [x] Phân quyền hai vai trò `User` và `Admin`; endpoint chỉ-admin bị chặn với người thường *(đã kiểm chứng: người thường nhận 403)*
+- [x] Kiểm tra dữ liệu đầu vào ở backend cho mọi endpoint hiện có (trả mã lỗi thống nhất)
+- [x] Hồ sơ cá nhân: xem và sửa tên hiển thị, tiểu sử *(API đã xong; giao diện web chưa có)*
+- [x] Có tài khoản admin đầu tiên (seed từ cấu hình) — đã kiểm chứng đăng nhập được và có role `Admin`
+- [ ] Khung đa ngôn ngữ Việt/Anh chạy trên web (mọi chuỗi hiển thị đi qua i18n) — *khung có từ GĐ 0; **các chuỗi mới của GĐ 1 chưa có***
+- [x] SignalR kết nối được và xác thực bằng token *(đã kiểm chứng: không token bị từ chối, token hợp lệ kết nối được, token sai bị từ chối)*
+- [x] Có test cho đăng nhập và phân quyền; bí mật/khóa API không nằm trong Git *(29 test pass; đã quét lại lịch sử Git)*
 
 Cộng thêm **Definition of Done** chung ở `docs/04_roadmap.md` mục 4 và `AGENTS.md` mục 16.
 
