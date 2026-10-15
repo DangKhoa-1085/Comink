@@ -35,15 +35,36 @@ cp .env.example .env
 # Sửa các giá trị placeholder trong .env theo môi trường của bạn
 ```
 
-Backend dùng `dotnet user-secrets` để bảo vệ bí mật khi phát triển:
+File `.env` phục vụ hai cơ chế:
+
+- **Docker Compose** đọc biến hạ tầng (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `REDIS_PASSWORD`…) để khởi động container.
+- **Backend** nạp `.env` khi khởi động (thư viện `DotNetEnv`, gọi trong `Program.cs`) và đọc các khoá theo quy ước .NET: `ConnectionStrings__Postgres` tương ứng `ConnectionStrings:Postgres`.
+
+Thứ tự ưu tiên (cao hơn thắng):
+**biến môi trường hệ điều hành → user-secrets → file `.env` → `appsettings.Development.json`**
+
+> Vì `appsettings.Development.json` thắng `.env`, không đặt bí mật trong file đó. Bí mật thuộc về `.env` (đã bị `.gitignore`) hoặc `dotnet user-secrets`.
+
+Bí mật khi phát triển nên đặt bằng `dotnet user-secrets` (không bao giờ vào Git):
 
 ```bash
-cd backend
-dotnet user-secrets set "ConnectionStrings:Postgres" "Host=localhost;Port=5432;Database=comink;Username=comink;Password=<mật-khẩu>"
+cd backend/src/Comink.Api
+dotnet user-secrets set "AdminSeed:Password" "<mật-khẩu-admin>"
 dotnet user-secrets set "Jwt:Secret" "<chuỗi-ngẫu-nhiên-ít-nhất-32-ký-tự>"
-dotnet user-secrets set "LiveKit:ApiKey" "devkey"
-dotnet user-secrets set "LiveKit:ApiSecret" "devsecret"
 ```
+
+LiveKit yêu cầu API secret **dài tối thiểu 32 ký tự**; giá trị dev phải khớp ở ba nơi: `infra/livekit.yaml`, `.env` và `appsettings.Development.json`.
+
+### 2b. Cài hook chặn bí mật (làm một lần)
+
+Repository có hook `pre-commit` chặn commit chứa khoá API, mật khẩu, private key. Bật bằng:
+
+```bash
+git config core.hooksPath .githooks
+chmod +x .githooks/pre-commit     # macOS/Linux
+```
+
+Hook chặn cả các file như `.env`, `serviceAccount*.json`, `*.pem`. Bỏ qua khi thật cần: `git commit --no-verify`.
 
 ### 3. Khởi động hạ tầng (PostgreSQL, Redis, Mailpit, LiveKit)
 
@@ -76,7 +97,8 @@ dotnet ef database update --project ../Comink.Infrastructure
 ```bash
 cd backend/src/Comink.Api
 dotnet run
-# Swagger UI: https://localhost:5001/swagger
+# OpenAPI: http://localhost:5117/openapi/v1.json
+# Health check: http://localhost:5117/health
 ```
 
 ### 6. Chạy web
@@ -108,7 +130,7 @@ comink/
 │   ├── 03_database_design.md
 │   └── 04_roadmap.md
 ├── backend/                # ASP.NET Core — Clean Architecture
-│   ├── Comink.sln
+│   ├── Comink.slnx
 │   ├── src/
 │   │   ├── Comink.Domain/
 │   │   ├── Comink.Application/

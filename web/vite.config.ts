@@ -17,13 +17,19 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      // Backend chạy ở http://localhost:5117
+      // (xem backend/src/Comink.Api/Properties/launchSettings.json)
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'http://localhost:5117',
         changeOrigin: true,
       },
       '/hub': {
-        target: 'http://localhost:5000',
+        target: 'http://localhost:5117',
         ws: true,
+      },
+      '/health': {
+        target: 'http://localhost:5117',
+        changeOrigin: true,
       },
     },
   },
