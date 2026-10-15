@@ -4,6 +4,7 @@ using Comink.Application.Identity.Abstractions;
 using Comink.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Comink.Infrastructure.Identity;
 
@@ -58,7 +59,7 @@ public class IdentityService : IIdentityService
             }
         };
 
-        var result = await _userManager.CreateAsync(user, password);
+        var result = await CreateUserSafelyAsync(user, password);
         if (!result.Succeeded)
         {
             return MapIdentityErrors(result);
@@ -74,6 +75,54 @@ public class IdentityService : IIdentityService
         }
 
         return IdentityOperationResult.Ok();
+    }
+
+    /// <summary>
+    /// Tạo người dùng và bắt lỗi vi phạm ràng buộc duy nhất ở tầng database.
+    /// Cần thiết vì khi hai request đăng ký cùng lúc, kiểm tra của Identity có thể
+    /// không thấy nhau, và PostgreSQL sẽ ném lỗi 23505 (unique violation).
+    /// </summary>
+    private async Task<IdentityResult> CreateUserSafelyAsync(ApplicationUser user, string password)
+    {
+        try
+        {
+            return await _userManager.CreateAsync(user, password);
+        }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex, "EmailIndex"))
+        {
+            return IdentityResult.Failed(new IdentityError
+            {
+                Code = nameof(IdentityFailureCode.DuplicateEmail),
+                Description = "Email đã được sử dụng."
+            });
+        }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex, "UserNameIndex"))
+        {
+            return IdentityResult.Failed(new IdentityError
+            {
+                Code = nameof(IdentityFailureCode.DuplicateUserName),
+                Description = "Tên đăng nhập đã được sử dụng."
+            });
+        }
+    }
+
+    /// <summary>
+    /// Kiểm tra chuỗi exception có phải lỗi vi phạm ràng buộc duy nhất của PostgreSQL
+    /// trên chỉ mục <paramref name="indexName"/> hay không.
+    /// </summary>
+    private static bool IsUniqueViolation(Exception exception, string indexName)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is PostgresException postgres &&
+                postgres.SqlState == PostgresErrorCodes.UniqueViolation &&
+                postgres.ConstraintName == indexName)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <inheritdoc />

@@ -34,6 +34,13 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
         builder.Property(u => u.UserName).HasMaxLength(32);
         builder.Property(u => u.NormalizedUserName).HasMaxLength(32);
 
+        // email là duy nhất (mục 3.1: "NN, UQ trên cột chuẩn hóa").
+        // Chỉ mục EmailIndex do Identity tạo KHÔNG unique, nên phải khai báo rõ ở đây —
+        // nếu thiếu, hai tài khoản có thể trùng email và đăng nhập sẽ lỗi khi tìm theo email.
+        builder.Property(u => u.Email).HasMaxLength(256);
+        builder.Property(u => u.NormalizedEmail).HasMaxLength(256);
+        builder.HasIndex(u => u.NormalizedEmail).IsUnique();
+
         // Quan hệ 1-1 với UserProfile
         builder.HasOne(u => u.Profile)
             .WithOne(p => p.User)

@@ -119,6 +119,17 @@ public static class DependencyInjection
                 };
             });
 
+        // AddIdentity ở trên đăng ký cookie scheme và đặt nó làm mặc định.
+        // API này xác thực bằng JWT nên phải ghi đè cả ba scheme mặc định;
+        // nếu không, request thiếu token sẽ bị chuyển hướng 302 tới /Account/Login
+        // thay vì trả 401/403 theo hợp đồng (docs/05_api_contract.md mục 5).
+        services.AddAuthentication(options =>
+        {
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultForbidScheme = JwtBearerDefaults.AuthenticationScheme;
+        });
+
         // --- Phân quyền theo role ---
         services.AddAuthorizationBuilder()
             .AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"))
