@@ -1,4 +1,5 @@
 // ApplicationUser — mở rộng ASP.NET Core Identity
+using Comink.Infrastructure.Persistence.Entities;
 using Microsoft.AspNetCore.Identity;
 
 namespace Comink.Infrastructure.Identity;
@@ -95,33 +96,4 @@ public class UserSettings
         "{\"friendRequest\":true,\"friendAccepted\":true,\"newFollower\":true,\"postLiked\":true," +
         "\"postCommented\":true,\"commentReplied\":true,\"postShared\":true,\"mentioned\":true," +
         "\"missedCall\":true,\"addedToGroup\":true,\"adminAction\":true}";
-}
-
-/// <summary>
-/// Refresh token cho phiên đăng nhập.
-/// Ánh xạ sang bảng `refresh_tokens`.
-/// </summary>
-public class RefreshToken
-{
-    public Guid Id { get; set; } = Guid.CreateVersion7();
-    public Guid UserId { get; set; }
-    public ApplicationUser User { get; set; } = null!;
-
-    // Chỉ lưu băm, không lưu token gốc
-    public string TokenHash { get; set; } = string.Empty;
-
-    // Mọi token xoay vòng từ cùng một lần đăng nhập chung một family_id
-    public Guid FamilyId { get; set; }
-
-    // Thông tin thiết bị (cho quản lý phiên [NC])
-    public string? DeviceName { get; set; }
-    public string? IpAddress { get; set; }
-    public string? UserAgent { get; set; }
-
-    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-    public DateTimeOffset ExpiresAt { get; set; }
-    public DateTimeOffset? RevokedAt { get; set; }
-    public Guid? ReplacedByTokenId { get; set; }
-
-    public bool IsActive => RevokedAt == null && DateTimeOffset.UtcNow < ExpiresAt;
 }

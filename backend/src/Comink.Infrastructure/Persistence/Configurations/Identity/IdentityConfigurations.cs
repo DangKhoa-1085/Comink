@@ -1,5 +1,6 @@
 // Cấu hình EF Core cho ApplicationUser và các bảng Identity mở rộng
 using Comink.Infrastructure.Identity;
+using Comink.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

@@ -1,5 +1,6 @@
 // ApplicationDbContext — EF Core DbContext chính
 using Comink.Infrastructure.Identity;
+using Comink.Infrastructure.Persistence.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;

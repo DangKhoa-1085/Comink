@@ -1,5 +1,9 @@
 // Program.cs — Entry point của Comink.Api
+using Comink.Api.Endpoints;
+using Comink.Api.Hubs;
+using Comink.Application.Identity.Validators;
 using Comink.Infrastructure;
+using FluentValidation;
 using Serilog;
 
 // --- Cấu hình Serilog sớm để bắt lỗi khởi động ---
@@ -48,8 +52,11 @@ try
             .WriteTo.Console();
     });
 
-    // --- Infrastructure (DbContext, Identity, Redis, v.v.) ---
+    // --- Infrastructure (DbContext, Identity, JWT, Redis, v.v.) ---
     builder.Services.AddInfrastructure(builder.Configuration);
+
+    // --- Validator của FluentValidation (đặt ở tầng Application) ---
+    builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>();
 
     // --- OpenAPI / Swagger ---
     builder.Services.AddOpenApi();
@@ -95,6 +102,14 @@ try
     app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTimeOffset.UtcNow }))
        .WithName("HealthCheck")
        .WithTags("System");
+
+    // --- Endpoint nghiệp vụ (vertical slice theo nhóm tính năng) ---
+    app.MapAuthEndpoints();
+    app.MapUserEndpoints();
+    app.MapAdminEndpoints();
+
+    // --- Hub SignalR (Giai đoạn 1 chỉ cần xác thực được bằng token) ---
+    app.MapHub<ChatHub>("/hub/chat");
 
     app.Run();
 }
