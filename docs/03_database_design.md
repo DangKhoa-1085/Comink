@@ -1,7 +1,8 @@
 # Comink — Thiết kế cơ sở dữ liệu (PostgreSQL)
 
 > Tài liệu 03, dựa trên `COMINK_SPEC.md` và `02_tech_stack_decisions.md`. Mô tả toàn bộ schema PostgreSQL, quan hệ, enum, chỉ mục và cách quản lý migration.
-> Trạng thái: **Đã chốt (2026-10-10)**; migration M0 (Identity: `20261010_Identity_InitialCreate`) đã được sinh thành công trong `Persistence/Migrations/`.
+> Trạng thái: **Đã chốt (2026-10-10)**; migration M0 (Identity: `20261015_Identity_InitialCreate`) đã được sinh trong `Persistence/Migrations/`, bao gồm extension `pg_trgm`, `unaccent` và hàm `immutable_unaccent` (mục 5.1), và **đã áp thành công lên PostgreSQL 17** khi kiểm chứng Giai đoạn 0.
+> Migration M0 đã được sinh lại ngày 2026-10-15 để khớp tài liệu (`user_name` varchar(32), `users.updated_at`, `user_settings.notification_settings`) — xem `docs/tasks/phase0_remediation.md`.
 
 ---
 
@@ -339,7 +340,9 @@ Lớp `ApplicationUser : IdentityUser<Guid>`, đổi tên bảng Identity sang `
 
 Các bảng Identity chuẩn khác: `roles`, `user_roles`, `user_claims`, `role_claims`, `user_logins`, `user_tokens` (giữ nguyên cấu trúc, chỉ đổi tên/khóa). Token xác minh email và đặt lại mật khẩu do Identity tạo dạng **không trạng thái** (data protection token), nên **không cần bảng riêng**.
 
-Dữ liệu khởi tạo (seed): hai role `User`, `Admin`; tài khoản admin đầu tiên lấy từ biến môi trường.
+Dữ liệu khởi tạo (seed): hai role `User`, `Admin`; tài khoản admin đầu tiên lấy từ cấu hình `AdminSeed` (email, mật khẩu, tên hiển thị).
+
+> **Cách seed:** role và tài khoản admin được seed **lúc ứng dụng khởi động** trong `Comink.Infrastructure/MigrationExtensions.cs` (chỉ môi trường `Development`), **không** nằm trong migration. Migration chỉ tạo cấu trúc bảng. Nhờ vậy migration thuần cấu trúc, không phụ thuộc giá trị cấu hình.
 
 #### `user_profiles` (1–1 với `users`)
 
@@ -747,7 +750,8 @@ Mỗi enum tương ứng một `enum` trong C#, lưu **chuỗi** trong DB và c�
 | `Visibility` | `posts.visibility`, `albums.visibility`, `user_settings.default_post_visibility` | `Public` | Mọi người |
 | | | `Friends` | Chỉ bạn bè |
 | | | `OnlyMe` | Chỉ mình tôi |
-| `AudienceScope` | `user_settings.profile_visibility`, `who_can_message`, `who_can_call` | `Everyone`, `Friends`, `Nobody` | Ai được xem hồ sơ / nhắn tin / gọi. Riêng `profile_visibility` chỉ dùng `Everyone` hoặc `Friends` (mặc định `Everyone`, thay cho `Public` ở mục 3.1) |
+| `AudienceScope` | `user_settings.who_can_message`, `who_can_call` | `Everyone`, `Friends`, `Nobody` | Ai được nhắn tin / gọi |
+| `ProfileVisibility` | `user_settings.profile_visibility` | `Everyone`, `Friends` | Ai được xem hồ sơ. **Không** dùng `Nobody` (mặc định `Everyone`; thay cho `Public` ở mục 3.1) |
 | `FriendshipStatus` | `friendships.status` | `Pending`, `Accepted` | Chờ chấp nhận / đã là bạn |
 | `ContentStatus` | `posts.status`, `comments.status` | `Active`, `Hidden` | Hiển thị / bị admin ẩn |
 | `ConversationType` | `conversations.type` | `Direct`, `Group` | Chat riêng / nhóm |
@@ -940,7 +944,7 @@ Chỉ tạo bảng khi cần, mỗi nhóm một migration riêng:
 
 | Mốc | Migration chứa | Điều kiện |
 |---|---|---|
-| M0 | Extension, hàm `immutable_unaccent`, `users` + bảng Identity, `roles` (seed), `user_profiles`, `user_settings`, `refresh_tokens` | Khởi tạo |
+| M0 | Extension, hàm `immutable_unaccent`, `users` + bảng Identity, `user_profiles`, `user_settings`, `refresh_tokens` (role `User`/`Admin` và tài khoản admin seed lúc khởi động, không nằm trong migration — xem mục 3.1) | Khởi tạo |
 | M1 | `media_assets`, `posts`, `post_media`, `post_likes`, `comments`, `friendships`, `follows` | Mạng xã hội **cơ bản** |
 | M2 | `conversations`, `conversation_members`, `messages`, `message_attachments` (cột `reply_to`, `forwarded_from`, `edited_at`, `deleted_at`, `content_search` **chưa thêm**) | Nhắn tin **cơ bản** |
 | M3 | `calls`, `call_participants` (+ cột `messages.call_id`) | Gọi **cơ bản** |
@@ -969,7 +973,7 @@ Không đổi tên cột/bảng trực tiếp trên dữ liệu thật mà khôn
 
 | Loại | Nội dung | Môi trường |
 |---|---|---|
-| Bắt buộc | Role `User`, `Admin`; tài khoản admin đầu tiên (email và mật khẩu lấy từ biến môi trường) | Mọi môi trường |
+| Bắt buộc | Role `User`, `Admin`; tài khoản admin đầu tiên (email và mật khẩu lấy từ cấu hình `AdminSeed`; mật khẩu nên đặt bằng user-secrets) — seed lúc khởi động ở môi trường `Development` | Mọi môi trường |
 | Dev/Demo | Khoảng 20–30 người dùng mẫu, quan hệ bạn bè/theo dõi, bài viết, vài hội thoại có tin nhắn, vài cuộc gọi trong lịch sử | Chỉ `Development` và kịch bản demo, bật bằng cờ cấu hình |
 | Kiểm thử hiệu năng | Sinh số lượng lớn (ví dụ 50.000 tin nhắn) bằng công cụ sinh dữ liệu (Bogus) | Chỉ khi đo hiệu năng |
 

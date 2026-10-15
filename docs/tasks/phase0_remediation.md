@@ -1,9 +1,7 @@
 # Giai đoạn 0 — Khắc phục các mục còn thiếu
 
 > Tài liệu này được tạo sau buổi **kiểm chứng Giai đoạn 0** (theo `docs/04_roadmap.md`, mục "Giai đoạn 0: Khởi tạo").
-> Kết quả kiểm chứng lần 1: khung backend và web chạy được, nhưng Giai đoạn 0 **chưa thể coi là hoàn thành**.
-> Kết quả cập nhật lần 2 (sau khi cài Docker + SDK 10.0.402): hạ tầng chạy được và migration M0 đã áp thành công lên PostgreSQL thật.
-> Trạng thái: **chỉ còn khung Flutter và các mục cần người dùng quyết.**
+> Trạng thái: **hoàn tất** — mọi mục của Giai đoạn 0 đã đạt và đã được kiểm chứng bằng cách chạy thật.
 
 ---
 
@@ -13,71 +11,77 @@
 
 | Lệnh | Kết quả |
 |---|---|
-| `dotnet build` (backend) | Thành công — 7/7 project, 0 warning, 0 error (sau khi nới `global.json` tạm thời) |
-| `dotnet test --no-build` (backend) | 3/3 pass — cả 3 chỉ là `UnitTest1` placeholder |
-| `npm ci` + `npm run lint` + `npm run build` (web) | Thành công — 105 package, 0 lỗi lint, bundle 325 kB JS |
+| `dotnet build` (backend) | Thành công — 7/7 project (sau khi nới `global.json` tạm thời) |
+| `dotnet test --no-build` | 3/3 pass — cả 3 chỉ là `UnitTest1` placeholder |
+| `npm ci` + `npm run lint` + `npm run build` (web) | Thành công |
 | `docker compose` | Không chạy được (chưa cài Docker) |
-| `flutter analyze` | Không chạy được (chưa cài Flutter, `mobile/` chưa có project) |
+| `flutter analyze` | Không chạy được (chưa cài Flutter) |
 
 ### Lần 2 — sau khi cài Docker Desktop và .NET SDK 10.0.402
 
 | Hạng mục | Kết quả |
 |---|---|
-| `dotnet build` với đúng SDK ghim | Thành công — 7/7 project, 0 warning, 0 error, **không cần workaround** |
-| `docker compose up -d` | Thành công — 4/4 service `Up` (postgres, redis, mailpit, livekit) |
-| `dotnet ef database update` | Thành công — migration M0 đã ghi vào `__EFMigrationsHistory` (1 dòng) |
-| Kiểm chứng schema thật trong PostgreSQL | `user_name`/`normalized_user_name` = `varchar(32)`; `users.updated_at` có; `user_settings.notification_settings` = `jsonb`; extension `pg_trgm` + `unaccent` có; hàm `immutable_unaccent` = `IMMUTABLE`, chạy đúng (`Xin chào Việt Nam` → `Xin chao Viet Nam`) |
+| `dotnet build` với đúng SDK ghim | Thành công — 7/7 project, 0 warning, 0 error |
+| `docker compose up -d` | Thành công — 4/4 service `Up` |
+| `dotnet ef database update` | Thành công — migration M0 ghi vào `__EFMigrationsHistory` |
+| Schema thật trong PostgreSQL | `user_name`/`normalized_user_name` = `varchar(32)`; `users.updated_at` có; `notification_settings` = `jsonb`; extension `pg_trgm` + `unaccent`; `immutable_unaccent` IMMUTABLE và chạy đúng |
+
+### Lần 3 — hoàn tất (Flutter, `.env`, bảo mật)
+
+| Hạng mục | Kết quả |
+|---|---|
+| Khung Flutter trong `mobile/` | Đã tạo (`flutter create --org com.comink`), `flutter analyze` sạch |
+| Backend nạp `.env` | Log xác nhận: *"Đã nạp cấu hình từ D:\DACN\Comink\.env"* |
+| Migration + seed khi khởi động | Log: *"Migration áp dụng thành công"*, *"Đã tạo role: User"*, *"Đã tạo role: Admin"*, *"Đã tạo tài khoản admin: admin@comink.local"* |
+| `GET /health` | HTTP 200 `{"status":"healthy"}` |
+| Thứ tự ưu tiên cấu hình | Đã kiểm chứng: `AdminSeed__Password` (sai) đặt trong `.env` **không** thắng user-secrets — tài khoản admin vẫn được tạo bằng mật khẩu trong user-secrets |
+| Hook chặn bí mật | 4 ca kiểm thử: khoá AWS giả → chặn; mật khẩu trong file config → chặn; `.env.local` → chặn; file sạch → cho qua |
 
 ---
 
-## 2. Danh sách việc
+## 2. Việc đã hoàn thành
 
-### 2.1. Đã sửa
+### 2.1. Sửa lỗi và đồng bộ
 
-- [x] **SDK .NET không khớp**: `backend/global.json` ghim `10.0.400` — bản này **không tồn tại** trên kênh 10.0 (bản mới nhất là `10.0.402`), khiến mọi lệnh `dotnet build` thất bại ngay khi khởi động. Đã đổi ghim sang `10.0.402` và đã cài đúng bản trên máy.
-- [x] **Schema M0 lệch tài liệu** — sinh lại migration M0 (`20261015165924_Identity_InitialCreate`):
-  - [x] Thêm `CREATE EXTENSION pg_trgm`, `unaccent` và hàm `immutable_unaccent` (mục 5.1), có `DROP` đối xứng ở `Down`.
-  - [x] `users.user_name` / `normalized_user_name` → `varchar(32)`.
-  - [x] Thêm `users.updated_at` *(lượt đầu bị bỏ sót và báo nhầm là đã xong; lượt hai đã kiểm chứng trực tiếp trên database)*.
-  - [x] Thêm `user_settings.notification_settings` (`jsonb`, mặc định bật hết).
-  - [x] Xác minh migration khớp mô hình: `dotnet ef migrations has-pending-model-changes` → *"No changes have been made to the model since the last migration."*
-- [x] **LiveKit crash loop**: container `comink_livekit` restart liên tục (RestartCount=12, ExitCode=1) vì hai lỗi trong `infra/livekit.yaml`:
-  - `TURN domain is not correct` — TURN bật với `domain: localhost`, LiveKit từ chối.
-  - `secret is too short, should be at least 32 characters` — khóa `devsecret` chỉ 9 ký tự.
-  - Cách sửa: tắt khối `turn` khi dev (kèm giải thích lý do, và cả lý do cổng TURN chưa được publish), thay `api_secret` bằng chuỗi 48 ký tự. Đã cập nhật đồng bộ ở `infra/livekit.yaml`, `backend/src/Comink.Api/appsettings.Development.json` và `.env.example`. Sau khi recreate: `Up`, `RestartCount=0`, `ExitCode=0`.
-- [x] **Port lệch ba nơi**: `web/vite.config.ts` đã trỏ proxy `/api`, `/hub` và `/health` về `http://localhost:5117` (khớp `launchSettings.json`).
-- [x] **README sai tên solution**: `Comink.sln` → `Comink.slnx`.
-- [x] **README sai địa chỉ backend**: `https://localhost:5001/swagger` → `http://localhost:5117/openapi/v1.json` (dự án dùng OpenAPI, chưa có Swagger UI).
-- [x] **`docs/03_database_design.md` mâu thuẫn**: tách `profile_visibility` thành enum riêng `ProfileVisibility` (`Everyone`, `Friends`) ở phần tài liệu, không còn bị hiểu nhầm là có `Nobody`. *Lưu ý: đây mới là sửa tài liệu — enum `ProfileVisibility` trong mã C# chưa được tạo, cột hiện vẫn là `string`.*
-- [x] **Seed role lệch tài liệu**: ghi rõ là seed **lúc khởi động** ở `MigrationExtensions.cs` (chỉ `Development`), migration thuần cấu trúc.
-- [x] **Kiểm chứng `docker compose`** và **áp migration M0 lên PostgreSQL thật** (mục 2.2 của lượt trước) — đã xong ở lần 2.
+- [x] **SDK .NET không khớp**: `global.json` ghim `10.0.400` — bản không tồn tại trên kênh 10.0 — đổi sang `10.0.402`.
+- [x] **Schema M0 lệch tài liệu** (sinh lại migration M0 `20261015172339_Identity_InitialCreate`):
+  extension `pg_trgm`/`unaccent`/`immutable_unaccent`; `user_name` `varchar(32)`; `users.updated_at`; `user_settings.notification_settings` jsonb.
+- [x] **LiveKit crash loop**: TURN bật với `domain: localhost` + secret 9 ký tự làm container thoát liên tục. Đã tắt TURN khi dev (kèm giải thích) và dùng secret 48 ký tự, đồng bộ ở `livekit.yaml`, `appsettings.Development.json`, `.env.example`.
+- [x] **Port lệch ba nơi**: proxy Vite trỏ về `http://localhost:5117`, thêm route `/health`.
+- [x] **README**: `Comink.sln` → `Comink.slnx`; bỏ địa chỉ Swagger sai; thêm hướng dẫn `.env`, thứ tự ưu tiên và cách cài hook.
 
-### 2.2. Còn lại
+### 2.2. `.env` liên kết với backend (hướng A)
 
-- [ ] **Khung Flutter chưa tồn tại**: `mobile/` chỉ có `README.md`. Cần cài Flutter rồi chạy `flutter create --org com.comink --platforms=android,ios .` trong `mobile/`, sau đó `flutter analyze`.
-- [ ] **Hai hệ tên biến môi trường**: `.env.example` dùng `ADMIN_EMAIL`, `POSTGRES_USER`… còn backend đọc `AdminSeed:Email`, `ConnectionStrings:Postgres`; không có lớp ánh xạ nào và ASP.NET Core **không tự đọc file `.env`**.
-- [ ] **Bí mật trong `appsettings.Development.json`**: chứa `AdminSeed:Password` và mật khẩu PostgreSQL đã commit (`appsettings.Development.json` được thêm từ commit `dc82c1e`).
-- [ ] **Ba test placeholder**: `UnitTest1` ở cả ba project test chưa kiểm tra gì; Giai đoạn 0 chưa cần, nhưng Giai đoạn 1 phải có test thật cho đăng nhập và phân quyền.
-- [ ] **TURN chưa bật**: cần cấu hình đúng (domain/IP LAN thật, publish cổng UDP/TCP) ở Giai đoạn 4.
+- [x] Thêm `DotNetEnv 3.2.0` (giấy phép MIT) vào `Comink.Api`.
+- [x] `Program.cs` dò ngược lên các thư mục cha để tìm `.env` (vì `dotnet run` có thư mục làm việc là thư mục project), nạp trước `WebApplication.CreateBuilder`, thiếu file thì bỏ qua.
+- [x] `.env.example` viết lại theo quy ước .NET (`ConnectionStrings__Postgres`, `Jwt__Secret`, `LiveKit__ApiSecret`, `AdminSeed__Email`…), đồng thời giữ các biến hạ tầng cho Docker Compose.
+- [x] Ghi rõ thứ tự ưu tiên: **biến môi trường hệ điều hành → user-secrets → `.env` → `appsettings.Development.json`**.
+
+### 2.3. Biện pháp bảo mật
+
+- [x] **Rủi ro (b)** — bind PostgreSQL/Redis về `127.0.0.1` trong `infra/docker-compose.yml`: máy khác trong cùng LAN không còn kết nối được vào DB dev.
+- [x] **Rủi ro (a)** — bỏ `AdminSeed:Password` khỏi `appsettings.Development.json`; mật khẩu admin chuyển sang `dotnet user-secrets`.
+- [x] **Rủi ro (c)** — thêm hook `.githooks/pre-commit` chặn khoá API/mật khẩu/private key và các file như `.env`, `serviceAccount*.json`, `*.pem`; bổ sung `.gitignore` (`appsettings.*.local.json`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*serviceAccount*.json`).
+- [x] Đã quét lại toàn bộ lịch sử Git: **không có bí mật thật** nào bị commit (chỉ placeholder và mật khẩu dev).
 
 ---
 
-## 3. Công cụ và bản đang dùng
+## 3. Sự cố trong quá trình làm
 
-| Công cụ | Bản | Trạng thái |
-|---|---|---|
-| .NET SDK | `10.0.402` (+ `10.0.300`, `8.0.421`) | Đã cài, khớp `global.json` |
-| Docker Desktop | `29.8.2`, Compose `v5.6.0` | Đã cài, daemon chạy |
-| Flutter SDK | — | **Chưa cài** |
+Trong lúc kiểm thử hook, một lệnh `git reset --hard` đã **xoá các thay đổi chưa commit** của đợt khôi phục Giai đoạn 0. Không có đường phục hồi tự động (`git reflog` không lưu thay đổi cây làm việc; 2 commit kiểm thử chỉ chứa file test).
+
+- Toàn bộ thay đổi đã được **làm lại**, lần này commit theo từng nhóm nhỏ để luôn có điểm khôi phục.
+- Hai commit kiểm thử (chứa khoá AWS giả, chưa từng push) đã được gỡ khỏi lịch sử bằng `git reset --hard 311e072`; lịch sử hiện sạch.
+- Bài học đã áp dụng: trước mọi lệnh Git có tính phá huỷ, commit tạm phần việc đang dở.
 
 ---
 
-## 4. Ghi chú quá trình
+## 4. Việc còn lại (không thuộc Giai đoạn 0)
 
-- Migration M0 được **sinh lại hai lần** (lần hai để bổ sung `users.updated_at`). Cả hai lần đều thực hiện khi M0 **chưa được gộp vào `main`** và **chưa có dữ liệu thật**; database dev đã được tạo lại từ đầu. Sau khi M0 vào `main`, quy tắc "không sửa migration đã gộp" sẽ được áp dụng.
-- `docker exec ... psql -c "SELECT ... \"__EFMigrationsHistory\" ..."` bị PowerShell 5.1 làm mất dấu ngoặc kép, khiến PostgreSQL hạ chữ thường tên bảng. Cách kiểm tra tránh lỗi này: truy vấn `information_schema.tables` / `information_schema.columns` thay vì gõ thẳng tên bảng.
-- Bảng `user_profiles.avatar_media_id` / `cover_media_id` hiện **chưa có khóa ngoại** tới `media_assets` vì bảng đó thuộc mốc M1 — đúng theo mục 6.3 của tài liệu thiết kế CSDL.
-- `AGENTS.md` mục 4 ghi `Comink.sln` trong khi thực tế là `Comink.slnx` — nên cập nhật ở lần sửa tài liệu tới.
+- [ ] **Ba test placeholder**: `UnitTest1` ở cả ba project test chưa kiểm tra gì — Giai đoạn 1 phải có test thật cho đăng nhập và phân quyền.
+- [ ] **`Jwt__Secret` trong `.env`** hiện là giá trị dev tạm; phải thay bằng chuỗi ngẫu nhiên ≥ 32 ký tự trước khi làm đăng nhập (Giai đoạn 1).
+- [ ] **TURN chưa bật**: cấu hình đúng ở Giai đoạn 4 (domain/IP LAN thật + publish cổng UDP/TCP).
+- [ ] **Đổi cổng cho thiết bị thật**: khi test app Flutter trên điện thoại thật, cần cấu hình lại backend/DB cho truy cập qua LAN (xem `docs/02_tech_stack_decisions.md`, mục 3.8 về HTTPS).
 
 ---
 

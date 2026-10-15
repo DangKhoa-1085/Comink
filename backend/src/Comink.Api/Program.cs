@@ -9,18 +9,31 @@ Log.Logger = new LoggerConfiguration()
 
 try
 {
-    // --- Nạp biến môi trường từ file .env ở thư mục gốc repository ---
-    // File .env là tuỳ chọn: thiếu file thì ứng dụng dùng appsettings/user-secrets.
+    // --- Nạp biến môi trường từ file .env ---
+    // Thư mục làm việc khi `dotnet run` là thư mục project (backend/src/Comink.Api),
+    // nên phải dò ngược lên các thư mục cha để tìm .env ở gốc repository.
+    // File .env là tuỳ chọn: thiếu file thì dùng appsettings/user-secrets.
     // Biến môi trường đã có sẵn trong hệ điều hành KHÔNG bị ghi đè.
-    var envFilePath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
-    if (File.Exists(envFilePath))
+    static string? FindEnvFile(string startDirectory, int maxLevels = 6)
+    {
+        var dir = new DirectoryInfo(startDirectory);
+        for (var i = 0; i < maxLevels && dir is not null; i++, dir = dir.Parent)
+        {
+            var candidate = Path.Combine(dir.FullName, ".env");
+            if (File.Exists(candidate)) return candidate;
+        }
+        return null;
+    }
+
+    var envFilePath = FindEnvFile(Directory.GetCurrentDirectory());
+    if (envFilePath is not null)
     {
         DotNetEnv.Env.Load(envFilePath);
         Log.Information("Đã nạp cấu hình từ {EnvFile}", envFilePath);
     }
     else
     {
-        Log.Information("Không tìm thấy {EnvFile} — dùng appsettings và user-secrets", envFilePath);
+        Log.Information("Không tìm thấy file .env — dùng appsettings và user-secrets");
     }
 
     var builder = WebApplication.CreateBuilder(args);
