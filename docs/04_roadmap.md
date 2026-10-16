@@ -71,14 +71,17 @@ Mỗi giai đoạn gồm: **mục tiêu**, **phụ thuộc** và **checklist ho�
 **Mục tiêu:** người dùng đăng ký, đăng nhập và có hồ sơ; hệ thống phân quyền hoạt động.
 **Phụ thuộc:** GĐ 0.
 
-- [ ] Đăng ký, đăng nhập, đăng xuất, làm mới token hoạt động trên web
-- [ ] Phân quyền hai vai trò `User` và `Admin`; endpoint chỉ-admin bị chặn với người thường
-- [ ] Kiểm tra dữ liệu đầu vào ở backend cho mọi endpoint hiện có (trả mã lỗi thống nhất)
-- [ ] Hồ sơ cá nhân: xem và sửa tên hiển thị, tiểu sử
-- [ ] Có tài khoản admin đầu tiên (seed từ biến môi trường)
-- [ ] Khung đa ngôn ngữ Việt/Anh chạy trên web (mọi chuỗi hiển thị đi qua i18n)
-- [ ] SignalR kết nối được và xác thực bằng token (chưa cần nghiệp vụ)
-- [ ] Có test cho đăng nhập và phân quyền; bí mật/khóa API không nằm trong Git
+- [x] Đăng ký, đăng nhập, đăng xuất, làm mới token hoạt động trên web
+- [x] Phân quyền hai vai trò `User` và `Admin`; endpoint chỉ-admin bị chặn với người thường
+- [x] Kiểm tra dữ liệu đầu vào ở backend cho mọi endpoint hiện có (trả mã lỗi thống nhất)
+- [x] Hồ sơ cá nhân: xem và sửa tên hiển thị, tiểu sử
+- [x] Có tài khoản admin đầu tiên (seed từ cấu hình `AdminSeed`)
+- [x] Khung đa ngôn ngữ Việt/Anh chạy trên web (mọi chuỗi hiển thị đi qua i18n)
+- [x] SignalR kết nối được và xác thực bằng token (chưa cần nghiệp vụ)
+- [x] Có test cho đăng nhập và phân quyền; bí mật/khóa API không nằm trong Git
+
+> **Trạng thái (cập nhật 2026-10-17):** cả 8 mục đã đạt. Backend: 29 test pass (unit + tích hợp trên PostgreSQL thật). Web: `lint` + `build` sạch, 39 kiểm tra end-to-end qua proxy của Vite, 5 kiểm tra SignalR, 27 kiểm tra render (SSR).
+> Chi tiết và giới hạn còn lại (chưa kiểm chứng trên trình duyệt thật) ở `docs/tasks/phase1_foundation_auth.md`. Hợp đồng API: `docs/05_api_contract.md`.
 
 ### Giai đoạn 2: Mạng xã hội CB + Ảnh trong bài viết
 

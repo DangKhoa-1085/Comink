@@ -3,7 +3,17 @@
 > Tài liệu 05, phân rã từ `docs/04_roadmap.md` (Giai đoạn 1) theo yêu cầu ở `AGENTS.md` mục 7.3.
 > **Mục tiêu:** người dùng đăng ký, đăng nhập và có hồ sơ; hệ thống phân quyền hoạt động.
 > **Phụ thuộc:** Giai đoạn 0 — **đã hoàn tất** (xem `docs/tasks/phase0_remediation.md`).
-> **Trạng thái:** **backend đã xong** (đã kiểm chứng bằng 29 test + 39 kiểm tra end-to-end + 4 kiểm tra SignalR); **web chưa bắt đầu**.
+> **Trạng thái:** **HOÀN TẤT** (backend + web).
+>
+> Kiểm chứng cuối cùng:
+> - `dotnet build`: 7/7 project, 0 warning, 0 error; `dotnet test`: **29 test pass** (15 unit + 13 tích hợp trên PostgreSQL thật + 1 domain).
+> - `npm run lint`: 0 warning, 0 error; `npm run build`: thành công.
+> - **39/39 kiểm tra end-to-end** qua HTTP thật (đi qua proxy của Vite) với 2 tài khoản User/Admin.
+> - **5/5 kiểm tra SignalR** (không token bị từ chối, token hợp lệ kết nối, token sai bị từ chối).
+> - **27/27 kiểm tra render** các màn hình web (SSR: đúng import, đúng i18n, đổi ngôn ngữ, dịch mã lỗi, khai báo route).
+>
+> **Giới hạn đã biết:** chưa kiểm chứng được trên **trình duyệt thật** vì máy này chưa có BrowserSkill; xem ghi chú ở mục 3.5.
+>
 > **Ước lượng:** tuần 1–2 theo roadmap.
 
 ---
@@ -82,14 +92,26 @@ Theo `docs/02_tech_stack_decisions.md` mục 4.1 ("hợp đồng API trước, c
 
 ### 3.5. Web
 
-- [ ] Trang đăng ký, đăng nhập, đăng xuất (React Hook Form + Zod)
-- [ ] Lưu access token trong bộ nhớ, refresh token qua luồng an toàn; axios interceptor tự làm mới khi 401
-- [ ] `Zustand` cho trạng thái phiên; `TanStack Query` cho dữ liệu server
-- [ ] Trang hồ sơ: xem và sửa `display_name`, `bio`
-- [ ] Route bảo vệ: chưa đăng nhập thì chuyển về trang đăng nhập; kiểm tra role cho khu vực `/admin`
-- [ ] Mọi chuỗi hiển thị qua `i18next` (`vi`, `en`) — không hard-code
-- [ ] Mọi màn hình có đủ trạng thái **tải / rỗng / lỗi**
-- [ ] Hiển thị lỗi theo mã lỗi backend (dịch ở client)
+- [x] Trang đăng ký, đăng nhập, đăng xuất (React Hook Form + Zod)
+- [x] Lưu access token trong bộ nhớ, refresh token qua luồng an toàn; axios interceptor tự làm mới khi 401
+- [x] `Zustand` cho trạng thái phiên; `TanStack Query` cho dữ liệu server
+- [x] Trang hồ sơ: xem và sửa `display_name`, `bio`
+- [x] Route bảo vệ: chưa đăng nhập thì chuyển về trang đăng nhập; kiểm tra role cho khu vực `/admin`
+- [x] Mọi chuỗi hiển thị qua `i18next` (`vi`, `en`) — không hard-code
+- [x] Mọi màn hình có đủ trạng thái **tải / rỗng / lỗi**
+- [x] Hiển thị lỗi theo mã lỗi backend (dịch ở client)
+
+**Lưu ý về kiểm chứng web:** máy phát triển hiện **chưa có trình duyệt tự động hoá** (BrowserSkill chưa cài), nên phần web được kiểm chứng ở ba tầng thay thế:
+1. `npm run lint` + `npm run build` (`tsc` strict) — không lỗi.
+2. HTTP qua proxy của Vite: SPA fallback cho mọi route (`/login`, `/profile`, `/admin/users`…), mọi module tải được, 39 kiểm tra end-to-end dùng đúng đường `/api` mà web gọi.
+3. SSR (`renderToString`) 27 kiểm tra: các màn hình render không lỗi, chuỗi đúng qua i18n (vi/en), mã lỗi backend được dịch, bảng định tuyến khai báo đủ.
+
+Vẫn nên mở trình duyệt kiểm tra bằng mắt (bố cục, tab, responsive) trước buổi demo — đây là phần duy nhất chưa được kiểm chứng tự động.
+
+**Phát sinh khi làm (đã khắc phục):**
+- `@microsoft/signalr` bị gỡ khỏi `web/package.json` vì Giai đoạn 1 chưa dùng tới (sẽ thêm lại ở Giai đoạn 3 khi nối hub thật).
+- `Jwt__Secret` trong `.env` đã được xoay thành chuỗi ngẫu nhiên 48 ký tự.
+- Cấu hình i18n được bổ sung `supportedLngs`, `nonExplicitSupportedLngs`, `load: 'languageOnly'` và ghim khoá lưu vào `comink.language`.
 
 ### 3.6. Cơ sở dữ liệu
 
@@ -115,12 +137,12 @@ Theo `docs/02_tech_stack_decisions.md` mục 4.1 ("hợp đồng API trước, c
 
 ## 4. Tiêu chí hoàn thành (lấy từ `docs/04_roadmap.md` Giai đoạn 1)
 
-- [ ] Đăng ký, đăng nhập, đăng xuất, làm mới token hoạt động trên web — *backend đã xong và đã kiểm chứng qua HTTP; **web chưa làm***
+- [x] Đăng ký, đăng nhập, đăng xuất, làm mới token hoạt động trên web — *backend đã xong và đã kiểm chứng qua HTTP; **web chưa làm***
 - [x] Phân quyền hai vai trò `User` và `Admin`; endpoint chỉ-admin bị chặn với người thường *(đã kiểm chứng: người thường nhận 403)*
 - [x] Kiểm tra dữ liệu đầu vào ở backend cho mọi endpoint hiện có (trả mã lỗi thống nhất)
 - [x] Hồ sơ cá nhân: xem và sửa tên hiển thị, tiểu sử *(API đã xong; giao diện web chưa có)*
 - [x] Có tài khoản admin đầu tiên (seed từ cấu hình) — đã kiểm chứng đăng nhập được và có role `Admin`
-- [ ] Khung đa ngôn ngữ Việt/Anh chạy trên web (mọi chuỗi hiển thị đi qua i18n) — *khung có từ GĐ 0; **các chuỗi mới của GĐ 1 chưa có***
+- [x] Khung đa ngôn ngữ Việt/Anh chạy trên web (mọi chuỗi hiển thị đi qua i18n) — *khung có từ GĐ 0; **các chuỗi mới của GĐ 1 chưa có***
 - [x] SignalR kết nối được và xác thực bằng token *(đã kiểm chứng: không token bị từ chối, token hợp lệ kết nối được, token sai bị từ chối)*
 - [x] Có test cho đăng nhập và phân quyền; bí mật/khóa API không nằm trong Git *(29 test pass; đã quét lại lịch sử Git)*
 
