@@ -1,6 +1,7 @@
 // Program.cs — Entry point của Comink.Api
 using Comink.Api.Endpoints;
 using Comink.Api.Hubs;
+using Comink.Application.Common;
 using Comink.Application.Identity.Validators;
 using Comink.Infrastructure;
 using FluentValidation;
@@ -78,7 +79,35 @@ try
     });
 
     // --- ProblemDetails cho error handling thống nhất ---
-    builder.Services.AddProblemDetails();
+    // Lỗi do framework sinh (401 chưa xác thực, 403 thiếu quyền, 404 không tìm thấy, 405…)
+    // không đi qua ApiResults nên thiếu trường `code`; bổ sung tại đây để client luôn dịch
+    // được sang vi/en (docs/05_api_contract.md mục 5). Lỗi nghiệp vụ đã tự đặt `code`
+    // trong ApiResults nên được giữ nguyên.
+    builder.Services.AddProblemDetails(options =>
+    {
+        options.CustomizeProblemDetails = context =>
+        {
+            if (context.ProblemDetails.Extensions.ContainsKey("code"))
+            {
+                return;
+            }
+
+            var code = context.ProblemDetails.Status switch
+            {
+                StatusCodes.Status400BadRequest => ErrorCodes.ValidationFailed,
+                StatusCodes.Status401Unauthorized => ErrorCodes.Unauthorized,
+                StatusCodes.Status403Forbidden => ErrorCodes.Forbidden,
+                StatusCodes.Status404NotFound => ErrorCodes.NotFound,
+                StatusCodes.Status500InternalServerError => ErrorCodes.InternalError,
+                _ => null
+            };
+
+            if (code is not null)
+            {
+                context.ProblemDetails.Extensions["code"] = code;
+            }
+        };
+    });
 
     var app = builder.Build();
 

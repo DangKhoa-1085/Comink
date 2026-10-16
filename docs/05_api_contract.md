@@ -33,6 +33,16 @@
 
 `errors` chỉ có khi lỗi validate (`400`).
 
+Lỗi do framework sinh (chưa xác thực, thiếu quyền, không tìm thấy…) cũng được bổ sung trường `code` theo bảng ở mục 5, nên client luôn có mã để dịch thay vì phải đoán theo HTTP status:
+
+| Mã HTTP | `code` |
+|---|---|
+| 400 | `VALIDATION_FAILED` |
+| 401 | `UNAUTHORIZED` |
+| 403 | `FORBIDDEN` |
+| 404 | `NOT_FOUND` |
+| 500 | `INTERNAL_ERROR` |
+
 ### 1.2. Cấu trúc phân trang
 
 ```json
@@ -248,3 +258,4 @@ Mã lỗi là **hằng số tiếng Anh** ở backend; web/app dịch sang `vi`/
 | Ngày | Thay đổi |
 |---|---|
 | 2026-10-15 | Chốt hợp đồng Giai đoạn 1: auth, hồ sơ, danh sách tài khoản admin, mã lỗi, quy ước SignalR |
+| 2026-10-17 | Bổ sung `code` cho lỗi do framework sinh (400/401/403/404/500) — khắc phục lệch hợp đồng phát hiện khi kiểm chứng trên trình duyệt thật |
