@@ -81,7 +81,8 @@ Mỗi giai đoạn gồm: **mục tiêu**, **phụ thuộc** và **checklist ho�
 - [x] Có test cho đăng nhập và phân quyền; bí mật/khóa API không nằm trong Git
 
 > **Trạng thái (cập nhật 2026-10-17):** cả 8 mục đã đạt. Backend: 29 test pass (unit + tích hợp trên PostgreSQL thật). Web: `lint` + `build` sạch, 39 kiểm tra end-to-end qua proxy của Vite, 5 kiểm tra SignalR, 27 kiểm tra render (SSR).
-> Chi tiết và giới hạn còn lại (chưa kiểm chứng trên trình duyệt thật) ở `docs/tasks/phase1_foundation_auth.md`. Hợp đồng API: `docs/05_api_contract.md`.
+> **Đã kiểm chứng trên trình duyệt thật** (Chrome qua BrowserSkill, hạ tầng Docker + backend + Vite): đăng ký → đăng nhập → hồ sơ → khôi phục phiên → đa ngôn ngữ → đăng xuất → route bảo vệ, và phiên `Admin` với `/admin/users` (danh sách, tìm kiếm, trạng thái rỗng). Hai lỗi nhỏ phát hiện trong đợt này (lỗi framework thiếu `code`, số nhiều tiếng Anh) đã sửa và kiểm chứng lại.
+> Chi tiết ở `docs/tasks/phase1_foundation_auth.md`. Hợp đồng API: `docs/05_api_contract.md`.
 
 ### Giai đoạn 2: Mạng xã hội CB + Ảnh trong bài viết
 

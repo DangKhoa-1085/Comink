@@ -3,16 +3,18 @@
 > Tài liệu 05, phân rã từ `docs/04_roadmap.md` (Giai đoạn 1) theo yêu cầu ở `AGENTS.md` mục 7.3.
 > **Mục tiêu:** người dùng đăng ký, đăng nhập và có hồ sơ; hệ thống phân quyền hoạt động.
 > **Phụ thuộc:** Giai đoạn 0 — **đã hoàn tất** (xem `docs/tasks/phase0_remediation.md`).
-> **Trạng thái:** **HOÀN TẤT** (backend + web).
+> **Trạng thái:** **HOÀN TẤT** (backend + web) — đã kiểm chứng trên **trình duyệt thật**.
 >
-> Kiểm chứng cuối cùng:
+> Chạy lại toàn bộ trong đợt kiểm chứng trình duyệt (2026-10-17):
 > - `dotnet build`: 7/7 project, 0 warning, 0 error; `dotnet test`: **29 test pass** (15 unit + 13 tích hợp trên PostgreSQL thật + 1 domain).
 > - `npm run lint`: 0 warning, 0 error; `npm run build`: thành công.
-> - **39/39 kiểm tra end-to-end** qua HTTP thật (đi qua proxy của Vite) với 2 tài khoản User/Admin.
-> - **5/5 kiểm tra SignalR** (không token bị từ chối, token hợp lệ kết nối, token sai bị từ chối).
-> - **27/27 kiểm tra render** các màn hình web (SSR: đúng import, đúng i18n, đổi ngôn ngữ, dịch mã lỗi, khai báo route).
+> - **Trình duyệt thật** (Chrome 155 qua BrowserSkill, cửa sổ agent, hạ tầng Docker + backend + Vite đang chạy): đăng ký → đăng nhập → sửa hồ sơ → tải lại trang → đổi ngôn ngữ → đăng xuất → route bảo vệ; và **phiên Admin**: đăng nhập → `/admin/users` → tìm kiếm → trạng thái rỗng → đăng xuất. Chi tiết ở mục 3.5.
+> - **Phân quyền backend**: `GET /api/admin/users` bằng token `User` → `403 FORBIDDEN`; **SignalR** `/hub/chat` negotiate: không token → `401`, token hợp lệ → `200`, token sai → `401`.
+> - **2 lỗi phát hiện trong đợt này đã sửa** (lỗi framework thiếu `code`, số nhiều tiếng Anh) — xem mục 3.9.
 >
-> **Giới hạn đã biết:** chưa kiểm chứng được trên **trình duyệt thật** vì máy này chưa có BrowserSkill; xem ghi chú ở mục 3.5.
+> Kết quả của các đợt trước vẫn giữ nguyên: **39/39 kiểm tra end-to-end** qua proxy Vite, **27/27 kiểm tra render** (SSR), **5/5 kiểm tra SignalR**.
+>
+> **Giới hạn đã biết:** đã đóng — trước đây chưa kiểm chứng được trên trình duyệt thật vì máy chưa có BrowserSkill; nay đã cài `bsk` CLI 0.3.3 + extension và kiểm chứng xong.
 >
 > **Ước lượng:** tuần 1–2 theo roadmap.
 
@@ -101,12 +103,31 @@ Theo `docs/02_tech_stack_decisions.md` mục 4.1 ("hợp đồng API trước, c
 - [x] Mọi màn hình có đủ trạng thái **tải / rỗng / lỗi**
 - [x] Hiển thị lỗi theo mã lỗi backend (dịch ở client)
 
-**Lưu ý về kiểm chứng web:** máy phát triển hiện **chưa có trình duyệt tự động hoá** (BrowserSkill chưa cài), nên phần web được kiểm chứng ở ba tầng thay thế:
-1. `npm run lint` + `npm run build` (`tsc` strict) — không lỗi.
-2. HTTP qua proxy của Vite: SPA fallback cho mọi route (`/login`, `/profile`, `/admin/users`…), mọi module tải được, 39 kiểm tra end-to-end dùng đúng đường `/api` mà web gọi.
-3. SSR (`renderToString`) 27 kiểm tra: các màn hình render không lỗi, chuỗi đúng qua i18n (vi/en), mã lỗi backend được dịch, bảng định tuyến khai báo đủ.
+**Kiểm chứng trên trình duyệt thật (2026-10-17):** đã cài `bsk` CLI 0.3.3 + extension BrowserSkill và chạy hết luồng bằng Chrome 155 trong cửa sổ agent. Kết quả từng bước:
 
-Vẫn nên mở trình duyệt kiểm tra bằng mắt (bố cục, tab, responsive) trước buổi demo — đây là phần duy nhất chưa được kiểm chứng tự động.
+| Bước | Kết quả quan sát được |
+|---|---|
+| Trang chủ | Render đúng tiếng Việt, gọi `/health` báo "Backend đang hoạt động (healthy)" |
+| Đăng ký | Tạo tài khoản mới thành công, toast "Tạo tài khoản thành công", chuyển về trang chủ, header hiện tên người dùng |
+| Trạng thái tải | Nút đổi thành "Đang tạo tài khoản…" và bị vô hiệu hoá trong lúc gửi |
+| Hồ sơ | Hiển thị email/tên đăng nhập/vai trò/ngày tham gia; sửa `display_name` + `bio` → toast "Đã cập nhật hồ sơ", header đổi tên theo |
+| Tải lại trang | Vẫn đăng nhập và dữ liệu hồ sơ vừa sửa được tải lại từ backend. Log mạng: `401 GET /api/users/me` → `200 POST /api/auth/refresh` → `200 GET /api/users/me` (access token chỉ nằm trong bộ nhớ) |
+| Đa ngôn ngữ | `vi → en` đổi toàn bộ giao diện; thông báo lỗi đang hiển thị cũng được dịch lại; `en → vi` đổi ngược lại đúng |
+| Đăng xuất | Về trang đăng nhập, toast "Signed out", refresh token bị thu hồi trong `refresh_tokens` |
+| Route bảo vệ | `/profile` khi chưa đăng nhập → chuyển về `/login` |
+| Chặn khu vực quản trị | Tài khoản `User` vào `/admin/users` bị đưa về trang chủ, menu "Admin" không hiển thị |
+| Sai mật khẩu | Hiện đúng thông báo đã dịch: "Incorrect email/username or password." |
+| Validate phía client | Gửi form đăng ký rỗng → 4 thông báo lỗi đã dịch, không gửi request |
+| Trùng email / trùng username | `409` + thông báo dịch đúng ("This email is already in use." / "Tên đăng nhập này đã được sử dụng.") |
+| Trang 404 | Route không tồn tại → trang 404 với link "Back to home" |
+| Giao diện sáng/tối | Nút đổi giao diện chuyển sang dark, màu theo theme |
+| **Phiên Admin** | Đăng nhập `admin@comink.local` → menu "Admin" xuất hiện → `/admin/users` hiển thị bảng 5 tài khoản; mạng: `200 POST /api/auth/login` → `200 GET /api/users/me` → `200 GET /api/admin/users?limit=10` |
+| Tìm kiếm quản trị | Nhập `khoa` → còn 1 dòng; nhập chuỗi không tồn tại → "No accounts found" |
+| Đăng xuất admin | Về trang đăng nhập, refresh token của admin bị thu hồi |
+
+Vẫn nên xem lại bố cục/responsive bằng mắt trên vài kích thước cửa sổ trước buổi demo — đây là phần không được kiểm chứng tự động.
+
+**Chạy lại sau khi sửa 2 lỗi ở mục 3.9 (cùng ngày):** đăng nhập lại `admin@comink.local` trên backend đã build lại → `/admin/users` vẫn hiển thị đúng danh sách và tìm kiếm; dòng đếm hiển thị `Đang hiển thị 1 tài khoản` (vi) và `Showing 1 account` (en) — hết lỗi số nhiều.
 
 **Phát sinh khi làm (đã khắc phục):**
 - `@microsoft/signalr` bị gỡ khỏi `web/package.json` vì Giai đoạn 1 chưa dùng tới (sẽ thêm lại ở Giai đoạn 3 khi nối hub thật).
@@ -133,16 +154,32 @@ Vẫn nên mở trình duyệt kiểm tra bằng mắt (bố cục, tab, respons
 - [x] Ghi danh sách endpoint + mã lỗi + sự kiện SignalR vào tài liệu hợp đồng API (chưa có file — cần tạo, ví dụ `docs/05_api_contract.md`)
 - [x] Cập nhật `README.md` nếu thêm bước chạy mới
 
+### 3.9. Lỗi phát hiện khi kiểm chứng trên trình duyệt và cách sửa
+
+Hai lỗi nhỏ phát hiện trong đợt kiểm chứng trình duyệt (2026-10-17) — không lỗi nào chặn demo, nhưng đều lệch với tài liệu nên đã sửa:
+
+**1) Lỗi do framework sinh thiếu trường `code`.** `401` (chưa xác thực), `403` (thiếu quyền), `404` (không tìm thấy) do middleware của ASP.NET Core sinh ra **không** đi qua `ApiResults` nên chỉ có `type/title/status/traceId`, thiếu `code` — trái với `docs/05_api_contract.md` mục 5 (đáng lẽ là `UNAUTHORIZED` / `FORBIDDEN` / `NOT_FOUND`). Hệ quả: `lib/http.ts` không tìm thấy `code` nên gán `INTERNAL_ERROR`, và client hiển thị "Máy chủ gặp lỗi" thay vì "Bạn không có quyền…" — dù `web/src/locales/*.json` đã có sẵn 3 bản dịch đó.
+
+- Sửa: `Program.cs` — `AddProblemDetails` được cấu hình `CustomizeProblemDetails` để bổ sung `code` theo mã HTTP (400 → `VALIDATION_FAILED`, 401 → `UNAUTHORIZED`, 403 → `FORBIDDEN`, 404 → `NOT_FOUND`, 500 → `INTERNAL_ERROR`). Lỗi nghiệp vụ do `ApiResults` tự đặt `code` nên được giữ nguyên.
+- Kiểm chứng lại bằng request thật: `401 → "code":"UNAUTHORIZED"`, `403 → "code":"FORBIDDEN"`, `404 → "code":"NOT_FOUND"`, còn `POST /api/auth/login` sai mật khẩu vẫn trả `AUTH_INVALID_CREDENTIALS`.
+
+**2) Sai số nhiều trong tiếng Anh.** Trang quản trị hiển thị "Showing **1 accounts**" vì khoá i18n `admin.total_shown` không có dạng số nhiều.
+
+- Sửa: tách thành `total_shown_one` / `total_shown_other` trong `en.json`; `vi.json` dùng `total_shown_other` (tiếng Việt chỉ có một dạng số nhiều).
+- Kiểm chứng: chạy i18next trên chính hai file locale — `en` count=1 → "Showing 1 account", count=5 → "Showing 5 accounts", `vi` → "Đang hiển thị N tài khoản".
+
+**Còn thiếu (ghi nhận, chưa làm):** chưa có **test tự động ở tầng HTTP**; dự án hiện chỉ có test tầng service/DbContext, nên hai sửa đổi trên được kiểm chứng bằng request thật và ghi lại kết quả, không phải bằng test. Khi thêm `WebApplicationFactory` (cần cẩn thận vì `Program.cs` có nạp `.env` thật) thì nên bổ sung test khẳng định `401/403/404` đều có `code`.
+
 ---
 
 ## 4. Tiêu chí hoàn thành (lấy từ `docs/04_roadmap.md` Giai đoạn 1)
 
-- [x] Đăng ký, đăng nhập, đăng xuất, làm mới token hoạt động trên web — *backend đã xong và đã kiểm chứng qua HTTP; **web chưa làm***
-- [x] Phân quyền hai vai trò `User` và `Admin`; endpoint chỉ-admin bị chặn với người thường *(đã kiểm chứng: người thường nhận 403)*
+- [x] Đăng ký, đăng nhập, đăng xuất, làm mới token hoạt động trên web *(đã kiểm chứng trên trình duyệt thật; luồng làm mới token xác nhận qua log mạng)*
+- [x] Phân quyền hai vai trò `User` và `Admin`; endpoint chỉ-admin bị chặn với người thường *(đã kiểm chứng: token `User` nhận `403 FORBIDDEN`; giao diện cũng chuyển hướng khỏi `/admin/users`)*
 - [x] Kiểm tra dữ liệu đầu vào ở backend cho mọi endpoint hiện có (trả mã lỗi thống nhất)
-- [x] Hồ sơ cá nhân: xem và sửa tên hiển thị, tiểu sử *(API đã xong; giao diện web chưa có)*
+- [x] Hồ sơ cá nhân: xem và sửa tên hiển thị, tiểu sử *(đã kiểm chứng trên trình duyệt thật)*
 - [x] Có tài khoản admin đầu tiên (seed từ cấu hình) — đã kiểm chứng đăng nhập được và có role `Admin`
-- [x] Khung đa ngôn ngữ Việt/Anh chạy trên web (mọi chuỗi hiển thị đi qua i18n) — *khung có từ GĐ 0; **các chuỗi mới của GĐ 1 chưa có***
+- [x] Khung đa ngôn ngữ Việt/Anh chạy trên web (mọi chuỗi hiển thị đi qua i18n) *(đã kiểm chứng cả hai chiều vi↔en trên trình duyệt thật)*
 - [x] SignalR kết nối được và xác thực bằng token *(đã kiểm chứng: không token bị từ chối, token hợp lệ kết nối được, token sai bị từ chối)*
 - [x] Có test cho đăng nhập và phân quyền; bí mật/khóa API không nằm trong Git *(29 test pass; đã quét lại lịch sử Git)*
 
