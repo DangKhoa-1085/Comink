@@ -74,12 +74,30 @@ Trong lúc kiểm thử hook, một lệnh `git reset --hard` đã **xoá các t
 - Hai commit kiểm thử (chứa khoá AWS giả, chưa từng push) đã được gỡ khỏi lịch sử bằng `git reset --hard 311e072`; lịch sử hiện sạch.
 - Bài học đã áp dụng: trước mọi lệnh Git có tính phá huỷ, commit tạm phần việc đang dở.
 
+### 3.1. Sự cố lần hai (2026-10-17) — khi kiểm thử hook chặn bí mật
+
+Script kiểm thử hook tự gọi `git commit -m "hook test"`, và vì mọi file đang sửa đều nằm trong index, **16 commit rác `hook test` đã được tạo**, trong đó một commit chứa toàn bộ code web Giai đoạn 1; nhiều file test `zz*` cũng lọt vào lịch sử.
+
+- Đã xử lý bằng `git reset --mixed df6c24c` (giữ nguyên cây làm việc), rồi commit lại **đúng hai nhóm**: code web và bản sửa hook. Không có thay đổi thật nào bị mất.
+- **Bài học:** script kiểm thử Git phải chạy trong **repository tạm** hoặc phải chủ động `git reset` trước mỗi lần `git add`; không bao giờ để script tự commit trong khi cây làm việc đang có việc thật.
+- Sự cố phụ: lệnh dọn dẹp `Get-ChildItem -Filter '.env.*'` đã **xoá nhầm file `.env`** (bị gitignore nên Git không bảo vệ). Đã tạo lại từ `.env.example` và xoay `Jwt__Secret` mới.
+  **Bài học:** khi dọn file theo mẫu, phải loại trừ tường minh các file cấu hình thật; `.env` không nằm trong Git nên không có cách phục hồi nào khác.
+
+### 3.2. Bài học về hook
+
+Bản hook đầu tiên dùng mẫu quá rộng nên **bắt nhầm bản dịch i18n** (`"password": "Password"` trong `locales/*.json`). Quá trình sửa cho thấy hai cạm bẫy:
+
+1. **Không dùng lookahead `(?=...)`** — `grep -E` của Git (BSD/musl) không hỗ trợ, mẫu sẽ im lặng không khớp và hook mất tác dụng mà không báo lỗi.
+2. **`grep` khớp theo từng dòng** — không thể "cho phép theo nhãn" một cách an toàn, vì dòng vừa có nhãn vừa có bí mật sẽ được cho qua.
+
+Kết luận: hook được **đơn giản hoá** — chỉ giữ các mẫu có độ tin cậy cao (private key, `AKIA...`, `sk-...`, `AIza...`, `Password=` trong chuỗi kết nối, `api_key =`) và danh sách file bị cấm. Giới hạn này được ghi rõ ngay trong file hook. Dòng `"password"` trong file dịch **không** còn bị bắt nhầm.
+
 ---
 
 ## 4. Việc còn lại (không thuộc Giai đoạn 0)
 
-- [ ] **Ba test placeholder**: `UnitTest1` ở cả ba project test chưa kiểm tra gì — Giai đoạn 1 phải có test thật cho đăng nhập và phân quyền.
-- [ ] **`Jwt__Secret` trong `.env`** hiện là giá trị dev tạm; phải thay bằng chuỗi ngẫu nhiên ≥ 32 ký tự trước khi làm đăng nhập (Giai đoạn 1).
+- [x] ~~**Ba test placeholder**~~ — đã thay bằng test thật ở Giai đoạn 1 (29 test).
+- [x] ~~**`Jwt__Secret` trong `.env`**~~ — đã xoay thành chuỗi ngẫu nhiên 48 ký tự (2026-10-17).
 - [ ] **TURN chưa bật**: cấu hình đúng ở Giai đoạn 4 (domain/IP LAN thật + publish cổng UDP/TCP).
 - [ ] **Đổi cổng cho thiết bị thật**: khi test app Flutter trên điện thoại thật, cần cấu hình lại backend/DB cho truy cập qua LAN (xem `docs/02_tech_stack_decisions.md`, mục 3.8 về HTTPS).
 
