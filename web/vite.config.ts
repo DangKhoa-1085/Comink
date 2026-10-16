@@ -33,4 +33,11 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    // Bundle hiện ~650 kB vì đã gồm chuỗi thư viện thời gian thực
+    // (@microsoft/signalr, livekit-client, firebase). Với quy mô demo cục bộ thì
+    // chấp nhận được; nâng ngưỡng cảnh báo để build không còn tiếng ồn.
+    // Khi web phình to hơn, việc cần làm là tách chunk theo route (React.lazy).
+    chunkSizeWarningLimit: 1000,
+  },
 })
