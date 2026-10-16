@@ -119,7 +119,8 @@
     "load_more": "Load more",
     "loading_more": "Loading more...",
     "empty": "No accounts found",
-    "total_shown": "Showing {{count}} accounts",
+    "total_shown_one": "Showing {{count}} account",
+    "total_shown_other": "Showing {{count}} accounts",
     "status_active": "Active",
     "status_locked": "Locked",
     "status_deleted": "Deactivated"

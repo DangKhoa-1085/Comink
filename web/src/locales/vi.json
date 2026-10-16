@@ -119,7 +119,7 @@
     "load_more": "Tải thêm",
     "loading_more": "Đang tải thêm...",
     "empty": "Không tìm thấy tài khoản nào",
-    "total_shown": "Đang hiển thị {{count}} tài khoản",
+    "total_shown_other": "Đang hiển thị {{count}} tài khoản",
     "status_active": "Đang hoạt động",
     "status_locked": "Đã khóa",
     "status_deleted": "Đã vô hiệu hóa"
