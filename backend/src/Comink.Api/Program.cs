@@ -87,28 +87,10 @@ try
     // trong ApiResults nên được giữ nguyên.
     builder.Services.AddProblemDetails(options =>
     {
+        // Gắn `code` + `title` cho lỗi do framework sinh (401/403/404/… và 400 khi body JSON hỏng)
+        // theo đúng một nguồn duy nhất là `code` — xem ApiResults.ApplyProblemDefaults.
         options.CustomizeProblemDetails = context =>
-        {
-            if (context.ProblemDetails.Extensions.ContainsKey("code"))
-            {
-                return;
-            }
-
-            var code = context.ProblemDetails.Status switch
-            {
-                StatusCodes.Status400BadRequest => ErrorCodes.ValidationFailed,
-                StatusCodes.Status401Unauthorized => ErrorCodes.Unauthorized,
-                StatusCodes.Status403Forbidden => ErrorCodes.Forbidden,
-                StatusCodes.Status404NotFound => ErrorCodes.NotFound,
-                StatusCodes.Status500InternalServerError => ErrorCodes.InternalError,
-                _ => null
-            };
-
-            if (code is not null)
-            {
-                context.ProblemDetails.Extensions["code"] = code;
-            }
-        };
+            Comink.Api.Common.ApiResults.ApplyProblemDefaults(context.ProblemDetails);
     });
 
     var app = builder.Build();

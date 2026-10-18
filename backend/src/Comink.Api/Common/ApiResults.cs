@@ -64,6 +64,42 @@ public static class ApiResults
                 : Problem(result.ErrorCode ?? ErrorCodes.InternalError);
     }
 
+    /// <summary>
+    /// Gắn `code` và `title` cho ProblemDetails do framework sinh ra (401/403/404/405…, hoặc 400
+    /// khi body JSON không đọc được) để response **nhất quán** với lỗi nghiệp vụ
+    /// (docs/05_api_contract.md mục 5). ProblemDetails đã có `code` thì giữ nguyên.
+    /// <para>
+    /// `code` là nguồn duy nhất: `title` được suy ra từ `code` bằng <see cref="TitleFor"/>, nên
+    /// mọi lỗi cùng mã đều có cùng tiêu đề — trước đây lỗi 400 của framework có title
+    /// "Bad Request" còn lỗi validate có "Validation failed".
+    /// </para>
+    /// </summary>
+    public static void ApplyProblemDefaults(ProblemDetails problemDetails)
+    {
+        if (problemDetails.Extensions.ContainsKey("code"))
+        {
+            return;
+        }
+
+        var code = problemDetails.Status switch
+        {
+            StatusCodes.Status400BadRequest => ErrorCodes.ValidationFailed,
+            StatusCodes.Status401Unauthorized => ErrorCodes.Unauthorized,
+            StatusCodes.Status403Forbidden => ErrorCodes.Forbidden,
+            StatusCodes.Status404NotFound => ErrorCodes.NotFound,
+            StatusCodes.Status500InternalServerError => ErrorCodes.InternalError,
+            _ => null
+        };
+
+        if (code is null)
+        {
+            return;
+        }
+
+        problemDetails.Extensions["code"] = code;
+        problemDetails.Title = TitleFor(code);
+    }
+
     /// <summary>Tiêu đề tiếng Anh cho ProblemDetails (client không hiển thị trực tiếp).</summary>
     private static string TitleFor(string errorCode) => errorCode switch
     {
