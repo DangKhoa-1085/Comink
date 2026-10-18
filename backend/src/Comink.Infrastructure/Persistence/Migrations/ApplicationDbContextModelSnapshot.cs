@@ -284,6 +284,396 @@ namespace Comink.Infrastructure.Persistence.Migrations
                     b.ToTable("user_settings", (string)null);
                 });
 
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Comment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AuthorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("author_id");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("content");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid?>("ParentCommentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_comment_id");
+
+                    b.Property<Guid>("PostId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("post_id");
+
+                    b.Property<int>("ReplyCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("reply_count");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Active")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_comments");
+
+                    b.HasIndex("AuthorId")
+                        .HasDatabaseName("ix_comments_author_id");
+
+                    b.HasIndex("ParentCommentId", "CreatedAt")
+                        .HasDatabaseName("ix_comments_parent_comment_id_created_at");
+
+                    b.HasIndex("PostId", "CreatedAt", "Id")
+                        .HasDatabaseName("ix_comments_post_id_created_at_id")
+                        .HasFilter("deleted_at IS NULL AND parent_comment_id IS NULL");
+
+                    b.ToTable("comments", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_comments_content_length", "char_length(content) BETWEEN 1 AND 2000");
+
+                            t.HasCheckConstraint("ck_comments_status", "status IN ('Active', 'Hidden')");
+                        });
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Follow", b =>
+                {
+                    b.Property<Guid>("FollowerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("follower_id");
+
+                    b.Property<Guid>("FolloweeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("followee_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.HasKey("FollowerId", "FolloweeId")
+                        .HasName("pk_follows");
+
+                    b.HasIndex("FolloweeId")
+                        .HasDatabaseName("ix_follows_followee_id");
+
+                    b.ToTable("follows", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_follows_not_self", "follower_id <> followee_id");
+                        });
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Friendship", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AddresseeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("addressee_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("RequesterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requester_id");
+
+                    b.Property<DateTimeOffset?>("RespondedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("responded_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Pending")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_friendships");
+
+                    b.HasIndex("AddresseeId", "Status")
+                        .HasDatabaseName("ix_friendships_addressee_id_status");
+
+                    b.HasIndex("RequesterId", "Status")
+                        .HasDatabaseName("ix_friendships_requester_id_status");
+
+                    b.ToTable("friendships", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_friendships_not_self", "requester_id <> addressee_id");
+
+                            t.HasCheckConstraint("ck_friendships_status", "status IN ('Pending', 'Accepted')");
+                        });
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.MediaAsset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Context")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Post")
+                        .HasColumnName("context");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<decimal?>("DurationSeconds")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("duration_seconds");
+
+                    b.Property<int?>("Height")
+                        .HasColumnType("integer")
+                        .HasColumnName("height");
+
+                    b.Property<string>("MimeType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("mime_type");
+
+                    b.Property<string>("OriginalFilename")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("original_filename");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Cloudinary")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("ProviderPublicId")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("provider_public_id");
+
+                    b.Property<string>("ResourceType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Image")
+                        .HasColumnName("resource_type");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size_bytes");
+
+                    b.Property<string>("ThumbnailUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("thumbnail_url");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("url");
+
+                    b.Property<int?>("Width")
+                        .HasColumnType("integer")
+                        .HasColumnName("width");
+
+                    b.HasKey("Id")
+                        .HasName("pk_media_assets");
+
+                    b.HasIndex("OwnerId")
+                        .HasDatabaseName("ix_media_assets_owner_id");
+
+                    b.HasIndex("Provider", "ProviderPublicId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_media_assets_provider_provider_public_id");
+
+                    b.ToTable("media_assets", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_media_assets_context", "context IN ('Post', 'Message', 'Avatar', 'Cover', 'Album')");
+
+                            t.HasCheckConstraint("ck_media_assets_provider", "provider IN ('Cloudinary', 'Firebase', 'Local')");
+
+                            t.HasCheckConstraint("ck_media_assets_resource_type", "resource_type IN ('Image', 'Video', 'File')");
+
+                            t.HasCheckConstraint("ck_media_assets_size", "size_bytes > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Post", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AuthorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("author_id");
+
+                    b.Property<int>("CommentCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("comment_count");
+
+                    b.Property<string>("Content")
+                        .HasColumnType("text")
+                        .HasColumnName("content");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<int>("LikeCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("like_count");
+
+                    b.Property<int>("ShareCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("share_count");
+
+                    b.Property<Guid?>("SharedPostId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("shared_post_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Active")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Visibility")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Friends")
+                        .HasColumnName("visibility");
+
+                    b.HasKey("Id")
+                        .HasName("pk_posts");
+
+                    b.HasIndex("SharedPostId")
+                        .HasDatabaseName("ix_posts_shared_post_id");
+
+                    b.HasIndex("AuthorId", "CreatedAt", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_posts_author_id_created_at_id")
+                        .HasFilter("deleted_at IS NULL AND status = 'Active'");
+
+                    b.ToTable("posts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_posts_content_length", "char_length(content) <= 5000");
+
+                            t.HasCheckConstraint("ck_posts_status", "status IN ('Active', 'Hidden')");
+
+                            t.HasCheckConstraint("ck_posts_visibility", "visibility IN ('Public', 'Friends', 'OnlyMe')");
+                        });
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.PostLike", b =>
+                {
+                    b.Property<Guid>("PostId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("post_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.HasKey("PostId", "UserId")
+                        .HasName("pk_post_likes");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_post_likes_user_id");
+
+                    b.ToTable("post_likes", (string)null);
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.PostMedia", b =>
+                {
+                    b.Property<Guid>("PostId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("post_id");
+
+                    b.Property<Guid>("MediaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("media_id");
+
+                    b.Property<short>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("smallint")
+                        .HasDefaultValue((short)0)
+                        .HasColumnName("sort_order");
+
+                    b.HasKey("PostId", "MediaId")
+                        .HasName("pk_post_media");
+
+                    b.HasIndex("MediaId")
+                        .HasDatabaseName("ix_post_media_media_id");
+
+                    b.ToTable("post_media", (string)null);
+                });
+
             modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -537,6 +927,151 @@ namespace Comink.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Comment", b =>
+                {
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "Author")
+                        .WithMany()
+                        .HasForeignKey("AuthorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_comments_users_author_id");
+
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.Comment", "Parent")
+                        .WithMany("Replies")
+                        .HasForeignKey("ParentCommentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_comments_comments_parent_comment_id");
+
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.Post", "Post")
+                        .WithMany()
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_comments_posts_post_id");
+
+                    b.Navigation("Author");
+
+                    b.Navigation("Parent");
+
+                    b.Navigation("Post");
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Follow", b =>
+                {
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "Followee")
+                        .WithMany()
+                        .HasForeignKey("FolloweeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_follows_users_followee_id");
+
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "Follower")
+                        .WithMany()
+                        .HasForeignKey("FollowerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_follows_users_follower_id");
+
+                    b.Navigation("Followee");
+
+                    b.Navigation("Follower");
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Friendship", b =>
+                {
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "Addressee")
+                        .WithMany()
+                        .HasForeignKey("AddresseeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_friendships_users_addressee_id");
+
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "Requester")
+                        .WithMany()
+                        .HasForeignKey("RequesterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_friendships_users_requester_id");
+
+                    b.Navigation("Addressee");
+
+                    b.Navigation("Requester");
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.MediaAsset", b =>
+                {
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "Owner")
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_media_assets_users_owner_id");
+
+                    b.Navigation("Owner");
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Post", b =>
+                {
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "Author")
+                        .WithMany()
+                        .HasForeignKey("AuthorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_posts_users_author_id");
+
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.Post", "SharedPost")
+                        .WithMany()
+                        .HasForeignKey("SharedPostId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_posts_posts_shared_post_id");
+
+                    b.Navigation("Author");
+
+                    b.Navigation("SharedPost");
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.PostLike", b =>
+                {
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.Post", "Post")
+                        .WithMany()
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_post_likes_posts_post_id");
+
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_post_likes_users_user_id");
+
+                    b.Navigation("Post");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.PostMedia", b =>
+                {
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.MediaAsset", "Media")
+                        .WithMany()
+                        .HasForeignKey("MediaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_post_media_media_assets_media_id");
+
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.Post", "Post")
+                        .WithMany("Media")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_post_media_posts_post_id");
+
+                    b.Navigation("Media");
+
+                    b.Navigation("Post");
+                });
+
             modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.RefreshToken", b =>
                 {
                     b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "User")
@@ -613,6 +1148,16 @@ namespace Comink.Infrastructure.Persistence.Migrations
                     b.Navigation("RefreshTokens");
 
                     b.Navigation("Settings");
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Comment", b =>
+                {
+                    b.Navigation("Replies");
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Post", b =>
+                {
+                    b.Navigation("Media");
                 });
 #pragma warning restore 612, 618
         }

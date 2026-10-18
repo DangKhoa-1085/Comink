@@ -25,12 +25,28 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<UserSettings> UserSettings => Set<UserSettings>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    // --- Mạng xã hội (Giai đoạn 2) ---
+    public DbSet<Friendship> Friendships => Set<Friendship>();
+    public DbSet<Follow> Follows => Set<Follow>();
+    public DbSet<Post> Posts => Set<Post>();
+    public DbSet<PostMedia> PostMediaLinks => Set<PostMedia>();
+    public DbSet<PostLike> PostLikes => Set<PostLike>();
+    public DbSet<Comment> Comments => Set<Comment>();
+
+    // --- Hình ảnh và tệp (Giai đoạn 2) ---
+    public DbSet<MediaAsset> MediaAssets => Set<MediaAsset>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
 
         // Áp dụng tất cả IEntityTypeConfiguration<T> từ cùng assembly
         builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+
+        // Ánh xạ hàm PostgreSQL tuỳ biến để gọi được từ LINQ (tìm kiếm không dấu).
+        builder.HasDbFunction(typeof(CominkDbFunctions).GetMethod(nameof(CominkDbFunctions.ImmutableUnaccent))!)
+            .HasName("immutable_unaccent")
+            .HasSchema("public");
 
         // Đổi tên bảng Identity sang snake_case (EFCore.NamingConventions đã xử lý cột,
         // nhưng tên bảng Identity cần đổi thủ công vì chúng được đặt tên cứng)

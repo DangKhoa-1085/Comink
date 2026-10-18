@@ -78,6 +78,10 @@ public static class MigrationExtensions
 
         var admin = new ApplicationUser
         {
+            // Phải gán Id tường minh: ApplicationUser được cấu hình ValueGeneratedNever
+            // (xem IdentityConfigurations), nên bỏ trống thì EF ghi Guid.Empty — trùng với
+            // giá trị "chưa đặt" mà code thường dùng để kiểm tra.
+            Id = Guid.CreateVersion7(),
             UserName = "admin",
             Email = adminEmail,
             EmailConfirmed = true,
