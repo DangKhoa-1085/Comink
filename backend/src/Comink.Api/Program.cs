@@ -141,7 +141,13 @@ try
         await app.Services.ApplyMigrationsAsync();
     }
 
-    app.UseExceptionHandler();
+    // Lỗi đọc body (JSON sai định dạng / sai kiểu / thiếu trường) do framework ném
+    // BadHttpRequestException(400) → trả 400 + code VALIDATION_FAILED thay vì 500 INTERNAL_ERROR
+    // (xem Common/ExceptionStatusMapper.cs và docs/05_api_contract.md mục 5).
+    app.UseExceptionHandler(new ExceptionHandlerOptions
+    {
+        StatusCodeSelector = Comink.Api.Common.ExceptionStatusMapper.StatusCodeFor
+    });
     app.UseStatusCodePages();
     app.UseCors("AllowWebClient");
     app.UseAuthentication();

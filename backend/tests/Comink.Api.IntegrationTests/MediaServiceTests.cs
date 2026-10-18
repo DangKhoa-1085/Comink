@@ -129,7 +129,7 @@ public class MediaServiceTests : IntegrationTestBase
 
         var second = await media.RegisterAsync(owner.Id, request);
         Assert.True(second.Succeeded);
-        Assert.Equal(first.Value!.Id, second.Value.Id);
+        Assert.Equal(first.Value!.Id, second.Value!.Id);
     }
 
     [Fact]
