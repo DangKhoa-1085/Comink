@@ -14,6 +14,7 @@ import { systemApi } from '../api/system'
 import { Card, Spinner } from '../components/ui/Feedback'
 import { Button } from '../components/ui/Button'
 import { useAuthStore } from '../stores/authStore'
+import { FeedPage } from './FeedPage'
 
 interface Feature {
   icon: typeof Users
@@ -60,6 +61,11 @@ export function HomePage() {
     retry: 1,
   })
 
+  // Người đã đăng nhập thấy bảng tin; khách thấy trang giới thiệu.
+  if (user) {
+    return <FeedPage />
+  }
+
   return (
     <div>
       <section className="mb-12 text-center">
@@ -71,11 +77,6 @@ export function HomePage() {
         <p className="mx-auto max-w-3xl text-lg leading-relaxed text-slate-600 dark:text-slate-400">
           {t('app.description')}
         </p>
-        {user && (
-          <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-            {t('app.signed_in_as', { name: user.displayName })}
-          </p>
-        )}
       </section>
 
       {/* Trạng thái backend: có đủ ba trạng thái tải / lỗi / thành công */}

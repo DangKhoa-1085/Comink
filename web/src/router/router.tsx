@@ -7,11 +7,16 @@ import { RegisterPage } from '../pages/RegisterPage'
 import { ProfilePage } from '../pages/ProfilePage'
 import { AdminUsersPage } from '../pages/AdminUsersPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
+import { FeedPage } from '../pages/FeedPage'
+import { SearchPage } from '../pages/SearchPage'
+import { FriendsPage } from '../pages/FriendsPage'
+import { UserProfilePage } from '../pages/UserProfilePage'
 
 /**
  * Bảng định tuyến của web.
  * - `/login`, `/register`: công khai.
- * - `/profile`: yêu cầu đăng nhập.
+ * - `/` (bảng tin khi đã đăng nhập), `/feed`, `/profile`, `/search`, `/friends`, `/users/:id`:
+ *   yêu cầu đăng nhập.
  * - `/admin/users`: yêu cầu role `Admin` (backend vẫn kiểm tra lại — AGENTS.md mục 9.2).
  */
 export const router = createBrowserRouter([
@@ -24,7 +29,13 @@ export const router = createBrowserRouter([
       { path: 'register', element: <RegisterPage /> },
       {
         element: <ProtectedRoute />,
-        children: [{ path: 'profile', element: <ProfilePage /> }],
+        children: [
+          { path: 'profile', element: <ProfilePage /> },
+          { path: 'search', element: <SearchPage /> },
+          { path: 'friends', element: <FriendsPage /> },
+          { path: 'users/:id', element: <UserProfilePage /> },
+          { path: 'feed', element: <FeedPage /> },
+        ],
       },
       {
         element: <RequireRole role="Admin" />,

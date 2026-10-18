@@ -55,6 +55,16 @@ export function AppHeader() {
                 {t('nav.profile')}
               </NavLink>
             )}
+            {user && (
+              <NavLink to="/search" className={navLinkClass}>
+                {t('social.search')}
+              </NavLink>
+            )}
+            {user && (
+              <NavLink to="/friends" className={navLinkClass}>
+                {t('social.friends')}
+              </NavLink>
+            )}
             {isAdmin && (
               <NavLink to="/admin/users" className={navLinkClass}>
                 {t('nav.admin')}

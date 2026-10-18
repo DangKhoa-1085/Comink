@@ -31,6 +31,12 @@ export default defineConfig({
         target: 'http://localhost:5117',
         changeOrigin: true,
       },
+      // Ảnh lưu cục bộ khi dev (phương án B của GĐ 2 — backend phục vụ /uploads).
+      // Thiếu mục này thì ảnh trong bài viết rơi vào SPA fallback và bị vỡ.
+      '/uploads': {
+        target: 'http://localhost:5117',
+        changeOrigin: true,
+      },
     },
   },
   build: {
