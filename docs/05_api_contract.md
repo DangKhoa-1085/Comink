@@ -224,7 +224,7 @@ Phản hồi `200 OK`: phân trang `AdminUserSummary`:
 
 | Mã | HTTP | Ý nghĩa |
 |---|---|---|
-| `VALIDATION_FAILED` | 400 | Dữ liệu đầu vào không hợp lệ (kèm `errors`) |
+| `VALIDATION_FAILED` | 400 | Dữ liệu đầu vào không hợp lệ (kèm `errors`) — **hoặc** body JSON không đọc được (sai định dạng, sai kiểu, thiếu trường bắt buộc); trường hợp này không có `errors` |
 | `AUTH_INVALID_CREDENTIALS` | 401 | Sai tài khoản hoặc mật khẩu |
 | `AUTH_ACCOUNT_LOCKED` | 403 | Tài khoản bị admin khóa (`account_status = Locked`) |
 | `AUTH_REFRESH_TOKEN_INVALID` | 401 | Refresh token không hợp lệ/hết hạn/đã thu hồi |
@@ -237,6 +237,8 @@ Phản hồi `200 OK`: phân trang `AdminUserSummary`:
 | `INTERNAL_ERROR` | 500 | Lỗi không mong đợi |
 
 Mã lỗi là **hằng số tiếng Anh** ở backend; web/app dịch sang `vi`/`en`.
+
+> **Ghi chú (2026-10-18):** lỗi framework khi đọc body (`BadHttpRequestException` với status 400) trước đây trả `500 INTERNAL_ERROR`; đã sửa thành `400 VALIDATION_FAILED` qua `ExceptionStatusMapper` (`backend/src/Comink.Api/Common/ExceptionStatusMapper.cs`). Chỉ map đúng 400; các mã 4xx khác (413, 415…) vẫn trả 500 và **chưa có mã lỗi riêng** — cần bổ sung khi làm phần bảo mật/hardening.
 
 ---
 

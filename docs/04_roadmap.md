@@ -107,6 +107,11 @@ Mỗi giai đoạn gồm: **mục tiêu**, **phụ thuộc** và **checklist ho�
 > - **Hai lỗi thật đã sửa:** (1) `Visibility.Public` bị lưu thành `Friends` do bẫy enum `0` + `HasDefaultValue` (sửa bằng `HasSentinel`); (2) Vite thiếu proxy `/uploads` làm ảnh lưu cục bộ bị vỡ.
 > - Migration: **M1** (`Social_InitialCreate`) + `Media_AddLocalProvider`. Chi tiết: `docs/tasks/phase2_social.md`; hợp đồng API: `docs/05_api_contract.md` mục 7.
 
+> **Cập nhật 2026-10-18 (sau khi chuyển sang Cloudinary thật):**
+> - **Cloudinary đã bật và kiểm chứng thật:** ký HMAC-SHA1 → client upload trực tiếp lên `comink/post`, đăng ký media (`provider = Cloudinary`), đăng bài kèm ảnh, ảnh truy cập công khai `HTTP 200 image/png`; `/uploads` trả `404` và `local-upload` bị chặn đúng thiết kế (400).
+> - **(Sửa lỗi hợp đồng lỗi)** Body JSON không parse được trước đây trả `500 INTERNAL_ERROR`, nay trả `400 VALIDATION_FAILED` (`ExceptionStatusMapper` + 4 test mới). `dotnet test` nay **85/85 pass** (Domain 24 · Application 15 · Tích hợp 46), `dotnet build` 0 warning 0 error.
+> - Đã xoá bài test dùng ảnh lưu cục bộ (phương án a) — không còn bài "đang sống" nào tham chiếu ảnh `Local`.
+
 ### Giai đoạn 3: Nhắn tin CB + Ảnh trong tin nhắn
 
 **Mục tiêu:** hai người dùng nhắn tin được với nhau theo thời gian thực và xem lại lịch sử.
