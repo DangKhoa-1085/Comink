@@ -11,7 +11,7 @@
 > - **Trình duyệt thật** (Chrome qua BrowserSkill): đăng nhập → bảng tin có bài + ảnh hiển thị → soạn và đăng bài mới → thích → bình luận (đếm bình luận tăng 0 → 1) → tìm người dùng **không dấu** (`tran` → "Minh Trần") → trang Bạn bè (3 mục + trạng thái rỗng) → trang cá nhân công khai (số liệu + nút Hủy kết bạn/Theo dõi + danh sách bài).
 > - Kiểm chứng HTTP thật với **3 tài khoản**: 28/28 phép kiểm tra quan hệ, 32/35 lượt kiểm tra bài viết (3 lỗi là do script test, chạy lại đạt), media 5/5.
 > - **Hai lỗi thật đã sửa:** bẫy `Visibility.Public` → `Friends` (thiếu sentinel) và Vite thiếu proxy `/uploads`.
-> - **Chưa tick** checklist ở `docs/04_roadmap.md` theo quy ước `AGENTS.md` mục 12 (chờ bạn xác nhận).
+> - **Checklist** GĐ 2 trong `docs/04_roadmap.md` (dòng 92–101) **đã được bạn tick đủ 10/10 mục**.
 >
 > **Ước lượng:** tuần 3–4 theo roadmap. Migration tương ứng: **M1** (`Social_InitialCreate`) + `Media_AddLocalProvider`.
 > **Người phụ trách:** Dev A (mạng xã hội + ảnh/tệp + quản trị) — `docs/04_roadmap.md` mục 2.
