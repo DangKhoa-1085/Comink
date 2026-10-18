@@ -77,6 +77,20 @@ public static class ApiResults
         ErrorCodes.AuthRefreshTokenReused => "Refresh token reuse detected",
         ErrorCodes.AuthEmailAlreadyExists => "Email already exists",
         ErrorCodes.AuthUserNameAlreadyExists => "Username already exists",
+        ErrorCodes.SocialCannotFriendSelf => "Cannot befriend yourself",
+        ErrorCodes.SocialCannotFollowSelf => "Cannot follow yourself",
+        ErrorCodes.SocialAlreadyFriends => "Already friends",
+        ErrorCodes.SocialFriendRequestNotFound => "Friend request not found",
+        ErrorCodes.SocialNotRequestAddressee => "Not the addressee of this request",
+        ErrorCodes.PostNotFound => "Post not found",
+        ErrorCodes.PostContentRequired => "Post content required",
+        ErrorCodes.PostTooManyMedia => "Too many media items",
+        ErrorCodes.PostMediaNotOwned => "Media does not belong to the author",
+        ErrorCodes.CommentNotFound => "Comment not found",
+        ErrorCodes.CommentReplyDepthExceeded => "Replies are limited to one level",
+        ErrorCodes.MediaUnsupportedType => "Unsupported media type",
+        ErrorCodes.MediaTooLarge => "Media is too large",
+        ErrorCodes.MediaNotFound => "Media not found",
         _ => "Unexpected error"
     };
 
@@ -93,6 +107,20 @@ public static class ApiResults
         ErrorCodes.NotFound => StatusCodes.Status404NotFound,
         ErrorCodes.AuthEmailAlreadyExists => StatusCodes.Status409Conflict,
         ErrorCodes.AuthUserNameAlreadyExists => StatusCodes.Status409Conflict,
+        ErrorCodes.SocialCannotFriendSelf => StatusCodes.Status400BadRequest,
+        ErrorCodes.SocialCannotFollowSelf => StatusCodes.Status400BadRequest,
+        ErrorCodes.SocialAlreadyFriends => StatusCodes.Status409Conflict,
+        ErrorCodes.SocialFriendRequestNotFound => StatusCodes.Status404NotFound,
+        ErrorCodes.SocialNotRequestAddressee => StatusCodes.Status403Forbidden,
+        ErrorCodes.PostNotFound => StatusCodes.Status404NotFound,
+        ErrorCodes.PostContentRequired => StatusCodes.Status400BadRequest,
+        ErrorCodes.PostTooManyMedia => StatusCodes.Status400BadRequest,
+        ErrorCodes.PostMediaNotOwned => StatusCodes.Status400BadRequest,
+        ErrorCodes.CommentNotFound => StatusCodes.Status404NotFound,
+        ErrorCodes.CommentReplyDepthExceeded => StatusCodes.Status400BadRequest,
+        ErrorCodes.MediaUnsupportedType => StatusCodes.Status400BadRequest,
+        ErrorCodes.MediaTooLarge => StatusCodes.Status400BadRequest,
+        ErrorCodes.MediaNotFound => StatusCodes.Status404NotFound,
         _ => StatusCodes.Status500InternalServerError
     };
 

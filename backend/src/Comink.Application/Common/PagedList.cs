@@ -1,16 +1,14 @@
-// Kiểu dữ liệu dùng chung cho phản hồi API.
-namespace Comink.Api.Common;
+// Phân trang theo con trỏ dùng chung cho tầng Application và Api (docs/05_api_contract.md mục 1.2).
+namespace Comink.Application.Common;
 
 /// <summary>
-/// Kết quả phân trang theo con trỏ (docs/05_api_contract.md mục 1.2).
-/// Không dùng offset — mọi danh sách dài đều phân trang bằng (created_at, id).
+/// Kết quả phân trang theo con trỏ <c>(created_at, id)</c>. Không dùng offset
+/// (AGENTS.md mục 8.1).
 /// </summary>
 /// <typeparam name="T">Kiểu phần tử trong danh sách.</typeparam>
-public record PagedResult<T>(IReadOnlyList<T> Items, string? NextCursor, bool HasMore);
+public record PagedList<T>(IReadOnlyList<T> Items, string? NextCursor, bool HasMore);
 
-/// <summary>
-/// Mã hóa / giải mã con trỏ phân trang dạng <c>base64(createdAt|id)</c>.
-/// </summary>
+/// <summary>Mã hóa / giải mã con trỏ phân trang dạng <c>base64(createdAt|id)</c>.</summary>
 public static class CursorCodec
 {
     private const char Separator = '|';

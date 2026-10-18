@@ -2,8 +2,10 @@
 using Comink.Api.Endpoints;
 using Comink.Api.Hubs;
 using Comink.Application.Common;
+using Comink.Application.Common.Interfaces;
 using Comink.Application.Identity.Validators;
 using Comink.Infrastructure;
+using Comink.Infrastructure.Media;
 using FluentValidation;
 using Serilog;
 
@@ -114,6 +116,24 @@ try
     // --- Middleware pipeline ---
     app.UseSerilogRequestLogging();
 
+    // --- Phục vụ tệp lưu cục bộ khi dev (phương án B: chỉ bật khi KHÔNG dùng Cloudinary) ---
+    using (var mediaScope = app.Services.CreateScope())
+    {
+        var mediaOptions = mediaScope.ServiceProvider
+            .GetRequiredService<Microsoft.Extensions.Options.IOptions<MediaStorageOptions>>().Value;
+
+        if (!mediaOptions.UseCloudinary
+            && mediaScope.ServiceProvider.GetRequiredService<IMediaStorage>() is LocalDiskMediaStorage localStorage)
+        {
+            Directory.CreateDirectory(localStorage.RootPath);
+            app.UseStaticFiles(new StaticFileOptions
+            {
+                FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(localStorage.RootPath),
+                RequestPath = mediaOptions.PublicBaseUrl
+            });
+        }
+    }
+
     if (app.Environment.IsDevelopment())
     {
         app.MapOpenApi();
@@ -136,6 +156,11 @@ try
     app.MapAuthEndpoints();
     app.MapUserEndpoints();
     app.MapAdminEndpoints();
+    app.MapFriendshipEndpoints();
+    app.MapFollowEndpoints();
+    app.MapPostEndpoints();
+    app.MapCommentEndpoints();
+    app.MapMediaEndpoints();
 
     // --- Hub SignalR (Giai đoạn 1 chỉ cần xác thực được bằng token) ---
     app.MapHub<ChatHub>("/hub/chat");

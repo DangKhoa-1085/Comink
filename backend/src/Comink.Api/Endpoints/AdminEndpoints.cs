@@ -1,6 +1,7 @@
 // Endpoint quản trị — /api/admin (docs/05_api_contract.md mục 4).
 // Giai đoạn 1 chỉ có danh sách tài khoản; khóa/mở khóa thuộc Giai đoạn 5.
 using Comink.Api.Common;
+using Comink.Application.Common;
 using Comink.Application.Identity.Abstractions;
 
 namespace Comink.Api.Endpoints;
@@ -28,7 +29,7 @@ public static class AdminEndpoints
 
         group.MapGet("/users", ListUsersAsync)
             .WithName("ListUsers")
-            .Produces<PagedResult<AdminUserSummary>>()
+            .Produces<PagedList<AdminUserSummary>>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden);
 
@@ -70,6 +71,6 @@ public static class AdminEndpoints
             ? CursorCodec.Encode(page[^1].CreatedAt, page[^1].Id)
             : null;
 
-        return Results.Ok(new PagedResult<AdminUserSummary>(items, nextCursor, hasMore));
+        return Results.Ok(new PagedList<AdminUserSummary>(items, nextCursor, hasMore));
     }
 }

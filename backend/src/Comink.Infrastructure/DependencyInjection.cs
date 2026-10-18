@@ -1,10 +1,15 @@
 // DI registration cho Infrastructure layer
 using System.Text;
+using Comink.Application.Common.Interfaces;
 using Comink.Application.Identity;
 using Comink.Application.Identity.Abstractions;
 using Comink.Application.Social;
+using Comink.Application.Social.Abstractions;
 using Comink.Infrastructure.Identity;
+using Comink.Infrastructure.Media;
 using Comink.Infrastructure.Persistence;
+using Comink.Infrastructure.Social;
+using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -140,6 +145,26 @@ public static class DependencyInjection
         services.AddScoped<ITokenService, JwtTokenService>();
         services.AddScoped<AuthService>();
         services.AddScoped<ProfileService>();
+
+        // --- Mạng xã hội (Giai đoạn 2) ---
+        services.AddScoped<IUserDirectoryService, UserDirectoryService>();
+        services.AddScoped<IFriendshipService, FriendshipService>();
+        services.AddScoped<IFollowService, FollowService>();
+        services.AddScoped<IPostService, PostService>();
+        services.AddScoped<ILikeService, LikeService>();
+        services.AddScoped<ICommentService, CommentService>();
+        services.AddScoped<IMediaService, MediaService>();
+
+        // --- Lưu trữ media: Cloudinary khi có khoá, ngược lại lưu đĩa cục bộ (dev) ---
+        services.Configure<MediaStorageOptions>(configuration.GetSection(MediaStorageOptions.SectionName));
+        services.AddScoped<IMediaStorage>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<MediaStorageOptions>>().Value;
+
+            return options.UseCloudinary
+                ? (IMediaStorage)ActivatorUtilities.CreateInstance<CloudinaryMediaStorage>(sp)
+                : ActivatorUtilities.CreateInstance<LocalDiskMediaStorage>(sp);
+        });
 
         // --- Redis ---
         var redisConnectionString = configuration.GetConnectionString("Redis")
