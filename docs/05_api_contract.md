@@ -239,6 +239,8 @@ Phản hồi `200 OK`: phân trang `AdminUserSummary`:
 Mã lỗi là **hằng số tiếng Anh** ở backend; web/app dịch sang `vi`/`en`.
 
 > **Ghi chú (2026-10-18):** lỗi framework khi đọc body (`BadHttpRequestException` với status 400) trước đây trả `500 INTERNAL_ERROR`; đã sửa thành `400 VALIDATION_FAILED` qua `ExceptionStatusMapper` (`backend/src/Comink.Api/Common/ExceptionStatusMapper.cs`). Chỉ map đúng 400; các mã 4xx khác (413, 415…) vẫn trả 500 và **chưa có mã lỗi riêng** — cần bổ sung khi làm phần bảo mật/hardening.
+>
+> **Quy ước `title` là hàm của `code`:** `title` được suy ra từ `code` bằng `ApiResults.ApplyProblemDefaults` (trước đây lỗi 400 do framework có title `Bad Request` còn lỗi validate có `Validation failed`). Nay lỗi **cùng mã luôn cùng tiêu đề** — ví dụ cả hai loại 400 đều là `Validation failed`; 404 do framework là `Not found`, còn 404 bài viết là `Post not found` (theo `POST_NOT_FOUND`). Client vẫn **chỉ dựa vào `code`**, không dựa vào `title`.
 
 ---
 
