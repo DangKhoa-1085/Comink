@@ -769,7 +769,7 @@ Mỗi enum tương ứng một `enum` trong C#, lưu **chuỗi** trong DB và c�
 | `CallEndReason` | `calls.end_reason` | `Completed`, `NoAnswer`, `Declined`, `Cancelled`, `Failed` | Lý do kết thúc |
 | `MediaResourceType` | `media_assets.resource_type` | `Image`, `Video`, `File` | Loại tệp |
 | `MediaContext` | `media_assets.context` | `Post`, `Message`, `Avatar`, `Cover`, `Album` | Mục đích tải lên |
-| `MediaProvider` | `media_assets.provider` | `Cloudinary`, `Firebase` | Nơi lưu |
+| `MediaProvider` | `media_assets.provider` | `Cloudinary`, `Firebase`, `Local` | Nơi lưu. `Local` **chỉ dùng khi chạy dev** chưa có khoá Cloudinary (phương án B của GĐ 2, xem `docs/tasks/phase2_social.md` mục 3.9) |
 | `DevicePlatform` | `user_devices.platform` | `Web`, `Android`, `iOS` | |
 | `ReportTargetType` | `reports.target_type` | `Post`, `Comment`, `Message`, `User` | Đối tượng bị báo cáo |
 | `ReportReason` | `reports.reason` | `Spam`, `Harassment`, `Inappropriate`, `Misinformation`, `Other` | |

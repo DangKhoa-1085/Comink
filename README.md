@@ -110,6 +110,19 @@ npm run dev
 # http://localhost:5173
 ```
 
+### 6b. Ảnh trong bài viết (Giai đoạn 2)
+
+Ảnh được tải lên **trực tiếp** bằng chữ ký do backend cấp (`docs/02_tech_stack_decisions.md` mục 3.4). Chọn một trong hai cách:
+
+| Cách | Cấu hình | Kết quả |
+|---|---|---|
+| **Cloudinary** (production) | Điền `MediaStorage__CloudName`, `MediaStorage__ApiKey`, `MediaStorage__ApiSecret` trong `.env` | Client tải thẳng lên Cloudinary; backend chỉ cấp chữ ký |
+| **Đĩa cục bộ** (dev, mặc định khi để trống 3 khoá) | Không cần làm gì | Backend lưu tệp vào `infra/uploads/<context>/` và phục vụ tại `/uploads/...` |
+
+- Proxy của Vite đã chuyển tiếp `/uploads` về backend — thiếu mục này thì ảnh trong bài viết sẽ bị vỡ.
+- Giới hạn: `image/jpeg`, `image/png`, `image/webp`, ≤ 5 MB/ảnh, ≤ 10 ảnh/bài (kiểm tra ở cả client và server).
+- Thư mục `infra/uploads` là dữ liệu dev — không commit (xem `.gitignore`).
+
 ### 7. Chạy app Flutter (tuỳ chọn)
 
 ```bash

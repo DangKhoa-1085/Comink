@@ -168,7 +168,14 @@ Hai lỗi nhỏ phát hiện trong đợt kiểm chứng trình duyệt (2026-10
 - Sửa: tách thành `total_shown_one` / `total_shown_other` trong `en.json`; `vi.json` dùng `total_shown_other` (tiếng Việt chỉ có một dạng số nhiều).
 - Kiểm chứng: chạy i18next trên chính hai file locale — `en` count=1 → "Showing 1 account", count=5 → "Showing 5 accounts", `vi` → "Đang hiển thị N tài khoản".
 
-**Còn thiếu (ghi nhận, chưa làm):** chưa có **test tự động ở tầng HTTP**; dự án hiện chỉ có test tầng service/DbContext, nên hai sửa đổi trên được kiểm chứng bằng request thật và ghi lại kết quả, không phải bằng test. Khi thêm `WebApplicationFactory` (cần cẩn thận vì `Program.cs` có nạp `.env` thật) thì nên bổ sung test khẳng định `401/403/404` đều có `code`.
+**3) Tài khoản admin seed có khóa chính `Guid.Empty`** (phát hiện ngày 2026-10-17 khi chuẩn bị GĐ 2). `ApplicationUser` được cấu hình `ValueGeneratedNever()` (backend tự sinh khóa), nhưng `SeedAdminAsync` trong `MigrationExtensions` tạo `new ApplicationUser { ... }` **không gán `Id`** → EF ghi `00000000-0000-0000-0000-000000000000`. Đường đăng ký không bị vì `IdentityService` gán `Guid.CreateVersion7()`.
+
+- Hệ quả: khóa chính trùng với giá trị "chưa đặt" mà code thường dùng để kiểm tra; JWT phát ra có `sub = 0…0`; mọi bảng của GĐ 2 tham chiếu tới user sẽ lưu id 0.
+- Sửa: `SeedAdminAsync` gán `Id = Guid.CreateVersion7()`; cấp lại khóa cho dòng admin trong DB dev (UUIDv7 mới) và cập nhật toàn bộ bảng tham chiếu (`user_claims`, `user_logins`, `user_tokens`, `user_roles`, `user_profiles`, `user_settings`, `refresh_tokens`) trong **một transaction**.
+- Kiểm chứng: `count(*) WHERE id/user_id = '000…'` = 0 ở mọi bảng; admin vẫn có `display_name = Administrator` và role `Admin`; thử chèn `user_roles` trỏ tới user không tồn tại vẫn bị chặn → khóa ngoại còn hiệu lực sau thao tác. `dotnet build`: 0 warning; `dotnet test`: 29/29.
+- Lưu ý: phiên đăng nhập cũ của admin (JWT có `sub = 0…0`) trở nên không hợp lệ → phải đăng nhập lại.
+
+**Còn thiếu (ghi nhận, chưa làm):** chưa có **test tự động ở tầng HTTP**; dự án hiện chỉ có test tầng service/DbContext, nên các sửa đổi trên được kiểm chứng bằng request thật và ghi lại kết quả, không phải bằng test. Khi thêm `WebApplicationFactory` (cần cẩn thận vì `Program.cs` có nạp `.env` thật) thì nên bổ sung test khẳng định `401/403/404` đều có `code`. Chưa có test cho seeder (khó unit-test vì phụ thuộc `UserManager`).
 
 ---
 

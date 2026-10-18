@@ -19,6 +19,9 @@ appsettings.Local.json
 *serviceAccount*.json
 *service-account*.json
 
+# Tệp media lưu cục bộ khi dev (Giai đoạn 2, phương án B) — dữ liệu sinh ra, không commit
+infra/uploads/
+
 # ========================
 # .NET / ASP.NET Core
 # ========================

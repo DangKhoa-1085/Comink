@@ -100,6 +100,15 @@ Mỗi giai đoạn gồm: **mục tiêu**, **phụ thuộc** và **checklist ho�
 - [ ] Quyền xem bài viết đúng (không xem được bài `Friends` của người lạ)
 - [ ] Có test cho quyền xem bài và trạng thái kết bạn
 
+> **Trạng thái (cập nhật 2026-10-17):** cả 10 mục đã **cài đặt và kiểm chứng** ở backend + web, nhưng **chưa tick** theo quy ước `AGENTS.md` mục 12 (chờ bạn xác nhận).
+> - Backend: **81 test pass** (Domain 24 · Application 15 · Tích hợp 42 trên PostgreSQL thật), `dotnet build` 0 warning 0 error.
+> - Web: `npm run lint` 0 warning/0 error; `npm run build` thành công; **kiểm chứng trên trình duyệt thật** (Chrome qua BrowserSkill): bảng tin + soạn/đăng bài + ảnh hiển thị + thích + bình luận (đếm tăng đúng) + tìm người dùng **không dấu** + trang bạn bè + trang cá nhân + nút quan hệ.
+> - Kiểm chứng HTTP thật với **3 tài khoản**: 28/28 phép kiểm tra quan hệ bạn bè/theo dõi, 32/35 lượt kiểm tra bài viết (3 lỗi còn lại là do script test của tôi, đã sửa và chạy lại đạt), media 5/5.
+> - **Hai lỗi thật đã sửa:** (1) `Visibility.Public` bị lưu thành `Friends` do bẫy enum `0` + `HasDefaultValue` (sửa bằng `HasSentinel`); (2) Vite thiếu proxy `/uploads` làm ảnh lưu cục bộ bị vỡ.
+> - **(Sửa lỗi GĐ 1) Giao diện sáng/tối:** Tailwind v4 mặc định theo `prefers-color-scheme` nên nút đổi theme không có tác dụng trên máy đang bật chế độ tối; đã thêm `@custom-variant dark` và áp theme trước khi render — đã kiểm chứng trên trình duyệt.
+> - **Bổ sung khi rà soát:** UI sửa bài viết (trước đó web chỉ có đăng/xóa) — đã thêm và kiểm chứng trên trình duyệt.
+> - Migration: **M1** (`Social_InitialCreate`) + `Media_AddLocalProvider`. Chi tiết: `docs/tasks/phase2_social.md`; hợp đồng API: `docs/05_api_contract.md` mục 7.
+
 ### Giai đoạn 3: Nhắn tin CB + Ảnh trong tin nhắn
 
 **Mục tiêu:** hai người dùng nhắn tin được với nhau theo thời gian thực và xem lại lịch sử.
