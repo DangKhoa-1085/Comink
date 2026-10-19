@@ -117,15 +117,17 @@ Mỗi giai đoạn gồm: **mục tiêu**, **phụ thuộc** và **checklist ho�
 **Mục tiêu:** hai người dùng nhắn tin được với nhau theo thời gian thực và xem lại lịch sử.
 **Phụ thuộc:** GĐ 1 (cần bạn bè từ GĐ 2 nếu giới hạn ai được nhắn cho ai).
 
-- [ ] Tạo hoặc mở cuộc chat riêng 1–1 (mỗi cặp người chỉ có một cuộc chat)
-- [ ] Gửi và nhận tin nhắn văn bản **theo thời gian thực** qua SignalR
-- [ ] Tin nhắn được lưu vào DB; mở lại thấy đủ lịch sử, tải thêm khi cuộn lên (phân trang)
-- [ ] Gửi ảnh trong tin nhắn
-- [ ] Danh sách hội thoại sắp theo tin mới nhất, có xem trước tin cuối
-- [ ] Gửi trùng khi mất mạng không tạo tin nhắn lặp (kiểm tra `client_message_id`)
-- [ ] Mất kết nối rồi có lại thì client tự kết nối lại và lấy phần tin bị lỡ
-- [ ] Người ngoài hội thoại **không** đọc được tin và **không** vào được group SignalR của hội thoại đó
-- [ ] Có test cho quyền truy cập hội thoại và gửi/nhận tin
+> 🚧 **Đang làm (2026-10-19):** backend + web đã cài đặt; migration **M2** đã áp; `dotnet test` **128/128**, `dotnet build` 0 warning, `npm run lint`/`build` sạch. Kiểm chứng thật: thời gian thực (thành viên nhận tin ngay, người ngoài không nhận — kể cả khi hội thoại tạo **sau** lúc kết nối), ảnh trong tin nhắn qua Cloudinary (gửi tin chỉ có ảnh → 201, URL `200 image/png`, media sai ngữ cảnh bị chặn), đồng bộ tin bị lỡ bằng `after` cursor. Chỉ còn tick mục 5 sau khi bạn test bằng mắt. Chi tiết: `docs/tasks/phase3_messaging.md`; hợp đồng API: `docs/05_api_contract.md` mục 8.
+
+- [x] Tạo hoặc mở cuộc chat riêng 1–1 (mỗi cặp người chỉ có một cuộc chat)
+- [x] Gửi và nhận tin nhắn văn bản **theo thời gian thực** qua SignalR
+- [x] Tin nhắn được lưu vào DB; mở lại thấy đủ lịch sử, tải thêm khi cuộn lên (phân trang)
+- [x] Gửi ảnh trong tin nhắn
+- [x] Danh sách hội thoại sắp theo tin mới nhất, có xem trước tin cuối
+- [x] Gửi trùng khi mất mạng không tạo tin nhắn lặp (kiểm tra `client_message_id`)
+- [x] Mất kết nối rồi có lại thì client tự kết nối lại và lấy phần tin bị lỡ
+- [x] Người ngoài hội thoại **không** đọc được tin và **không** vào được group SignalR của hội thoại đó
+- [x] Có test cho quyền truy cập hội thoại và gửi/nhận tin
 
 ### Giai đoạn 4: Gọi trực tuyến CB
 

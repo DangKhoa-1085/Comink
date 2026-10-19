@@ -412,10 +412,103 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 
 ---
 
-## 8. Lịch sử thay đổi
+## 8. Nhắn tin (Giai đoạn 3)
+
+> Trạng thái: **mục 8.2–8.7 đã cài đặt ở backend và kiểm chứng bằng HTTP thật (2026-10-18)**; web đang làm. Quyết định **D1 đã chốt: chỉ bạn bè mới mở được hội thoại 1–1** (`docs/tasks/phase3_messaging.md` mục 2).
+> Phạm vi CB: **chỉ chat riêng 1–1**. Chat nhóm, trạng thái online, "đang nhập", đã gửi/đã đọc, trả lời, thu hồi/sửa, tìm kiếm, ghim, cảm xúc là **[NC]** — chưa có trong hợp đồng này.
+
+### 8.1. Quy ước riêng
+
+| Quy ước | Giá trị |
+|---|---|
+| Không phải thành viên hội thoại | `404 CONVERSATION_NOT_FOUND` cho **mọi** endpoint (không dùng 403 — tránh lộ sự tồn tại của hội thoại) |
+| Phân trang | Con trỏ: tin nhắn `(created_at, id)`, danh sách hội thoại `(last_message_at, id)`; **không** OFFSET |
+| Gửi tin idempotent | `clientMessageId` (uuid) do client sinh; trùng khoá → trả `200` kèm tin đã lưu, không tạo bản ghi mới |
+| Giới hạn | `content` ≤ 4000 ký tự; ≤ 10 tệp/tin; `limit` ≤ 50 (mặc định 20) |
+| Ai được nhắn cho ai | **D1 chưa chốt**; nếu chọn "chỉ bạn bè" thì trả `403 MESSAGING_NOT_FRIENDS` |
+
+### 8.2. Mở/tạo hội thoại 1–1
+
+`POST /api/conversations/direct`
+
+| Trường | Kiểu | Bắt buộc | Ghi chú |
+|---|---|---|---|
+| `userId` | uuid | ✔ | Người muốn nhắn cùng |
+
+- `201 Created` — tạo mới; `200 OK` — hội thoại đã tồn tại (idempotent theo `direct_key`).
+- Trả `ConversationDto`: `{ id, type, title?, avatarUrl?, createdAt, lastMessageAt?, members: [{ userId, displayName, userName, avatarUrl }], lastMessage?: MessageDto }`
+- Lỗi: `MESSAGING_CANNOT_MESSAGE_SELF` (400), `MESSAGING_NOT_FRIENDS` (403 — nếu D1 chọn "chỉ bạn bè"), `USER_NOT_FOUND` (404).
+
+### 8.3. Danh sách hội thoại
+
+`GET /api/conversations?limit=&cursor=`
+
+- Sắp xếp `last_message_at DESC` (`NULLS LAST` cho hội thoại chưa có tin).
+- Trả `PagedList<ConversationSummaryDto>`: `{ id, type, title?, peer: { userId, displayName, avatarUrl }, lastMessage?: { id, senderId, preview, type, createdAt }, unreadCount }` — `unreadCount = 0` ở CB.
+
+### 8.4. Chi tiết hội thoại
+
+`GET /api/conversations/{id}` → `ConversationDto` (cùng hình dạng 8.2). Người ngoài → `404 CONVERSATION_NOT_FOUND`.
+
+### 8.5. Lịch sử tin nhắn
+
+`GET /api/conversations/{id}/messages?limit=&before=|after=`
+
+| Tham số | Ý nghĩa |
+|---|---|
+| `before` | Con trỏ `(created_at, id)` — lấy **cũ hơn** (cuộn lên). Trả về mới nhất trước |
+| `after` | Con trỏ — lấy **mới hơn** (đồng bộ sau khi mất kết nối). Trả về cũ nhất trước |
+| (không có) | 50 tin mới nhất |
+
+- Gửi cả `before` và `after` → `400 VALIDATION_FAILED`.
+- Trả `PagedList<MessageDto>`: `{ id, conversationId, senderId, type, content?, attachments: [{ mediaId, url, thumbnailUrl?, width?, height? }], clientMessageId, createdAt }`
+
+### 8.6. Gửi tin nhắn
+
+`POST /api/conversations/{id}/messages`
+
+| Trường | Kiểu | Bắt buộc | Ghi chú |
+|---|---|---|---|
+| `clientMessageId` | uuid | ✔ | Client sinh; dùng chống gửi trùng |
+| `content` | string? | ✖ | ≤ 4000; rỗng khi tin chỉ có ảnh |
+| `mediaIds` | uuid[]? | ✖ | ≤ 10; media phải do người gửi tải lên với `context = Message` |
+
+- `201 Created` tin mới; `200 OK` nếu trùng `clientMessageId` (trả tin đã lưu).
+- Lỗi: `MESSAGE_CONTENT_REQUIRED` (400 — không có cả nội dung lẫn ảnh), `MESSAGE_TOO_MANY_ATTACHMENTS` (400), `MEDIA_NOT_OWNED` (400), `CONVERSATION_NOT_FOUND` (404).
+- Phát sự kiện `MessageCreated` tới group `conversation:{id}` (xem 8.7).
+
+### 8.7. SignalR — hub `/hub/chat`
+
+| Hạng mục | Quy ước |
+|---|---|
+| Xác thực | `access_token` qua query string (đã có từ GĐ 1) |
+| Group người dùng | `user:{userId}` (đã có) |
+| Group hội thoại | `conversation:{conversationId}` — **server tự thêm** khi client kết nối, dựa trên danh sách thành viên còn hiệu lực (`left_at IS NULL`). **Không** có hub method để client tự join/leave |
+| Sự kiện server → client | `MessageCreated` (payload `MessageDto`) gửi tới **`user:{id}` của từng thành viên** *và* group `conversation:{id}`. Phải phát theo `user:{id}` vì client chỉ được thêm vào group hội thoại **lúc kết nối** — hội thoại tạo sau khi kết nối sẽ không có ai trong group (lỗi thật 2026-10-19: phải tải lại trang mới thấy tin). Client ở cả hai group nhận trùng không sao: handler chèn tin theo `id` rồi làm mới dữ liệu |
+| Tín hiệu client → server | Chưa có ở CB ("đang nhập"/presence là **[NC]**) |
+| Đồng bộ sau khi mất kết nối | Client kết nối lại → gọi `GET /api/conversations/{id}/messages?after={lastMessageId}` và `GET /api/conversations` để làm mới |
+| Quyền | Người ngoài không nằm trong group hội thoại ⇒ **không nhận** `MessageCreated`; mọi truy cập REST trả 404 |
+
+### 8.8. Mã lỗi mới (GĐ 3)
+
+| Mã | HTTP | Ý nghĩa |
+|---|---|---|
+| `CONVERSATION_NOT_FOUND` | 404 | Không tìm thấy hội thoại **hoặc** người dùng không phải thành viên |
+| `MESSAGING_CANNOT_MESSAGE_SELF` | 400 | Không thể tự mở hội thoại với chính mình |
+| `MESSAGING_NOT_FRIENDS` | 403 | Chưa là bạn bè nên chưa nhắn tin được *(chỉ khi D1 chọn "chỉ bạn bè")* |
+| `MESSAGE_CONTENT_REQUIRED` | 400 | Tin không có nội dung và cũng không có tệp |
+| `MESSAGE_TOO_MANY_ATTACHMENTS` | 400 | Quá 10 tệp trong một tin |
+| `MESSAGE_CLIENT_ID_REQUIRED` | 400 | Thiếu `clientMessageId` |
+| `MESSAGE_INVALID_CURSOR` | 400 | Con trỏ phân trang không hợp lệ |
+
+---
+
+## 9. Lịch sử thay đổi
 
 | Ngày | Thay đổi |
 |---|---|
 | 2026-10-15 | Chốt hợp đồng Giai đoạn 1: auth, hồ sơ, danh sách tài khoản admin, mã lỗi, quy ước SignalR |
 | 2026-10-17 | Bổ sung `code` cho lỗi do framework sinh (400/401/403/404/500) — khắc phục lệch hợp đồng phát hiện khi kiểm chứng trên trình duyệt thật |
 | 2026-10-17 | Thêm mục 7: hợp đồng mạng xã hội GĐ 2 (tìm người dùng, hồ sơ công khai, bạn bè, theo dõi — đã cài đặt; bài viết/thích/bình luận/media — đã chốt, chưa cài đặt) |
+| 2026-10-18 | Sửa lỗi hợp đồng lỗi: body JSON hỏng trả `400 VALIDATION_FAILED` thay vì `500`; `title` suy ra từ `code` (mục 5) |
+| 2026-10-18 | Thêm mục 8 (đề xuất): hợp đồng nhắn tin GĐ 3 — hội thoại 1–1, gửi/nhận tin, phân trang, ảnh trong tin, SignalR group theo hội thoại. Chờ chốt quyết định D1 |
