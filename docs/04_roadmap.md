@@ -143,6 +143,8 @@ Mỗi giai đoạn gồm: **mục tiêu**, **phụ thuộc** và **checklist ho�
 - [ ] Hiển thị được lúc cuộc gọi đến để người nhận có thể vào cuộc gọi
 - [ ] Kết thúc cuộc gọi giải phóng đúng tài nguyên (không còn room "treo")
 
+> 🚧 **Đang làm (bắt đầu 2026-10-19):** **backend đã xong và kiểm chứng thật** — migration **M3** đã áp; `dotnet test` **154/154**, build 0 warning; tạo cuộc gọi qua LiveKit thật (room được tạo/xoá), token 10 phút, người ngoài `404`, answer/end đúng, ghi `calls` + tin nhắn `Call`; webhook `room_started`/`room_finished` trả **200**; TURN/UDP đã bật (IP LAN `192.168.1.29`, relay 30500–30510). Còn lại: **web UI gọi** + thử 2 máy thật với TURN relay. Chi tiết: `docs/tasks/phase4_calls.md`; hợp đồng API: `docs/05_api_contract.md` mục 9.
+
 ### Giai đoạn 5: Quản trị viên CB
 
 **Mục tiêu:** admin quản lý được tài khoản người dùng.

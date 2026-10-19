@@ -77,8 +77,8 @@ services:
   # -------------------------------------------------
   # LiveKit — Media server cho gọi thoại/video (chế độ dev)
   # API/WS: localhost:7880
-  # TURN/TCP: localhost:7881
-  # TURN/UDP: localhost:7882
+  # RTC/TCP: localhost:7881 · RTC/UDP: localhost:7882
+  # TURN (GĐ 4): UDP 3478 + TLS 5349 — dùng IP LAN khai báo trong livekit.yaml
   # -------------------------------------------------
   livekit:
     image: livekit/livekit-server:latest
@@ -87,8 +87,10 @@ services:
     command: --config /etc/livekit/livekit.yaml
     ports:
       - "7880:7880"   # HTTP API + WebSocket
-      - "7881:7881"   # TURN/TCP
-      - "7882:7882/udp" # TURN/UDP
+      - "7881:7881"   # RTC over TCP
+      - "7882:7882/udp" # RTC over UDP
+      - "3478:3478/udp" # TURN/UDP (GĐ 4)
+      - "30500-30510:30500-30510/udp" # Dải relay của TURN (khớp relay_range_start/end trong livekit.yaml)
     volumes:
       - ./livekit.yaml:/etc/livekit/livekit.yaml:ro
     networks:

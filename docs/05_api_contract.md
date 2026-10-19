@@ -552,6 +552,9 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 
 `POST /api/webhooks/livekit` — **AllowAnonymous**, bắt buộc xác thực JWT HS256 (`Authorization: Bearer …`) và đối chiếu claim `sha256` với hash của body.
 
+> ⚠️ **Bẫy đã gặp thật (2026-10-19):** LiveKit gửi JWT **trần** trong header `Authorization` — **không** kèm tiền tố `Bearer `. Endpoint phải chấp nhận cả hai dạng, nếu không sẽ trả 401 và cuộc gọi không bao giờ được đóng từ webhook.
+> Endpoint trả `200` cho mọi sự kiện đã xử lý (kể cả sự kiện không quan tâm, để LiveKit không gửi lại) và `401` khi chữ ký sai (kèm `{"error": "invalid_signature" | "missing_authorization"}` để chẩn đoán).
+
 | Sự kiện | Xử lý |
 |---|---|
 | `room_started` | đặt `answered_at` nếu chưa có |

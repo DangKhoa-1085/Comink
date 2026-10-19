@@ -21,28 +21,29 @@ logging:
   level: info
   json: false
 
-# TURN tích hợp sẵn: CHƯA BẬT khi dev.
+# TURN tích hợp sẵn (Giai đoạn 4 — quyết định D2: bật với IP LAN của máy dev).
 #
-# Lý do:
-#   1. TURN cần một domain hợp lệ; giá trị `localhost` bị LiveKit từ chối
-#      ("TURN domain is not correct") làm container thoát ngay.
-#   2. Cổng TURN mặc định (UDP 3478 / TLS 5349) chưa được publish trong
-#      infra/docker-compose.yml nên dù bật cũng không truy cập được từ máy host.
-#   3. Dev trên máy cá nhân không cần TURN (không có NAT giữa hai máy).
-#
-# Việc bật TURN đúng cách thuộc Giai đoạn 4 (Gọi trực tuyến CB) — xem
-# docs/04_roadmap.md: cần domain thật hoặc IP LAN, publish cổng UDP/TCP
-# tương ứng trong docker-compose, và dùng secret dài >= 32 ký tự.
-# turn:
-#   enabled: true
-#   domain: <domain-that-hoac-ip-lan>
-#   tls_port: 5349
-#   udp_port: 3478
-#   external_tls: false
+# - `domain` phải là hostname hoặc IP LAN hợp lệ; `localhost` bị LiveKit từ chối.
+# - Chỉ bật TURN/UDP (3478). LiveKit BẮT BUỘC có TLS cert nếu bật `tls_port`, nên ở môi
+#   trường dev ta để `tls_port: 0` (không cần cert). Muốn TURN/TLS thì phải cấu hình
+#   `cert_file`/`key_file` và publish cổng 5349 trong docker-compose.
+# - Phạm vi hoạt động: hai máy **cùng LAN** hoặc sau NAT của router (đúng mục 5 roadmap).
+#   Gọi giữa hai mạng hoàn toàn khác nhau (ví dụ 4G ↔ Wi-Fi) cần domain công khai hoặc tunnel.
+# - Đổi mạng thì phải sửa `domain` ở đây rồi `docker restart comink_livekit`.
+turn:
+  enabled: true
+  domain: 192.168.1.29
+  udp_port: 3478
+  tls_port: 0
+  external_tls: false
+  # Dải cổng TURN dùng để relay media. Mặc định LiveKit dùng 30000–40000 (quá rộng để
+  # publish trong Docker) → thu hẹp cho dev và publish đúng dải này trong docker-compose.
+  relay_range_start: 30500
+  relay_range_end: 30510
 
-# Webhook để nhận sự kiện (room kết thúc, người rời, v.v.)
-# Sẽ cấu hình sau khi backend có endpoint webhook
-# webhook:
-#   urls:
-#     - http://host.docker.internal:5117/api/webhooks/livekit
-#   api_key: devkey
+# Webhook để nhận sự kiện (room bắt đầu/kết thúc, người vào/rời) cho /api/webhooks/livekit.
+# host.docker.internal = máy host (từ trong container `localhost` là chính container).
+webhook:
+  urls:
+    - http://host.docker.internal:5117/api/webhooks/livekit
+  api_key: devkey

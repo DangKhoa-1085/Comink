@@ -110,6 +110,24 @@ npm run dev
 # http://localhost:5173
 ```
 
+### 6c. Gọi thoại/video (Giai đoạn 4 — LiveKit + TURN)
+
+LiveKit đã nằm trong `infra/docker-compose.yml` (`comink_livekit`), dùng chung `api_key`/`api_secret` với backend (`appsettings.Development.json` mục `LiveKit` và `.env`).
+
+| Hạng mục | Giá trị dev |
+|---|---|
+| API/WebSocket | `http://localhost:7880` (WebRTC) |
+| RTC | TCP `7881`, UDP `7882` |
+| TURN/UDP | `3478` + dải relay `30500–30510` (khai báo trong `infra/livekit.yaml`) |
+| TURN domain | **IP LAN của máy bạn** — sửa `turn.domain` trong `infra/livekit.yaml` rồi `docker restart comink_livekit` |
+
+Lưu ý khi test gọi giữa hai máy:
+
+- **Camera/micro chỉ chạy trên secure context**: `http://localhost` được coi là an toàn, còn `http://192.168.x.x:5173` **thì không** (trình duyệt chặn `getUserMedia`). Muốn test từ máy khác phải bật HTTPS cho Vite, hoặc mở Chrome với `--unsafely-treat-insecure-origin-as-secure=http://192.168.1.29:5173`.
+- Mở firewall cho UDP `7882`, `3478` và dải `30500–30510` nếu Windows hỏi.
+- TURN chỉ chạy UDP (LiveKit bắt buộc TLS cert nếu bật `tls_port`). Muốn TURN/TLS: cấu hình `cert_file`/`key_file` và mở cổng 5349.
+- Webhook LiveKit trỏ về `http://host.docker.internal:5117/api/webhooks/livekit`; LiveKit gửi JWT **trần** trong header `Authorization` (không kèm `Bearer `) — backend đã xử lý cả hai dạng.
+
 ### 6b. Ảnh trong bài viết (Giai đoạn 2)
 
 Ảnh được tải lên **trực tiếp** bằng chữ ký do backend cấp (`docs/02_tech_stack_decisions.md` mục 3.4). Chọn một trong hai cách:

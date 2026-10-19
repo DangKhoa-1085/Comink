@@ -3,7 +3,19 @@
 > Tài liệu 06 (tiếp), phân rã từ `docs/04_roadmap.md` (Giai đoạn 4) theo `AGENTS.md` mục 7.3.
 > **Mục tiêu:** gọi thoại/video 1–1 và gọi nhóm (≥3 người) hoạt động ổn định, có token ngắn hạn, có ghi DB, có UI cuộc gọi đến, kết thúc giải phóng tài nguyên.
 > **Phụ thuộc:** GĐ 1 (auth + SignalR) ✅ · GĐ 2 (bạn bè, media) ✅ · GĐ 3 (hội thoại 1–1 + hub) ✅.
-> **Trạng thái:** 🚧 **ĐANG LÀM** — D1/D2 **đã chốt** (xem mục 2); bắt đầu từ migration M3 + Domain.
+> **Trạng thái:** 🚧 **ĐANG LÀM** — D1/D2 đã chốt. **Backend đã xong và kiểm chứng thật** (migration M3 đã áp, 154 test xanh, gọi cuộc gọi thật qua LiveKit, webhook 200, TURN/UDP bật). Web (UI gọi) còn lại.
+>
+> **Tiến độ (2026-10-19):**
+> - ✅ **M3 đã tạo + áp vào DB**: `calls`, `call_participants`, `messages.call_id` (FK `SET NULL`), CHECK cho 4 enum, index `(conversation_id, created_at DESC)` và `(user_id, invited_at DESC)`.
+> - ✅ **Domain** `CallRules`: chuyển trạng thái, tính thời lượng, `ResolveEnd` (thứ tự ưu tiên Completed → Missed → Cancelled → Declined → Failed), validate danh sách người mời.
+> - ✅ **Infrastructure**: `LiveKitCallProvider` (JWT HS256 + Twirp CreateRoom/DeleteRoom), `CallService` (bắt đầu 1–1/nhóm, cấp token, answer/decline/end, lịch sử, xử lý webhook).
+> - ✅ **API**: 7 endpoint `/api/calls` + webhook `/api/webhooks/livekit` (xác thực HS256 + claim `sha256`), mã lỗi đã map vào `ApiResults`.
+> - ✅ **Kiểm chứng thật (LiveKit thật):** tạo cuộc gọi → `201 Ringing` + room `comink_…` được tạo; token `ws://localhost:7880` hạn 10 phút; **người ngoài xin token → `404 CALL_NOT_FOUND`**; answer → `InProgress` + `answered_at`; end → `Completed`, `duration`, **`Đã xoá room LiveKit`**; DB có `calls`/`call_participants` + tin nhắn `call:Audio:2:Completed`; **webhook `room_started`/`room_finished` trả 200**.
+> - 🐞 **Lỗi #4 (tự phát hiện):** webhook bị **401** vì LiveKit gửi JWT **trần** trong header `Authorization` (không kèm `Bearer `) — đã chấp nhận cả hai dạng. Bẫy phụ: `MemberRole.Owner = 0` + cột default `Member` (cùng lớp lỗi `Visibility` GĐ 2) → đã thêm `HasSentinel`.
+> - 🐞 **Lỗi #5:** `room_started` từng bị tính là "đã trả lời" → cuộc gọi không ai nghe sẽ thành `Completed`; nay chỉ `participant_joined` mới đặt `answered_at`.
+> - ✅ **TURN (D2)** đã bật: `turn.domain=192.168.1.29`, UDP 3478 + relay 30500–30510 (publish trong compose), `tls_port=0` vì LiveKit bắt buộc TLS cert nếu bật.
+> - ✅ **Test**: Domain +14 (`CallRulesTests`), Tích hợp +12 (`CallServiceTests`) ⇒ **`dotnet test` 154/154**, build 0 warning.
+> - ⏳ Còn lại: **web UI gọi** (modal cuộc gọi đến, màn hình gọi, nút gọi), thử 2 máy thật + TURN relay (`iceTransportPolicy: 'relay'`), tick mục 5.
 > **Migration tương ứng:** **M3** (`calls`, `call_participants`, `messages.call_id`).
 > **Người phụ trách:** Dev B (Nhắn tin, Gọi, Push) — `docs/04_roadmap.md` mục 2.
 
