@@ -37,7 +37,13 @@ public static class CursorCodec
                 return null;
             }
 
-            if (!DateTimeOffset.TryParse(parts[0], out var createdAt))
+            // Parse theo InvariantCulture: con trỏ là ISO-8601 nên không được phụ thuộc
+            // culture của máy chủ (máy đặt vi-VN vẫn phải đọc đúng "2026-10-19T22:15:05.123456+00:00").
+            if (!DateTimeOffset.TryParse(
+                    parts[0],
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.RoundtripKind,
+                    out var createdAt))
             {
                 return null;
             }
