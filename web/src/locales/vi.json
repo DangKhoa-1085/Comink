@@ -124,6 +124,23 @@
     "status_locked": "Đã khóa",
     "status_deleted": "Đã vô hiệu hóa"
   },
+  "chat": {
+    "title": "Tin nhắn",
+    "error": "Không tải được tin nhắn",
+    "connection_lost": "Mất kết nối — đang tự kết nối lại. Tin nhắn sẽ được đồng bộ khi có mạng.",
+    "empty_list": "Chưa có cuộc trò chuyện nào. Vào trang cá nhân của một người bạn và bấm “Nhắn tin”.",
+    "no_message_yet": "Chưa có tin nhắn",
+    "image_preview": "[Ảnh]",
+    "no_messages": "Chưa có tin nhắn nào. Hãy gửi lời chào!",
+    "load_older": "Tải tin cũ hơn",
+    "placeholder": "Nhập tin nhắn...",
+    "send": "Gửi",
+    "add_image": "Gửi ảnh",
+    "remove_image": "Bỏ ảnh",
+    "back": "Danh sách hội thoại",
+    "not_found": "Không tìm thấy hội thoại",
+    "open": "Nhắn tin"
+  },
   "social": {
     "feed": "Bảng tin",
     "feed_error": "Không tải được bảng tin",

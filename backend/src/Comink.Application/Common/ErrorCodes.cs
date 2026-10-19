@@ -41,4 +41,23 @@ public static class ErrorCodes
     public const string MediaUnsupportedType = "MEDIA_UNSUPPORTED_TYPE";
     public const string MediaTooLarge = "MEDIA_TOO_LARGE";
     public const string MediaNotFound = "MEDIA_NOT_FOUND";
+
+    /// <summary>Tệp không thuộc người gửi hoặc sai ngữ cảnh sử dụng (dùng cho tin nhắn).</summary>
+    public const string MediaNotOwned = "MEDIA_NOT_OWNED";
+
+    // --- Nhắn tin (Giai đoạn 3) — docs/05_api_contract.md mục 8.8 ---
+    public const string ConversationNotFound = "CONVERSATION_NOT_FOUND";
+    public const string MessagingCannotMessageSelf = "MESSAGING_CANNOT_MESSAGE_SELF";
+    public const string MessagingNotFriends = "MESSAGING_NOT_FRIENDS";
+    public const string MessageContentRequired = "MESSAGE_CONTENT_REQUIRED";
+    public const string MessageTooManyAttachments = "MESSAGE_TOO_MANY_ATTACHMENTS";
+    public const string MessageClientIdRequired = "MESSAGE_CLIENT_ID_REQUIRED";
+    public const string MessageInvalidCursor = "MESSAGE_INVALID_CURSOR";
+
+    // --- Cuộc gọi (Giai đoạn 4) — docs/05_api_contract.md mục 9.7 ---
+    public const string CallNotFound = "CALL_NOT_FOUND";
+    public const string CallAlreadyActive = "CALL_ALREADY_ACTIVE";
+    public const string CallAlreadyEnded = "CALL_ALREADY_ENDED";
+    public const string CallNotRinging = "CALL_NOT_RINGING";
+    public const string CallProviderUnavailable = "CALL_PROVIDER_UNAVAILABLE";
 }

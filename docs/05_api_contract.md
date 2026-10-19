@@ -503,7 +503,84 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 
 ---
 
-## 9. Lịch sử thay đổi
+## 9. Gọi trực tuyến (Giai đoạn 4)
+
+> Trạng thái: **đề xuất — bắt đầu cài đặt (2026-10-19)**. Quyết định đã chốt: **D1** gọi nhóm dùng `conversation` loại `Group` ẩn; **D2** bật TURN với IP LAN (`docs/tasks/phase4_calls.md` mục 2).
+> Media đi **trực tiếp** client ↔ LiveKit; backend chỉ cấp token ngắn hạn và ghi trạng thái.
+
+### 9.1. Quy ước riêng
+
+| Quy ước | Giá trị |
+|---|---|
+| Người ngoài cuộc gọi | `404 CALL_NOT_FOUND` cho **mọi** endpoint (kể cả xin token) |
+| Token | JWT **HS256** ký bằng `LiveKit:ApiSecret`, TTL **10 phút**, chứa `video.room`, `roomJoin`, `canPublish`; backend **không** trả `ApiSecret` |
+| Cuộc gọi nhóm | Không có `conversationId` → backend tạo conversation `Group` **ẩn** (không hiện trong danh sách chat) từ `participantIds` (≥2, phải là bạn bè) |
+| Đổ chuông | Tối đa **30 giây**, quá hạn → `NoAnswer` |
+| Ghi lịch sử | Khi kết thúc, ghi một tin nhắn loại `Call` vào hội thoại (`messages.call_id`) |
+
+### 9.2. Bắt đầu cuộc gọi
+
+`POST /api/calls`
+
+| Trường | Kiểu | Bắt buộc | Ghi chú |
+|---|---|---|---|
+| `conversationId` | uuid? | ✖ | Có → cuộc gọi 1–1 trong hội thoại đó |
+| `participantIds` | uuid[]? | ✖ | Có → cuộc gọi nhóm (≥2 người, phải là bạn bè); bỏ trống `conversationId` |
+| `type` | `Audio` \| `Video` | ✔ | |
+
+- `201` + `CallDto`: `{ id, conversationId, type, status, roomName, initiatedBy, createdAt, answeredAt, endedAt, participants: [{ userId, displayName, status }] }`
+- Phát SignalR `CallIncoming` tới `user:{id}` của từng người được mời.
+- Lỗi: `CALL_ALREADY_ACTIVE` (409), `CONVERSATION_NOT_FOUND` (404), `MESSAGING_NOT_FRIENDS` (403).
+
+### 9.3. Lấy token vào room
+
+`POST /api/calls/{id}/token` → `200 { url, token, roomName, expiresAt }`
+
+- Chỉ thành viên; cuộc gọi đã kết thúc → `409 CALL_ALREADY_ENDED`; LiveKit không chạy → `503 CALL_PROVIDER_UNAVAILABLE`.
+
+### 9.4. Chấp nhận / từ chối / kết thúc
+
+| Method | Đường dẫn | Kết quả |
+|---|---|---|
+| `POST` | `/api/calls/{id}/answer` | `status=InProgress`, participant `Joined`, `answered_at`; phát `CallUpdated` |
+| `POST` | `/api/calls/{id}/decline` | participant `Declined`; nếu mọi người từ chối → `Declined` + `end_reason=Declined` |
+| `POST` | `/api/calls/{id}/end` | `Completed`/`Cancelled`, `ended_at`, `duration_seconds`, gọi `EndRoomAsync`, ghi tin `Call`, phát `CallEnded` |
+| `GET` | `/api/calls/{id}` | `CallDto` (chỉ thành viên) |
+| `GET` | `/api/calls?cursor=&limit=` | `PagedList<CallSummaryDto>` — lịch sử của tôi, sắp `invited_at DESC` |
+
+### 9.5. Webhook LiveKit
+
+`POST /api/webhooks/livekit` — **AllowAnonymous**, bắt buộc xác thực JWT HS256 (`Authorization: Bearer …`) và đối chiếu claim `sha256` với hash của body.
+
+| Sự kiện | Xử lý |
+|---|---|
+| `room_started` | đặt `answered_at` nếu chưa có |
+| `participant_joined` / `participant_left` | cập nhật `call_participants.status`, `joined_at`/`left_at` |
+| `room_finished` | đặt `ended_at` + `duration_seconds`, `EndRoomAsync` (chống room treo), phát `CallEnded` |
+
+### 9.6. SignalR (hub `/hub/chat`)
+
+| Sự kiện | Gửi tới | Payload |
+|---|---|---|
+| `CallIncoming` | `user:{id}` người được mời | `CallDto` |
+| `CallUpdated` | `user:{id}` thành viên | `CallDto` |
+| `CallEnded` | `user:{id}` thành viên | `{ callId, status, endReason, durationSeconds }` |
+
+> Gửi theo `user:{id}` (không dùng group hội thoại) — bài học GĐ 3: group hội thoại có thể chưa tồn tại lúc client kết nối.
+
+### 9.7. Mã lỗi mới (GĐ 4)
+
+| Mã | HTTP | Ý nghĩa |
+|---|---|---|
+| `CALL_NOT_FOUND` | 404 | Không có cuộc gọi **hoặc** không phải thành viên |
+| `CALL_ALREADY_ACTIVE` | 409 | Hội thoại đang có cuộc gọi chưa kết thúc |
+| `CALL_ALREADY_ENDED` | 409 | Cuộc gọi đã kết thúc |
+| `CALL_NOT_RINGING` | 409 | Thao tác chỉ hợp lệ khi đang đổ chuông |
+| `CALL_PROVIDER_UNAVAILABLE` | 503 | Không kết nối được LiveKit |
+
+---
+
+## 10. Lịch sử thay đổi
 
 | Ngày | Thay đổi |
 |---|---|
@@ -512,3 +589,5 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 | 2026-10-17 | Thêm mục 7: hợp đồng mạng xã hội GĐ 2 (tìm người dùng, hồ sơ công khai, bạn bè, theo dõi — đã cài đặt; bài viết/thích/bình luận/media — đã chốt, chưa cài đặt) |
 | 2026-10-18 | Sửa lỗi hợp đồng lỗi: body JSON hỏng trả `400 VALIDATION_FAILED` thay vì `500`; `title` suy ra từ `code` (mục 5) |
 | 2026-10-18 | Thêm mục 8 (đề xuất): hợp đồng nhắn tin GĐ 3 — hội thoại 1–1, gửi/nhận tin, phân trang, ảnh trong tin, SignalR group theo hội thoại. Chờ chốt quyết định D1 |
+| 2026-10-19 | Mục 8 đã cài đặt và kiểm chứng; `MessageCreated` phát thêm tới `user:{id}` của từng thành viên (sửa lỗi phải tải lại trang) |
+| 2026-10-19 | Thêm mục 9 (đề xuất): hợp đồng gọi trực tuyến GĐ 4 — bắt đầu cuộc gọi, token LiveKit ngắn hạn, answer/decline/end, webhook, SignalR `CallIncoming`/`CallUpdated`/`CallEnded` |

@@ -284,6 +284,132 @@ namespace Comink.Infrastructure.Persistence.Migrations
                     b.ToTable("user_settings", (string)null);
                 });
 
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Call", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("AnsweredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("answered_at");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int?>("DurationSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_seconds");
+
+                    b.Property<string>("EndReason")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("end_reason");
+
+                    b.Property<DateTimeOffset?>("EndedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ended_at");
+
+                    b.Property<Guid>("InitiatorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("initiator_id");
+
+                    b.Property<string>("RoomName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("room_name");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Ringing")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasDefaultValue("Audio")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_calls");
+
+                    b.HasIndex("InitiatorId")
+                        .HasDatabaseName("ix_calls_initiator_id");
+
+                    b.HasIndex("RoomName")
+                        .IsUnique()
+                        .HasDatabaseName("ix_calls_room_name");
+
+                    b.HasIndex("ConversationId", "CreatedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_calls_conversation_id_created_at");
+
+                    b.ToTable("calls", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_calls_duration", "duration_seconds IS NULL OR duration_seconds >= 0");
+
+                            t.HasCheckConstraint("ck_calls_end_reason", "end_reason IS NULL OR end_reason IN ('Completed', 'NoAnswer', 'Declined', 'Cancelled', 'Failed')");
+
+                            t.HasCheckConstraint("ck_calls_status", "status IN ('Ringing', 'InProgress', 'Completed', 'Declined', 'Cancelled', 'Missed', 'Failed')");
+
+                            t.HasCheckConstraint("ck_calls_type", "type IN ('Audio', 'Video')");
+                        });
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.CallParticipant", b =>
+                {
+                    b.Property<Guid>("CallId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("call_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTimeOffset>("InvitedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("invited_at");
+
+                    b.Property<DateTimeOffset?>("JoinedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("joined_at");
+
+                    b.Property<DateTimeOffset?>("LeftAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("left_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Invited")
+                        .HasColumnName("status");
+
+                    b.HasKey("CallId", "UserId")
+                        .HasName("pk_call_participants");
+
+                    b.HasIndex("UserId", "InvitedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_call_participants_user_id_invited_at");
+
+                    b.ToTable("call_participants", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_call_participants_status", "status IN ('Invited', 'Joined', 'Declined', 'Missed', 'Left')");
+                        });
+                });
+
             modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Comment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -352,6 +478,109 @@ namespace Comink.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_comments_content_length", "char_length(content) BETWEEN 1 AND 2000");
 
                             t.HasCheckConstraint("ck_comments_status", "status IN ('Active', 'Hidden')");
+                        });
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Conversation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AvatarUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("avatar_url");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("DirectKey")
+                        .HasMaxLength(73)
+                        .HasColumnType("character varying(73)")
+                        .HasColumnName("direct_key");
+
+                    b.Property<DateTimeOffset?>("LastMessageAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_message_at");
+
+                    b.Property<Guid?>("LastMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("last_message_id");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("title");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Direct")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_conversations");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_conversations_created_by");
+
+                    b.HasIndex("LastMessageAt")
+                        .IsDescending()
+                        .HasDatabaseName("ix_conversations_last_message_at");
+
+                    b.HasIndex("LastMessageId")
+                        .HasDatabaseName("ix_conversations_last_message_id");
+
+                    b.ToTable("conversations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_conversations_direct_key", "(type = 'Direct') = (direct_key IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_conversations_type", "type IN ('Direct', 'Group')");
+                        });
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.ConversationMember", b =>
+                {
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTimeOffset>("JoinedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("joined_at");
+
+                    b.Property<DateTimeOffset?>("LeftAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("left_at");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Member")
+                        .HasColumnName("role");
+
+                    b.HasKey("ConversationId", "UserId")
+                        .HasName("pk_conversation_members");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_conversation_members_user_id");
+
+                    b.ToTable("conversation_members", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_conversation_members_role", "role IN ('Owner', 'Admin', 'Member')");
                         });
                 });
 
@@ -533,6 +762,91 @@ namespace Comink.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_media_assets_size", "size_bytes > 0");
                         });
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Message", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("CallId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("call_id");
+
+                    b.Property<Guid>("ClientMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_message_id");
+
+                    b.Property<string>("Content")
+                        .HasColumnType("text")
+                        .HasColumnName("content");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("SenderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sender_id");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Text")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_messages");
+
+                    b.HasIndex("CallId")
+                        .HasDatabaseName("ix_messages_call_id");
+
+                    b.HasIndex("SenderId", "ClientMessageId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_messages_sender_id_client_message_id");
+
+                    b.HasIndex("ConversationId", "CreatedAt", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_messages_conversation_id_created_at_id");
+
+                    b.ToTable("messages", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_messages_content_length", "content IS NULL OR char_length(content) <= 4000");
+
+                            t.HasCheckConstraint("ck_messages_type", "type IN ('Text', 'Image', 'Video', 'File', 'System', 'Call')");
+                        });
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.MessageAttachment", b =>
+                {
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<Guid>("MediaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("media_id");
+
+                    b.Property<short>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("smallint")
+                        .HasDefaultValue((short)0)
+                        .HasColumnName("sort_order");
+
+                    b.HasKey("MessageId", "MediaId")
+                        .HasName("pk_message_attachments");
+
+                    b.HasIndex("MediaId")
+                        .HasDatabaseName("ix_message_attachments_media_id");
+
+                    b.ToTable("message_attachments", (string)null);
                 });
 
             modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Post", b =>
@@ -927,6 +1241,48 @@ namespace Comink.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Call", b =>
+                {
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.Conversation", "Conversation")
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_calls_conversations_conversation_id");
+
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "Initiator")
+                        .WithMany()
+                        .HasForeignKey("InitiatorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_calls_users_initiator_id");
+
+                    b.Navigation("Conversation");
+
+                    b.Navigation("Initiator");
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.CallParticipant", b =>
+                {
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.Call", "Call")
+                        .WithMany("Participants")
+                        .HasForeignKey("CallId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_call_participants_calls_call_id");
+
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_call_participants_users_user_id");
+
+                    b.Navigation("Call");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Comment", b =>
                 {
                     b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "Author")
@@ -954,6 +1310,47 @@ namespace Comink.Infrastructure.Persistence.Migrations
                     b.Navigation("Parent");
 
                     b.Navigation("Post");
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Conversation", b =>
+                {
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "Creator")
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_conversations_asp_net_users_created_by");
+
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.Message", "LastMessage")
+                        .WithMany()
+                        .HasForeignKey("LastMessageId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_conversations_messages_last_message_id");
+
+                    b.Navigation("Creator");
+
+                    b.Navigation("LastMessage");
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.ConversationMember", b =>
+                {
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.Conversation", "Conversation")
+                        .WithMany("Members")
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_conversation_members_conversations_conversation_id");
+
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_conversation_members_users_user_id");
+
+                    b.Navigation("Conversation");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Follow", b =>
@@ -1008,6 +1405,56 @@ namespace Comink.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_media_assets_users_owner_id");
 
                     b.Navigation("Owner");
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Message", b =>
+                {
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.Call", "Call")
+                        .WithMany()
+                        .HasForeignKey("CallId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_messages_calls_call_id");
+
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.Conversation", "Conversation")
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_messages_conversations_conversation_id");
+
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "Sender")
+                        .WithMany()
+                        .HasForeignKey("SenderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_messages_users_sender_id");
+
+                    b.Navigation("Call");
+
+                    b.Navigation("Conversation");
+
+                    b.Navigation("Sender");
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.MessageAttachment", b =>
+                {
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.MediaAsset", "Media")
+                        .WithMany()
+                        .HasForeignKey("MediaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_message_attachments_media_assets_media_id");
+
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.Message", "Message")
+                        .WithMany("Attachments")
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_message_attachments_messages_message_id");
+
+                    b.Navigation("Media");
+
+                    b.Navigation("Message");
                 });
 
             modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Post", b =>
@@ -1150,9 +1597,24 @@ namespace Comink.Infrastructure.Persistence.Migrations
                     b.Navigation("Settings");
                 });
 
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Call", b =>
+                {
+                    b.Navigation("Participants");
+                });
+
             modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Comment", b =>
                 {
                     b.Navigation("Replies");
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Conversation", b =>
+                {
+                    b.Navigation("Members");
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Message", b =>
+                {
+                    b.Navigation("Attachments");
                 });
 
             modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Post", b =>

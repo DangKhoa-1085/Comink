@@ -61,6 +61,11 @@ export function AppHeader() {
               </NavLink>
             )}
             {user && (
+              <NavLink to="/messages" className={navLinkClass}>
+                {t('chat.title')}
+              </NavLink>
+            )}
+            {user && (
               <NavLink to="/friends" className={navLinkClass}>
                 {t('social.friends')}
               </NavLink>

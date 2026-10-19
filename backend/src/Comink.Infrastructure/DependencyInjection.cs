@@ -3,6 +3,7 @@ using System.Text;
 using Comink.Application.Common.Interfaces;
 using Comink.Application.Identity;
 using Comink.Application.Identity.Abstractions;
+using Comink.Application.Messaging.Abstractions;
 using Comink.Application.Social;
 using Comink.Application.Social.Abstractions;
 using Comink.Infrastructure.Identity;
@@ -154,6 +155,10 @@ public static class DependencyInjection
         services.AddScoped<ILikeService, LikeService>();
         services.AddScoped<ICommentService, CommentService>();
         services.AddScoped<IMediaService, MediaService>();
+
+        // --- Nhắn tin (Giai đoạn 3) ---
+        services.AddScoped<IConversationService, Messaging.ConversationService>();
+        services.AddScoped<IMessageService, Messaging.MessageService>();
 
         // --- Lưu trữ media: Cloudinary khi có khoá, ngược lại lưu đĩa cục bộ (dev) ---
         services.Configure<MediaStorageOptions>(configuration.GetSection(MediaStorageOptions.SectionName));

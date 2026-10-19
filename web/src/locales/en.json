@@ -125,6 +125,23 @@
     "status_locked": "Locked",
     "status_deleted": "Deactivated"
   },
+  "chat": {
+    "title": "Messages",
+    "error": "Could not load messages",
+    "connection_lost": "Connection lost — reconnecting. Messages will sync once you are back online.",
+    "empty_list": "No conversations yet. Open a friend's profile and tap “Message”.",
+    "no_message_yet": "No messages",
+    "image_preview": "[Image]",
+    "no_messages": "No messages yet. Say hello!",
+    "load_older": "Load older",
+    "placeholder": "Type a message...",
+    "send": "Send",
+    "add_image": "Send an image",
+    "remove_image": "Remove image",
+    "back": "Conversations",
+    "not_found": "Conversation not found",
+    "open": "Message"
+  },
   "social": {
     "feed": "Feed",
     "feed_error": "Could not load the feed",

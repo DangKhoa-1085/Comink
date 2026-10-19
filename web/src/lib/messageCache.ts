@@ -52,6 +52,12 @@ export async function syncMissedMessages(queryClient: QueryClient): Promise<void
       for (const message of page.items) {
         appendMessageToCache(queryClient, message)
       }
+
+      if (page.hasMore) {
+        // Lỡ quá 50 tin: không thể phân trang `after` thêm trong lúc đồng bộ, nên tải lại
+        // trang tin mới nhất để không bị thiếu các tin gần đây nhất.
+        queryClient.invalidateQueries({ queryKey: ['messages', conversationId] })
+      }
     } catch {
       // Bỏ qua lỗi mạng: lần làm mới kế tiếp sẽ bù lại, không được làm hỏng UI.
     }

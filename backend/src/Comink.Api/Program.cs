@@ -61,6 +61,10 @@ try
     // --- Validator của FluentValidation (đặt ở tầng Application) ---
     builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>();
 
+    // --- Phát sự kiện thời gian thực cho chat (cài đặt SignalR nằm ở tầng Api) ---
+    builder.Services.AddScoped<Comink.Application.Messaging.Abstractions.IChatNotifier,
+        Comink.Api.Realtime.SignalRChatNotifier>();
+
     // --- OpenAPI / Swagger ---
     builder.Services.AddOpenApi();
 
@@ -149,8 +153,10 @@ try
     app.MapPostEndpoints();
     app.MapCommentEndpoints();
     app.MapMediaEndpoints();
+    app.MapMessagingEndpoints();
 
-    // --- Hub SignalR (Giai đoạn 1 chỉ cần xác thực được bằng token) ---
+    // --- Hub SignalR ---
+    // Group hội thoại được thêm khi kết nối (ChatHub.OnConnectedAsync); phát sự kiện qua IChatNotifier.
     app.MapHub<ChatHub>("/hub/chat");
 
     app.Run();

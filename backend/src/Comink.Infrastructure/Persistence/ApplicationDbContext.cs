@@ -36,6 +36,16 @@ public class ApplicationDbContext : IdentityDbContext<
     // --- Hình ảnh và tệp (Giai đoạn 2) ---
     public DbSet<MediaAsset> MediaAssets => Set<MediaAsset>();
 
+    // --- Nhắn tin (Giai đoạn 3) ---
+    public DbSet<Conversation> Conversations => Set<Conversation>();
+    public DbSet<ConversationMember> ConversationMembers => Set<ConversationMember>();
+    public DbSet<Message> Messages => Set<Message>();
+    public DbSet<MessageAttachment> MessageAttachments => Set<MessageAttachment>();
+
+    // --- Cuộc gọi (Giai đoạn 4) ---
+    public DbSet<Call> Calls => Set<Call>();
+    public DbSet<CallParticipant> CallParticipants => Set<CallParticipant>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);

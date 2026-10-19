@@ -11,6 +11,8 @@ import { FeedPage } from '../pages/FeedPage'
 import { SearchPage } from '../pages/SearchPage'
 import { FriendsPage } from '../pages/FriendsPage'
 import { UserProfilePage } from '../pages/UserProfilePage'
+import { MessagesPage } from '../pages/MessagesPage'
+import { ChatPage } from '../pages/ChatPage'
 
 /**
  * Bảng định tuyến của web.
@@ -35,6 +37,8 @@ export const router = createBrowserRouter([
           { path: 'friends', element: <FriendsPage /> },
           { path: 'users/:id', element: <UserProfilePage /> },
           { path: 'feed', element: <FeedPage /> },
+          { path: 'messages', element: <MessagesPage /> },
+          { path: 'messages/:conversationId', element: <ChatPage /> },
         ],
       },
       {

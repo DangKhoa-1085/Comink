@@ -127,6 +127,14 @@ public static class ApiResults
         ErrorCodes.MediaUnsupportedType => "Unsupported media type",
         ErrorCodes.MediaTooLarge => "Media is too large",
         ErrorCodes.MediaNotFound => "Media not found",
+        ErrorCodes.MediaNotOwned => "Media does not belong to the sender",
+        ErrorCodes.ConversationNotFound => "Conversation not found",
+        ErrorCodes.MessagingCannotMessageSelf => "Cannot message yourself",
+        ErrorCodes.MessagingNotFriends => "You are not friends yet",
+        ErrorCodes.MessageContentRequired => "Message content required",
+        ErrorCodes.MessageTooManyAttachments => "Too many attachments",
+        ErrorCodes.MessageClientIdRequired => "Client message id required",
+        ErrorCodes.MessageInvalidCursor => "Invalid cursor",
         _ => "Unexpected error"
     };
 
@@ -157,6 +165,14 @@ public static class ApiResults
         ErrorCodes.MediaUnsupportedType => StatusCodes.Status400BadRequest,
         ErrorCodes.MediaTooLarge => StatusCodes.Status400BadRequest,
         ErrorCodes.MediaNotFound => StatusCodes.Status404NotFound,
+        ErrorCodes.MediaNotOwned => StatusCodes.Status400BadRequest,
+        ErrorCodes.ConversationNotFound => StatusCodes.Status404NotFound,
+        ErrorCodes.MessagingCannotMessageSelf => StatusCodes.Status400BadRequest,
+        ErrorCodes.MessagingNotFriends => StatusCodes.Status403Forbidden,
+        ErrorCodes.MessageContentRequired => StatusCodes.Status400BadRequest,
+        ErrorCodes.MessageTooManyAttachments => StatusCodes.Status400BadRequest,
+        ErrorCodes.MessageClientIdRequired => StatusCodes.Status400BadRequest,
+        ErrorCodes.MessageInvalidCursor => StatusCodes.Status400BadRequest,
         _ => StatusCodes.Status500InternalServerError
     };
 

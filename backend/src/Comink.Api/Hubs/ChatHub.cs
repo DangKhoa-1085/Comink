@@ -1,7 +1,10 @@
-// Hub SignalR nền của Giai đoạn 1: chỉ cần xác thực được bằng access token.
-// Nghiệp vụ chat (nhóm theo hội thoại, gửi/nhận tin) thuộc Giai đoạn 3.
+// Hub SignalR của chat. Nghiệp vụ nằm ở tầng Application/Infrastructure; hub chỉ lo
+// xác thực, group và tín hiệu nhẹ (docs/02_tech_stack_decisions.md mục 1.4, 5.3).
+using Comink.Application.Messaging;
+using Comink.Application.Messaging.Abstractions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Logging;
 
 namespace Comink.Api.Hubs;
 
@@ -12,21 +15,45 @@ namespace Comink.Api.Hubs;
 [Authorize]
 public class ChatHub : Hub
 {
+    private readonly IConversationService _conversations;
+    private readonly ILogger<ChatHub> _logger;
+
+    public ChatHub(IConversationService conversations, ILogger<ChatHub> logger)
+    {
+        _conversations = conversations;
+        _logger = logger;
+    }
+
     /// <summary>
-    /// Khi một client kết nối thành công, đưa vào nhóm riêng <c>user:{id}</c>
-    /// để nhận thông báo và trạng thái cuộc gọi đến (docs/02_tech_stack_decisions.md mục 1.4).
+    /// Khi một client kết nối: thêm vào nhóm riêng <c>user:{id}</c> và **tất cả** nhóm
+    /// <c>conversation:{id}</c> mà người đó còn là thành viên.
+    /// <para>
+    /// Group do server quyết định, không mở hub method cho client tự join — nhờ vậy người ngoài
+    /// không thể tự đưa mình vào hội thoại (yêu cầu roadmap GĐ 3 #8, AGENTS.md mục 9.3).
+    /// </para>
     /// </summary>
     public override async Task OnConnectedAsync()
     {
         var userId = Context.UserIdentifier;
-        if (!string.IsNullOrEmpty(userId))
+        if (!string.IsNullOrEmpty(userId) && Guid.TryParse(userId, out var userGuid))
         {
-            await Groups.AddToGroupAsync(Context.ConnectionId, UserGroup(userId));
+            await Groups.AddToGroupAsync(Context.ConnectionId, ChatEvents.UserGroup(userGuid));
+
+            var conversationIds = await _conversations.GetActiveConversationIdsAsync(userGuid);
+            foreach (var conversationId in conversationIds)
+            {
+                await Groups.AddToGroupAsync(Context.ConnectionId, ChatEvents.ConversationGroup(conversationId));
+            }
+
+            _logger.LogDebug(
+                "Người dùng {UserId} kết nối hub, tham gia {Count} hội thoại",
+                userGuid,
+                conversationIds.Count);
         }
 
         await base.OnConnectedAsync();
     }
 
     /// <summary>Tên nhóm riêng của một người dùng.</summary>
-    public static string UserGroup(string userId) => $"user:{userId}";
+    public static string UserGroup(string userId) => ChatEvents.UserGroup(Guid.Parse(userId));
 }
