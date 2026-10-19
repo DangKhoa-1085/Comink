@@ -1,12 +1,18 @@
 import { useTranslation } from 'react-i18next'
-import { Link, useParams } from 'react-router-dom'
-import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useParams, useNavigate } from 'react-router-dom'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { MessageCircle } from 'lucide-react'
+import { conversationsApi } from '../api/conversations'
 import { postsApi } from '../api/posts'
 import { usersApi } from '../api/users'
 import { Avatar } from '../components/social/Avatar'
 import { PostCard } from '../components/social/PostCard'
 import { RelationshipActions } from '../components/social/RelationshipActions'
+import { Button } from '../components/ui/Button'
 import { Alert, Spinner } from '../components/ui/Feedback'
+import { toast } from '../stores/toastStore'
+import { ApiError } from '../lib/http'
+import { translateErrorCode } from '../lib/errorMessages'
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll'
 import { useIncomingRequestIds } from '../hooks/useIncomingRequestIds'
 import { useAuthStore } from '../stores/authStore'
@@ -16,6 +22,7 @@ import { timeAgo } from '../lib/format'
 export function UserProfilePage() {
   const { t, i18n } = useTranslation()
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const me = useAuthStore((state) => state.user)
   const incomingRequests = useIncomingRequestIds()
@@ -32,6 +39,20 @@ export function UserProfilePage() {
     initialPageParam: null as string | null,
     getNextPageParam: (last) => (last.hasMore && last.nextCursor ? last.nextCursor : undefined),
     enabled: Boolean(id),
+  })
+
+  // Mở (hoặc lấy lại) hội thoại 1–1 với người này rồi chuyển sang khung chat.
+  // Backend chỉ cho bạn bè mở hội thoại → hiển thị lỗi MESSAGING_NOT_FRIENDS qua toast.
+  const openChat = useMutation({
+    mutationFn: () => conversationsApi.openDirect(id!),
+    onSuccess: (conversation) => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      navigate(`/messages/${conversation.id}`)
+    },
+    onError: (error) => {
+      const code = error instanceof ApiError ? error.code : 'INTERNAL_ERROR'
+      toast.error(translateErrorCode(t, code))
+    },
   })
 
   const refresh = () => {
@@ -93,18 +114,30 @@ export function UserProfilePage() {
             </dl>
           </div>
 
-          <div className="shrink-0">
+          <div className="flex shrink-0 flex-col items-end gap-2">
             {isSelf ? (
               <Link to="/profile" className="text-sm font-medium text-indigo-600 hover:underline">
                 {t('social.edit_profile')}
               </Link>
             ) : (
-              <RelationshipActions
-                userId={profile.id}
-                relationship={profile.relationship}
-                incomingRequestId={incomingRequests.get(profile.id)}
-                onChange={() => void profileQuery.refetch()}
-              />
+              <>
+                <RelationshipActions
+                  userId={profile.id}
+                  relationship={profile.relationship}
+                  incomingRequestId={incomingRequests.get(profile.id)}
+                  onChange={() => void profileQuery.refetch()}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openChat.mutate()}
+                  disabled={openChat.isPending}
+                  title={t('chat.open')}
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  {t('chat.open')}
+                </Button>
+              </>
             )}
           </div>
         </div>
