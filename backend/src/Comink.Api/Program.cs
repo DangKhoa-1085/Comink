@@ -65,6 +65,10 @@ try
     builder.Services.AddScoped<Comink.Application.Messaging.Abstractions.IChatNotifier,
         Comink.Api.Realtime.SignalRChatNotifier>();
 
+    // --- Phát sự kiện cuộc gọi (CallIncoming/CallUpdated/CallEnded) ---
+    builder.Services.AddScoped<Comink.Application.Calls.Abstractions.ICallNotifier,
+        Comink.Api.Realtime.SignalRCallNotifier>();
+
     // --- OpenAPI / Swagger ---
     builder.Services.AddOpenApi();
 
@@ -154,6 +158,8 @@ try
     app.MapCommentEndpoints();
     app.MapMediaEndpoints();
     app.MapMessagingEndpoints();
+    app.MapCallEndpoints();
+    app.MapLiveKitWebhookEndpoints();
 
     // --- Hub SignalR ---
     // Group hội thoại được thêm khi kết nối (ChatHub.OnConnectedAsync); phát sự kiện qua IChatNotifier.

@@ -135,6 +135,11 @@ public static class ApiResults
         ErrorCodes.MessageTooManyAttachments => "Too many attachments",
         ErrorCodes.MessageClientIdRequired => "Client message id required",
         ErrorCodes.MessageInvalidCursor => "Invalid cursor",
+        ErrorCodes.CallNotFound => "Call not found",
+        ErrorCodes.CallAlreadyActive => "Call already active",
+        ErrorCodes.CallAlreadyEnded => "Call already ended",
+        ErrorCodes.CallNotRinging => "Call is not ringing",
+        ErrorCodes.CallProviderUnavailable => "Call provider unavailable",
         _ => "Unexpected error"
     };
 
@@ -173,6 +178,11 @@ public static class ApiResults
         ErrorCodes.MessageTooManyAttachments => StatusCodes.Status400BadRequest,
         ErrorCodes.MessageClientIdRequired => StatusCodes.Status400BadRequest,
         ErrorCodes.MessageInvalidCursor => StatusCodes.Status400BadRequest,
+        ErrorCodes.CallNotFound => StatusCodes.Status404NotFound,
+        ErrorCodes.CallAlreadyActive => StatusCodes.Status409Conflict,
+        ErrorCodes.CallAlreadyEnded => StatusCodes.Status409Conflict,
+        ErrorCodes.CallNotRinging => StatusCodes.Status409Conflict,
+        ErrorCodes.CallProviderUnavailable => StatusCodes.Status503ServiceUnavailable,
         _ => StatusCodes.Status500InternalServerError
     };
 

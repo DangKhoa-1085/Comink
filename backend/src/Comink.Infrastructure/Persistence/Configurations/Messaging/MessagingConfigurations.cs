@@ -72,7 +72,11 @@ public class ConversationMemberConfiguration : IEntityTypeConfiguration<Conversa
             .HasConversion<string>()
             .HasMaxLength(16)
             .IsRequired()
-            .HasDefaultValue(MemberRole.Member);
+            .HasDefaultValue(MemberRole.Member)
+            // ⚠️ Bẫy giống `Visibility` ở GĐ 2: CLR default của enum là `Owner` (=0) nhưng cột có
+            // default `Member` → EF coi là "chưa gán" và bỏ cột khỏi INSERT. Sentinel buộc EF luôn
+            // ghi giá trị thật khi Role = Owner.
+            .HasSentinel((MemberRole)(-1));
 
         builder.Property(m => m.JoinedAt).IsRequired();
 
