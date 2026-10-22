@@ -1,8 +1,14 @@
 // DTO cho module Cuộc gọi (docs/05_api_contract.md mục 9).
 namespace Comink.Application.Calls.Dtos;
 
-/// <summary>Yêu cầu bắt đầu cuộc gọi: 1–1 (có `conversationId`) hoặc nhóm (có `participantIds`).</summary>
-public record StartCallRequest(Guid? ConversationId, IReadOnlyList<Guid>? ParticipantIds, string Type);
+/// <summary>
+/// Yêu cầu bắt đầu cuộc gọi **trong một hội thoại** (1–1 hoặc nhóm).
+/// <para>
+/// Quyết định D6 (2026-10-23): bỏ nhánh tạo "hội thoại nhóm ẩn" — gọi nhóm chỉ bắt đầu từ
+/// hội thoại nhóm thật, đúng như Messenger. Mọi thành viên còn lại đều nhận `CallIncoming`.
+/// </para>
+/// </summary>
+public record StartCallRequest(Guid ConversationId, string Type);
 
 /// <summary>Một người trong cuộc gọi.</summary>
 public record CallParticipantDto(Guid UserId, string DisplayName, string Status, DateTimeOffset InvitedAt);

@@ -14,6 +14,24 @@ public class CreateDirectConversationRequestValidator : AbstractValidator<Create
     }
 }
 
+/// <summary>Kiểm tra yêu cầu tạo nhóm chat (tên + số người mời). Quy tắc nghiệp vụ ở service.</summary>
+public class CreateGroupConversationRequestValidator : AbstractValidator<CreateGroupConversationRequest>
+{
+    public CreateGroupConversationRequestValidator()
+    {
+        RuleFor(x => x.Name)
+            .Cascade(CascadeMode.Stop)
+            .NotEmpty()
+            .WithMessage("Tên nhóm là bắt buộc.")
+            .MaximumLength(ConversationRules.MaxGroupTitleLength)
+            .WithMessage($"Tên nhóm tối đa {ConversationRules.MaxGroupTitleLength} ký tự.");
+
+        RuleFor(x => x.ParticipantIds)
+            .NotEmpty()
+            .WithMessage($"Nhóm cần ít nhất {ConversationRules.MinGroupMembers - 1} người được mời.");
+    }
+}
+
 /// <summary>Kiểm tra yêu cầu gửi tin nhắn (giới hạn độ dài và số tệp).</summary>
 public class SendMessageRequestValidator : AbstractValidator<SendMessageRequest>
 {

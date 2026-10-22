@@ -27,4 +27,22 @@ public static class ConversationRules
 
     /// <summary>Tự mở hội thoại với chính mình là không hợp lệ.</summary>
     public static bool IsSelfConversation(Guid first, Guid second) => first == second;
+
+    // --- Chat nhóm (NC Giai đoạn 3 — docs/tasks/phase3_messaging.md mục 7) ---
+
+    /// <summary>Nhóm tối thiểu 3 thành viên (tính cả người tạo) — giống Messenger.</summary>
+    public const int MinGroupMembers = 3;
+
+    /// <summary>
+    /// Nhóm tối đa 10 thành viên — bằng <c>CallRules.MaxParticipants</c> vì cuộc gọi nhóm
+    /// dùng chính hội thoại nhóm đó.
+    /// </summary>
+    public const int MaxGroupMembers = 10;
+
+    /// <summary>Tên nhóm: bắt buộc, tối đa 100 ký tự.</summary>
+    public const int MaxGroupTitleLength = 100;
+
+    /// <summary>Số thành viên (tính cả người tạo) có hợp lệ cho một nhóm không.</summary>
+    public static bool IsGroupSizeValid(int memberCount) =>
+        memberCount is >= MinGroupMembers and <= MaxGroupMembers;
 }

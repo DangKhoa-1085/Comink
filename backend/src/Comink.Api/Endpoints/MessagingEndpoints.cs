@@ -24,6 +24,13 @@ public static class MessagingEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        conversations.MapPost("/group", CreateGroupAsync)
+            .WithName("CreateGroupConversation")
+            .Produces<ConversationDto>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         conversations.MapGet("/", GetMyConversationsAsync)
             .WithName("GetMyConversations")
             .Produces<PagedList<ConversationSummaryDto>>();
@@ -77,6 +84,31 @@ public static class MessagingEndpoints
         return result.Value.WasCreated
             ? Results.Created($"/api/conversations/{result.Value.Conversation.Id}", result.Value.Conversation)
             : Results.Ok(result.Value.Conversation);
+    }
+
+    private static async Task<IResult> CreateGroupAsync(
+        CreateGroupConversationRequest request,
+        IValidator<CreateGroupConversationRequest> validator,
+        IConversationService conversationService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var userId = CurrentUser.GetUserId(httpContext.User);
+        if (userId is null)
+        {
+            return ApiResults.Problem(ErrorCodes.Unauthorized);
+        }
+
+        var (isValid, errorResult, _) = await ApiResults.ValidateAsync(validator, request, cancellationToken);
+        if (!isValid)
+        {
+            return errorResult!;
+        }
+
+        var result = await conversationService.CreateGroupAsync(userId.Value, request, cancellationToken);
+        return result.Succeeded && result.Value is not null
+            ? Results.Created($"/api/conversations/{result.Value.Id}", result.Value)
+            : ApiResults.Problem(result.ErrorCode ?? ErrorCodes.InternalError);
     }
 
     private static async Task<IResult> GetMyConversationsAsync(

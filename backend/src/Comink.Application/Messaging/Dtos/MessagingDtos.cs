@@ -4,6 +4,12 @@ namespace Comink.Application.Messaging.Dtos;
 /// <summary>Yêu cầu mở/tạo hội thoại 1–1.</summary>
 public record CreateDirectConversationRequest(Guid UserId);
 
+/// <summary>
+/// Yêu cầu tạo nhóm chat (NC GĐ 3): tên nhóm + danh sách thành viên mời (không gồm người tạo).
+/// Tổng thành viên phải trong khoảng 3–10 và tất cả phải là bạn bè của người tạo.
+/// </summary>
+public record CreateGroupConversationRequest(string Name, IReadOnlyList<Guid> ParticipantIds);
+
 /// <summary>Yêu cầu gửi tin nhắn. <c>ClientMessageId</c> do client sinh để chống gửi trùng.</summary>
 public record SendMessageRequest(Guid ClientMessageId, string? Content, IReadOnlyList<Guid>? MediaIds);
 
@@ -41,11 +47,12 @@ public record ConversationPeerDto(Guid UserId, string UserName, string DisplayNa
 /// <summary>Xem trước tin cuối trong danh sách hội thoại.</summary>
 public record ConversationLastMessageDto(Guid Id, Guid SenderId, string Preview, string Type, DateTimeOffset CreatedAt);
 
-/// <summary>Một dòng trong danh sách hội thoại.</summary>
+/// <summary>Một dòng trong danh sách hội thoại. <c>Peer</c> chỉ có với chat 1–1; nhóm dùng <c>Title</c>.</summary>
 public record ConversationSummaryDto(
     Guid Id,
     string Type,
     string? Title,
-    ConversationPeerDto Peer,
+    ConversationPeerDto? Peer,
     ConversationLastMessageDto? LastMessage,
-    int UnreadCount);
+    int UnreadCount,
+    int MemberCount);

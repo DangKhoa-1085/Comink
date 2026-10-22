@@ -69,6 +69,9 @@ try
     builder.Services.AddScoped<Comink.Application.Calls.Abstractions.ICallNotifier,
         Comink.Api.Realtime.SignalRCallNotifier>();
 
+    // --- Dọn cuộc gọi đổ chuông quá hạn (30s) — bắt buộc phía server, client có thể đóng tab ---
+    builder.Services.AddHostedService<Comink.Api.Realtime.CallRingTimeoutService>();
+
     // --- OpenAPI / Swagger ---
     builder.Services.AddOpenApi();
 
@@ -137,6 +140,24 @@ try
     app.UseExceptionHandler(new ExceptionHandlerOptions
     {
         StatusCodeSelector = Comink.Api.Common.ExceptionStatusMapper.StatusCodeFor
+    });
+
+    // Ghi log mọi lỗi không xử lý được (kèm đường dẫn) trước khi trả ProblemDetails — nếu không,
+    // lỗi 500 chỉ hiện ở client dưới dạng "Máy chủ gặp lỗi" mà không có dấu vết phía server.
+    app.Use(async (context, next) =>
+    {
+        try
+        {
+            await next();
+        }
+        catch (Exception exception) when (!context.Response.HasStarted)
+        {
+            context.RequestServices
+                .GetRequiredService<ILoggerFactory>()
+                .CreateLogger("UnhandledException")
+                .LogError(exception, "Lỗi không xử lý tại {Method} {Path}", context.Request.Method, context.Request.Path);
+            throw;
+        }
     });
     app.UseStatusCodePages();
     app.UseCors("AllowWebClient");

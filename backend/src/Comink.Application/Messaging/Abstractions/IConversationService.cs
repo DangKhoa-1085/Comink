@@ -24,6 +24,15 @@ public interface IConversationService
         int limit,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Tạo nhóm chat (NC GĐ 3 — docs/tasks/phase3_messaging.md mục 7).
+    /// Tổng thành viên 3–10, tất cả người được mời phải là bạn bè; người tạo là <c>Owner</c>.
+    /// </summary>
+    Task<OperationResult<ConversationDto>> CreateGroupAsync(
+        Guid currentUserId,
+        CreateGroupConversationRequest request,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Chi tiết một hội thoại; không phải thành viên thì trả CONVERSATION_NOT_FOUND.</summary>
     Task<OperationResult<ConversationDto>> GetByIdAsync(
         Guid currentUserId,

@@ -123,6 +123,77 @@ public class ConversationService : IConversationService
     }
 
     /// <inheritdoc />
+    public async Task<OperationResult<ConversationDto>> CreateGroupAsync(
+        Guid currentUserId,
+        CreateGroupConversationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        // Bỏ chính mình nếu client lỡ gửi kèm; khử trùng lặp.
+        var inviteeIds = request.ParticipantIds
+            .Where(id => id != currentUserId)
+            .Distinct()
+            .ToList();
+
+        var memberCount = inviteeIds.Count + 1;
+        if (!ConversationRules.IsGroupSizeValid(memberCount))
+        {
+            return OperationResult<ConversationDto>.Failure(
+                memberCount < ConversationRules.MinGroupMembers
+                    ? ErrorCodes.MessagingGroupTooFew
+                    : ErrorCodes.MessagingGroupTooMany);
+        }
+
+        // Chỉ mời được bạn bè còn hoạt động (cùng quy tắc D1 với chat 1–1).
+        foreach (var inviteeId in inviteeIds)
+        {
+            if (!await SocialLookup.IsActiveUserAsync(_db, inviteeId, cancellationToken))
+            {
+                return OperationResult<ConversationDto>.Failure(ErrorCodes.NotFound);
+            }
+
+            if (!await SocialLookup.AreFriendsAsync(_db, currentUserId, inviteeId, cancellationToken))
+            {
+                return OperationResult<ConversationDto>.Failure(ErrorCodes.MessagingNotFriends);
+            }
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var conversation = new Conversation
+        {
+            Type = ConversationType.Group,
+            Title = request.Name.Trim(),
+            CreatedBy = currentUserId,
+            CreatedAt = now
+        };
+
+        // Người tạo là Owner; người được mời là Member.
+        conversation.Members.Add(new ConversationMember
+        {
+            ConversationId = conversation.Id,
+            UserId = currentUserId,
+            Role = MemberRole.Owner,
+            JoinedAt = now
+        });
+
+        foreach (var inviteeId in inviteeIds)
+        {
+            conversation.Members.Add(new ConversationMember
+            {
+                ConversationId = conversation.Id,
+                UserId = inviteeId,
+                Role = MemberRole.Member,
+                JoinedAt = now
+            });
+        }
+
+        _db.Conversations.Add(conversation);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        // Trả chi tiết để client có ngay danh sách thành viên.
+        return await GetByIdAsync(currentUserId, conversation.Id, cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<OperationResult<PagedList<ConversationSummaryDto>>> GetMyConversationsAsync(
         Guid currentUserId,
         string? cursor,
@@ -137,9 +208,11 @@ public class ConversationService : IConversationService
         }
 
         // Hội thoại chưa có tin dùng created_at làm khoá sắp xếp để không có NULL trong con trỏ.
+        // Chỉ liệt kê chat 1–1 và nhóm (quyết định D6: không còn hội thoại nhóm "ẩn").
         var baseQuery = _db.Conversations
             .AsNoTracking()
-            .Where(c => c.Members.Any(m => m.UserId == currentUserId && m.LeftAt == null));
+            .Where(c => c.Members.Any(m => m.UserId == currentUserId && m.LeftAt == null) &&
+                        (c.Type == ConversationType.Direct || c.Type == ConversationType.Group));
 
         if (decoded is not null)
         {
@@ -184,6 +257,14 @@ public class ConversationService : IConversationService
             })
             .ToListAsync(cancellationToken);
 
+        // Số thành viên còn hoạt động của từng hội thoại (một truy vấn, dùng cho cả 1–1 và nhóm).
+        var memberCounts = await _db.ConversationMembers
+            .AsNoTracking()
+            .Where(m => conversationIds.Contains(m.ConversationId) && m.LeftAt == null)
+            .GroupBy(m => m.ConversationId)
+            .Select(g => new { ConversationId = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
         var lastMessageIds = pageRows
             .Where(r => r.LastMessageId is not null)
             .Select(r => r.LastMessageId!.Value)
@@ -197,18 +278,25 @@ public class ConversationService : IConversationService
 
         var items = pageRows.Select(row =>
         {
-            var peer = peers.FirstOrDefault(p => p.ConversationId == row.Id);
+            // Chỉ hội thoại 1–1 mới có "peer"; nhóm hiển thị theo Title + số thành viên.
+            var peer = row.Type == ConversationType.Direct
+                ? peers.FirstOrDefault(p => p.ConversationId == row.Id)
+                : null;
             var last = lastMessages.FirstOrDefault(m => m.Id == row.LastMessageId);
+            var memberCount = memberCounts.FirstOrDefault(x => x.ConversationId == row.Id)?.Count ?? 0;
 
             return new ConversationSummaryDto(
                 row.Id,
                 row.Type.ToString(),
                 row.Title,
-                new ConversationPeerDto(
-                    peer?.UserId ?? Guid.Empty,
-                    peer?.UserName ?? string.Empty,
-                    peer?.DisplayName ?? string.Empty,
-                    peer?.AvatarUrl),
+                // Nhóm không có "peer": hiển thị theo Title + số thành viên.
+                peer is null
+                    ? null
+                    : new ConversationPeerDto(
+                        peer.UserId,
+                        peer.UserName ?? string.Empty,
+                        peer.DisplayName ?? string.Empty,
+                        peer.AvatarUrl),
                 last is null
                     ? null
                     : new ConversationLastMessageDto(
@@ -218,7 +306,8 @@ public class ConversationService : IConversationService
                         last.Type.ToString(),
                         last.CreatedAt),
                 // Số tin chưa đọc là [NC] ở GĐ 3 — luôn 0.
-                0);
+                0,
+                memberCount);
         }).ToList();
 
         var nextCursor = hasMore && pageRows.Count > 0

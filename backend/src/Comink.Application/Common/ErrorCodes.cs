@@ -53,6 +53,8 @@ public static class ErrorCodes
     public const string MessageTooManyAttachments = "MESSAGE_TOO_MANY_ATTACHMENTS";
     public const string MessageClientIdRequired = "MESSAGE_CLIENT_ID_REQUIRED";
     public const string MessageInvalidCursor = "MESSAGE_INVALID_CURSOR";
+    public const string MessagingGroupTooFew = "MESSAGING_GROUP_TOO_FEW";
+    public const string MessagingGroupTooMany = "MESSAGING_GROUP_TOO_MANY";
 
     // --- Cuộc gọi (Giai đoạn 4) — docs/05_api_contract.md mục 9.7 ---
     public const string CallNotFound = "CALL_NOT_FOUND";

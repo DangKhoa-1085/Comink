@@ -64,6 +64,10 @@ public class ChatHubTests
         public Task<OperationResult<ConversationDto>> GetByIdAsync(
             Guid currentUserId, Guid conversationId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task<OperationResult<ConversationDto>> CreateGroupAsync(
+            Guid currentUserId, CreateGroupConversationRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private static (ChatHub Hub, FakeGroupManager Groups) CreateHub(

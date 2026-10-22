@@ -51,75 +51,18 @@ public class CallService : ICallService
             return OperationResult<CallDto>.Failure(ErrorCodes.ValidationFailed);
         }
 
-        List<Guid> memberIds;
-        Guid conversationId;
+        // Quyết định D6: cuộc gọi luôn bắt đầu trong một hội thoại (1–1 hoặc nhóm).
+        var conversationId = request.ConversationId;
+        var memberIds = await GetMemberIdsAsync(conversationId, cancellationToken);
 
-        if (request.ConversationId is { } existingConversationId)
+        if (!memberIds.Contains(currentUserId))
         {
-            // Gọi 1–1: người nhận là thành viên còn lại của hội thoại.
-            memberIds = await GetMemberIdsAsync(existingConversationId, cancellationToken);
-            if (!memberIds.Contains(currentUserId))
-            {
-                return OperationResult<CallDto>.Failure(ErrorCodes.ConversationNotFound);
-            }
-
-            if (memberIds.Count < 2)
-            {
-                return OperationResult<CallDto>.Failure(ErrorCodes.ValidationFailed);
-            }
-
-            conversationId = existingConversationId;
+            return OperationResult<CallDto>.Failure(ErrorCodes.ConversationNotFound);
         }
-        else
+
+        if (memberIds.Count < 2)
         {
-            // Gọi nhóm (quyết định D1): tạo conversation Group "ẩn" chỉ để chứa cuộc gọi.
-            var invitees = (request.ParticipantIds ?? [])
-                .Where(id => id != currentUserId)
-                .Distinct()
-                .ToList();
-
-            if (!CallRules.AreParticipantsValid(invitees))
-            {
-                return OperationResult<CallDto>.Failure(ErrorCodes.ValidationFailed);
-            }
-
-            foreach (var invitee in invitees)
-            {
-                if (!await SocialLookup.IsActiveUserAsync(_db, invitee, cancellationToken))
-                {
-                    return OperationResult<CallDto>.Failure(ErrorCodes.NotFound);
-                }
-
-                if (!await SocialLookup.AreFriendsAsync(_db, currentUserId, invitee, cancellationToken))
-                {
-                    return OperationResult<CallDto>.Failure(ErrorCodes.MessagingNotFriends);
-                }
-            }
-
-            var now = DateTimeOffset.UtcNow;
-            var conversation = new Conversation
-            {
-                Type = ConversationType.Group,
-                CreatedBy = currentUserId,
-                CreatedAt = now
-            };
-
-            foreach (var userId in new[] { currentUserId }.Concat(invitees))
-            {
-                conversation.Members.Add(new ConversationMember
-                {
-                    ConversationId = conversation.Id,
-                    UserId = userId,
-                    Role = MemberRole.Member,
-                    JoinedAt = now
-                });
-            }
-
-            _db.Conversations.Add(conversation);
-            await _db.SaveChangesAsync(cancellationToken);
-
-            conversationId = conversation.Id;
-            memberIds = await GetMemberIdsAsync(conversationId, cancellationToken);
+            return OperationResult<CallDto>.Failure(ErrorCodes.ValidationFailed);
         }
 
         // Mỗi hội thoại chỉ một cuộc gọi đang diễn ra (chống rò rỉ room).
@@ -243,6 +186,15 @@ public class CallService : ICallService
 
         if (CallRules.IsTerminal(call.Status))
         {
+            return OperationResult<CallDto>.Failure(ErrorCodes.CallAlreadyEnded);
+        }
+
+        // Hết giờ đổ chuông (mặc định 30s) → đóng cuộc gọi là Missed/NoAnswer, không cho vào room.
+        if (call.Status == CallStatus.Ringing &&
+            call.CreatedAt < DateTimeOffset.UtcNow.AddSeconds(-CallRules.RingTimeoutSeconds))
+        {
+            MarkInvitedAsMissed(call);
+            await FinishAsync(call, CallStatus.Missed, CallEndReason.NoAnswer, notifyMembers: true, cancellationToken);
             return OperationResult<CallDto>.Failure(ErrorCodes.CallAlreadyEnded);
         }
 
@@ -422,6 +374,49 @@ public class CallService : ICallService
 
         return OperationResult<PagedList<CallSummaryDto>>.Success(
             new PagedList<CallSummaryDto>(items, nextCursor, hasMore));
+    }
+
+    /// <inheritdoc />
+    public async Task<int> TimeoutRingingCallsAsync(CancellationToken cancellationToken = default)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(-CallRules.RingTimeoutSeconds);
+
+        var expiredCalls = await _db.Calls
+            .Include(c => c.Participants)
+            .Where(c => c.Status == CallStatus.Ringing && c.CreatedAt < deadline)
+            .ToListAsync(cancellationToken);
+
+        var finished = 0;
+
+        foreach (var call in expiredCalls)
+        {
+            // Ai đó đã vào room trước khi hết giờ → không phải "không ai nghe".
+            if (call.AnsweredAt is not null ||
+                call.Participants.Any(p => p.Status is CallParticipantStatus.Joined or CallParticipantStatus.Left))
+            {
+                continue;
+            }
+
+            MarkInvitedAsMissed(call);
+            await FinishAsync(call, CallStatus.Missed, CallEndReason.NoAnswer, notifyMembers: true, cancellationToken);
+            finished++;
+        }
+
+        if (finished > 0)
+        {
+            _logger.LogInformation("Đã kết thúc {Count} cuộc gọi hết giờ đổ chuông", finished);
+        }
+
+        return finished;
+    }
+
+    /// <summary>Đánh dấu những người chưa trả lời là <c>Missed</c>.</summary>
+    private static void MarkInvitedAsMissed(Call call)
+    {
+        foreach (var participant in call.Participants.Where(p => p.Status == CallParticipantStatus.Invited))
+        {
+            participant.Status = CallParticipantStatus.Missed;
+        }
     }
 
     /// <inheritdoc />

@@ -69,6 +69,13 @@ public interface ICallService
     Task HandleProviderEventAsync(
         CallProviderEvent providerEvent,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Kết thúc các cuộc gọi còn đổ chuông quá <c>CallRules.RingTimeoutSeconds</c> mà chưa ai nghe
+    /// (→ <c>Missed</c>/<c>NoAnswer</c>). Background service gọi định kỳ vài giây một lần.
+    /// Trả về số cuộc gọi vừa được đóng.
+    /// </summary>
+    Task<int> TimeoutRingingCallsAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>

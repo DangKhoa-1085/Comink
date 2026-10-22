@@ -6,8 +6,8 @@ using FluentValidation;
 namespace Comink.Application.Calls.Validators;
 
 /// <summary>
-/// Kiểm tra yêu cầu bắt đầu cuộc gọi: phải là 1–1 (có hội thoại) **hoặc** nhóm (có danh sách người),
-/// không được gửi cả hai; loại cuộc gọi chỉ Audio/Video.
+/// Kiểm tra yêu cầu bắt đầu cuộc gọi: bắt buộc có hội thoại (1–1 hoặc nhóm), loại chỉ Audio/Video.
+/// Quyết định D6: không còn nhánh gọi bằng danh sách người (`participantIds`).
 /// </summary>
 public class StartCallRequestValidator : AbstractValidator<StartCallRequest>
 {
@@ -18,16 +18,7 @@ public class StartCallRequestValidator : AbstractValidator<StartCallRequest>
             .WithMessage("Loại cuộc gọi chỉ nhận 'Audio' hoặc 'Video'.");
 
         RuleFor(x => x.ConversationId)
-            .Must((request, conversationId) => conversationId is not null || request.ParticipantIds is not null)
-            .WithMessage("Phải có ConversationId (gọi 1–1) hoặc ParticipantIds (gọi nhóm).");
-
-        RuleFor(x => x.ConversationId)
-            .Null()
-            .When(x => x.ParticipantIds is not null)
-            .WithMessage("Không gửi đồng thời ConversationId và ParticipantIds.");
-
-        RuleFor(x => x.ParticipantIds)
-            .Must(ids => ids is null || CallRules.AreParticipantsValid(ids))
-            .WithMessage($"Cuộc gọi nhóm cần từ 2 đến {CallRules.MaxParticipants} người, không trùng nhau.");
+            .NotEmpty()
+            .WithMessage("Phải có ConversationId (cuộc gọi luôn bắt đầu trong một hội thoại).");
     }
 }

@@ -138,7 +138,7 @@ public class CallServiceTests : IntegrationTestBase
         var notifier = new RecordingCallNotifier();
 
         var result = await NewService(db, provider, notifier)
-            .StartAsync(alice.Id, new StartCallRequest(conversation.Id, null, "Audio"));
+            .StartAsync(alice.Id, new StartCallRequest(conversation.Id, "Audio"));
 
         Assert.True(result.Succeeded);
         Assert.Equal("Ringing", result.Value!.Status);
@@ -160,15 +160,15 @@ public class CallServiceTests : IntegrationTestBase
         var notifier = new RecordingCallNotifier();
         var service = NewService(db, provider, notifier);
 
-        await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, null, "Audio"));
-        var second = await service.StartAsync(bob.Id, new StartCallRequest(conversation.Id, null, "Video"));
+        await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, "Audio"));
+        var second = await service.StartAsync(bob.Id, new StartCallRequest(conversation.Id, "Video"));
 
         Assert.False(second.Succeeded);
         Assert.Equal(ErrorCodes.CallAlreadyActive, second.ErrorCode);
     }
 
     [Fact]
-    public async Task Start_GroupCall_CreatesHiddenGroupConversationWithAllParticipants()
+    public async Task Start_GroupConversationCall_InvitesEveryMember()
     {
         var (db, alice, bob, _) = await CreateDirectPairAsync();
         var carol = NewUser("carol", "Carol");
@@ -182,29 +182,40 @@ public class CallServiceTests : IntegrationTestBase
         });
         await db.SaveChangesAsync();
 
-        var result = await NewService(db, new FakeCallProvider(), new RecordingCallNotifier())
-            .StartAsync(alice.Id, new StartCallRequest(null, [bob.Id, carol.Id], "Video"));
+        // Nhóm chat thật (NC GĐ 3) — cuộc gọi nhóm bắt đầu từ đây (quyết định D6, không còn nhóm ẩn).
+        var group = new Conversation
+        {
+            Type = ConversationType.Group,
+            Title = "Nhom hoc tap",
+            CreatedBy = alice.Id,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        foreach (var userId in new[] { alice.Id, bob.Id, carol.Id })
+        {
+            group.Members.Add(new ConversationMember
+            {
+                ConversationId = group.Id,
+                UserId = userId,
+                JoinedAt = group.CreatedAt
+            });
+        }
+
+        db.Conversations.Add(group);
+        await db.SaveChangesAsync();
+
+        var notifier = new RecordingCallNotifier();
+        var result = await NewService(db, new FakeCallProvider(), notifier)
+            .StartAsync(alice.Id, new StartCallRequest(group.Id, "Video"));
 
         Assert.True(result.Succeeded);
         Assert.Equal(3, result.Value!.Participants.Count);
 
-        var conversation = await db.Conversations.FindAsync(result.Value.ConversationId);
-        Assert.Equal(ConversationType.Group, conversation!.Type);
-    }
-
-    [Fact]
-    public async Task Start_GroupCall_WithNonFriend_IsForbidden()
-    {
-        var (db, alice, _, _) = await CreateDirectPairAsync();
-        var stranger = NewUser("stranger", "Stranger");
-        db.Users.Add(stranger);
-        await db.SaveChangesAsync();
-
-        var result = await NewService(db, new FakeCallProvider(), new RecordingCallNotifier())
-            .StartAsync(alice.Id, new StartCallRequest(null, [stranger.Id, Guid.CreateVersion7()], "Audio"));
-
-        Assert.False(result.Succeeded);
-        Assert.Equal(ErrorCodes.MessagingNotFriends, result.ErrorCode);
+        // Cả hai người còn lại đều nhận "cuộc gọi đến", người gọi thì không.
+        var incoming = Assert.Single(notifier.Incoming);
+        Assert.Contains(bob.Id, incoming.Users);
+        Assert.Contains(carol.Id, incoming.Users);
+        Assert.DoesNotContain(alice.Id, incoming.Users);
     }
 
     [Fact]
@@ -216,7 +227,7 @@ public class CallServiceTests : IntegrationTestBase
         await db.SaveChangesAsync();
 
         var service = NewService(db, new FakeCallProvider(), new RecordingCallNotifier());
-        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, null, "Audio"));
+        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, "Audio"));
 
         var token = await service.GetTokenAsync(outsider.Id, call.Value!.Id);
 
@@ -229,7 +240,7 @@ public class CallServiceTests : IntegrationTestBase
     {
         var (db, alice, bob, conversation) = await CreateDirectPairAsync();
         var service = NewService(db, new FakeCallProvider(), new RecordingCallNotifier());
-        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, null, "Video"));
+        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, "Video"));
 
         var token = await service.GetTokenAsync(bob.Id, call.Value!.Id);
 
@@ -245,7 +256,7 @@ public class CallServiceTests : IntegrationTestBase
         var (db, alice, bob, conversation) = await CreateDirectPairAsync();
         var notifier = new RecordingCallNotifier();
         var service = NewService(db, new FakeCallProvider(), notifier);
-        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, null, "Audio"));
+        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, "Audio"));
 
         var answered = await service.AnswerAsync(bob.Id, call.Value!.Id);
 
@@ -263,7 +274,7 @@ public class CallServiceTests : IntegrationTestBase
         var provider = new FakeCallProvider();
         var notifier = new RecordingCallNotifier();
         var service = NewService(db, provider, notifier);
-        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, null, "Audio"));
+        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, "Audio"));
         await service.AnswerAsync(bob.Id, call.Value!.Id);
 
         var ended = await service.EndAsync(alice.Id, call.Value.Id);
@@ -286,7 +297,7 @@ public class CallServiceTests : IntegrationTestBase
     {
         var (db, alice, bob, conversation) = await CreateDirectPairAsync();
         var service = NewService(db, new FakeCallProvider(), new RecordingCallNotifier());
-        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, null, "Audio"));
+        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, "Audio"));
 
         var first = await service.EndAsync(alice.Id, call.Value!.Id);
         var second = await service.EndAsync(bob.Id, call.Value.Id);
@@ -303,7 +314,7 @@ public class CallServiceTests : IntegrationTestBase
         var (db, alice, bob, conversation) = await CreateDirectPairAsync();
         var provider = new FakeCallProvider();
         var service = NewService(db, provider, new RecordingCallNotifier());
-        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, null, "Audio"));
+        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, "Audio"));
         await service.AnswerAsync(bob.Id, call.Value!.Id);
 
         // Webhook báo room đã đóng (nguồn sự thật cuối cùng).
@@ -321,7 +332,7 @@ public class CallServiceTests : IntegrationTestBase
     {
         var (db, alice, bob, conversation) = await CreateDirectPairAsync();
         var service = NewService(db, new FakeCallProvider(), new RecordingCallNotifier());
-        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, null, "Audio"));
+        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, "Audio"));
 
         await service.HandleProviderEventAsync(
             new CallProviderEvent(CallProviderEventType.ParticipantJoined, call.Value!.RoomName, bob.Id.ToString()));
@@ -339,7 +350,7 @@ public class CallServiceTests : IntegrationTestBase
         db.Users.Add(outsider);
         await db.SaveChangesAsync();
         var service = NewService(db, new FakeCallProvider(), new RecordingCallNotifier());
-        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, null, "Audio"));
+        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, "Audio"));
 
         var aliceHistory = await service.GetHistoryAsync(alice.Id, null, 20);
         var outsiderHistory = await service.GetHistoryAsync(outsider.Id, null, 20);
@@ -351,5 +362,57 @@ public class CallServiceTests : IntegrationTestBase
 
         Assert.True(outsiderHistory.Succeeded);
         Assert.Empty(outsiderHistory.Value!.Items);
+    }
+
+    /// <summary>Cuộc gọi đổ chuông quá 30s mà không ai nghe phải được đóng thành Missed/NoAnswer.</summary>
+    [Fact]
+    public async Task TimeoutRingingCalls_EndsMissedAndNotifiesMembers()
+    {
+        var (db, alice, bob, conversation) = await CreateDirectPairAsync();
+        var notifier = new RecordingCallNotifier();
+        var service = NewService(db, new FakeCallProvider(), notifier);
+        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, "Audio"));
+
+        // Đẩy cuộc gọi về quá khứ hơn 30 giây (CallRules.RingTimeoutSeconds).
+        var stored = await db.Calls.FindAsync(call.Value!.Id);
+        stored!.CreatedAt = DateTimeOffset.UtcNow.AddSeconds(-31);
+        await db.SaveChangesAsync();
+
+        var finished = await service.TimeoutRingingCallsAsync();
+
+        Assert.Equal(1, finished);
+
+        var reloaded = await db.Calls.FindAsync(call.Value.Id);
+        Assert.Equal(CallStatus.Missed, reloaded!.Status);
+        Assert.Equal(CallEndReason.NoAnswer, reloaded.EndReason);
+        Assert.NotNull(reloaded.EndedAt);
+
+        var participant = db.CallParticipants.Single(p => p.CallId == call.Value.Id && p.UserId == bob.Id);
+        Assert.Equal(CallParticipantStatus.Missed, participant.Status);
+
+        // Có tin nhắn "Call" ghi lại cuộc gọi nhỡ và có phát CallEnded.
+        Assert.Contains(db.Messages, m => m.CallId == call.Value.Id);
+        Assert.NotEmpty(notifier.Ended);
+    }
+
+    /// <summary>Người nhận bấm nghe sau khi hết giờ đổ chuông → CALL_ALREADY_ENDED, không vào room.</summary>
+    [Fact]
+    public async Task Answer_AfterRingTimeout_IsRejected()
+    {
+        var (db, alice, bob, conversation) = await CreateDirectPairAsync();
+        var service = NewService(db, new FakeCallProvider(), new RecordingCallNotifier());
+        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, "Audio"));
+
+        var stored = await db.Calls.FindAsync(call.Value!.Id);
+        stored!.CreatedAt = DateTimeOffset.UtcNow.AddSeconds(-31);
+        await db.SaveChangesAsync();
+
+        var answered = await service.AnswerAsync(bob.Id, call.Value.Id);
+
+        Assert.False(answered.Succeeded);
+        Assert.Equal(ErrorCodes.CallAlreadyEnded, answered.ErrorCode);
+
+        var reloaded = await db.Calls.FindAsync(call.Value.Id);
+        Assert.Equal(CallStatus.Missed, reloaded!.Status);
     }
 }
