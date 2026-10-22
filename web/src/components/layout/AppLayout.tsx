@@ -4,6 +4,7 @@ import { AppHeader } from './AppHeader'
 import { ToastContainer } from '../ui/ToastContainer'
 import { useAuthStore } from '../../stores/authStore'
 import { useChatConnection } from '../../hooks/useChatConnection'
+import { IncomingCallModal } from '../calls/IncomingCallModal'
 
 /** Khung chung của mọi trang: thanh điều hướng + nội dung + vùng thông báo. */
 export function AppLayout() {
@@ -31,6 +32,8 @@ export function AppLayout() {
       <main className="mx-auto max-w-6xl px-4 py-8">
         <Outlet />
       </main>
+      {/* Modal cuộc gọi đến — hiện ở mọi trang khi nhận sự kiện CallIncoming. */}
+      <IncomingCallModal />
       <footer className="border-t border-slate-200 py-6 text-center text-xs text-slate-500 dark:border-slate-800">
         <p>Comink &bull; Đồ án chuyên ngành công nghệ phần mềm &bull; 2026</p>
       </footer>

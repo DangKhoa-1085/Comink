@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, ImagePlus, Loader2, Send, X } from 'lucide-react'
+import { ArrowLeft, ImagePlus, Loader2, Phone, Send, Users, Video, X } from 'lucide-react'
+import { callsApi, type CallType } from '../api/calls'
 import { conversationsApi, type ChatMessage } from '../api/conversations'
 import { mediaApi } from '../api/media'
 import { Avatar } from '../components/social/Avatar'
@@ -22,8 +23,19 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 export function ChatPage() {
   const { t, i18n } = useTranslation()
   const { conversationId } = useParams<{ conversationId: string }>()
+  const navigate = useNavigate()
   const me = useAuthStore((state) => state.user)
   const queryClient = useQueryClient()
+
+  // Bắt đầu gọi thoại/video trong hội thoại này rồi sang màn hình gọi.
+  const startCall = useMutation({
+    mutationFn: (type: CallType) => callsApi.start({ conversationId: conversationId!, type }),
+    onSuccess: (call) => navigate(`/calls/${call.id}`),
+    onError: (error) => {
+      const code = error instanceof ApiError ? error.code : 'INTERNAL_ERROR'
+      toast.error(translateErrorCode(t, code))
+    }
+  })
 
   const [draft, setDraft] = useState('')
   const [pendingImage, setPendingImage] = useState<{ id: string; url: string } | null>(null)
@@ -148,8 +160,11 @@ export function ChatPage() {
   }
 
   const conversation = conversationQuery.data
-  const peer = conversation.members.find((member) => member.userId !== me?.id)
-  const peerName = peer?.displayName || peer?.userName || t('chat.title')
+  const isGroup = conversation.type === 'Group'
+  const peer = isGroup ? undefined : conversation.members.find((member) => member.userId !== me?.id)
+  const peerName = isGroup
+    ? conversation.title || t('chat.group')
+    : peer?.displayName || peer?.userName || t('chat.title')
 
   return (
     <div className="mx-auto flex h-[calc(100vh-9rem)] max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
@@ -157,10 +172,46 @@ export function ChatPage() {
         <Link to="/messages" className="rounded-lg p-1 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label={t('chat.back')}>
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <Avatar name={peerName} url={peer?.avatarUrl} size="sm" />
-        <div className="min-w-0">
+        {isGroup ? (
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300">
+            <Users className="h-4 w-4" />
+          </span>
+        ) : (
+          <Avatar name={peerName} url={peer?.avatarUrl} size="sm" />
+        )}
+        <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{peerName}</p>
-          {peer && <p className="truncate text-xs text-slate-500">@{peer.userName}</p>}
+          {isGroup ? (
+            <p className="truncate text-xs text-slate-500">
+              {t('chat.member_count', { count: conversation.members.length })}
+            </p>
+          ) : (
+            peer && <p className="truncate text-xs text-slate-500">@{peer.userName}</p>
+          )}
+        </div>
+
+        {/* Gọi thoại/video ngay trong hội thoại (docs/05_api_contract.md mục 9.2) */}
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => startCall.mutate('Audio')}
+            disabled={startCall.isPending}
+            title={t('call.start_audio')}
+            aria-label={t('call.start_audio')}
+          >
+            <Phone className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => startCall.mutate('Video')}
+            disabled={startCall.isPending}
+            title={t('call.start_video')}
+            aria-label={t('call.start_video')}
+          >
+            <Video className="h-4 w-4" />
+          </Button>
         </div>
       </header>
 
@@ -191,15 +242,32 @@ export function ChatPage() {
             <ul className="space-y-2">
               {messages.map((message) => {
                 const mine = message.senderId === me?.id
+                // Trong nhóm, phải thấy tin này của ai (yêu cầu người dùng 2026-10-23).
+                const sender = isGroup
+                  ? conversation.members.find((member) => member.userId === message.senderId)
+                  : undefined
+
                 return (
                   <li key={message.id} className={mine ? 'flex justify-end' : 'flex justify-start'}>
                     <div
                       className={
                         mine
-                          ? 'max-w-[75%] rounded-2xl rounded-br-sm bg-indigo-600 px-3 py-2 text-sm text-white'
-                          : 'max-w-[75%] rounded-2xl rounded-bl-sm bg-slate-100 px-3 py-2 text-sm text-slate-800 dark:bg-slate-800 dark:text-slate-100'
+                          ? 'flex max-w-[75%] flex-col items-end'
+                          : 'flex max-w-[75%] flex-col items-start'
                       }
                     >
+                      {!mine && sender && (
+                        <span className="mb-0.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                          {sender.displayName || sender.userName}
+                        </span>
+                      )}
+                      <div
+                        className={
+                          mine
+                            ? 'rounded-2xl rounded-br-sm bg-indigo-600 px-3 py-2 text-sm text-white'
+                            : 'rounded-2xl rounded-bl-sm bg-slate-100 px-3 py-2 text-sm text-slate-800 dark:bg-slate-800 dark:text-slate-100'
+                        }
+                      >
                       {message.attachments.length > 0 && (
                         <div className="mb-1 space-y-1">
                           {message.attachments.map((attachment) => (
@@ -218,6 +286,7 @@ export function ChatPage() {
                       <span className={mine ? 'mt-1 block text-[10px] text-indigo-200' : 'mt-1 block text-[10px] text-slate-400'}>
                         {timeAgo(message.createdAt, i18n.language)}
                       </span>
+                      </div>
                     </div>
                   </li>
                 )

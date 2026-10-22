@@ -15,6 +15,9 @@ export default defineConfig({
     },
   },
   server: {
+    // `host: true` = lắng nghe trên mọi interface để **máy khác trong LAN** truy cập được
+    // (cần cho việc test gọi 2 máy ở GĐ 4: http://<ip-lan>:5173).
+    host: true,
     port: 5173,
     proxy: {
       // Backend chạy ở http://localhost:5117

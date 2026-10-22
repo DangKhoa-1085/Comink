@@ -42,9 +42,11 @@ export interface ConversationSummary {
   id: string
   type: string
   title: string | null
-  peer: ConversationPeer
+  /** Chỉ có với hội thoại 1–1; nhóm dùng `title` + `memberCount`. */
+  peer: ConversationPeer | null
   lastMessage: ConversationLastMessage | null
   unreadCount: number
+  memberCount: number
 }
 
 export interface Conversation {
@@ -68,6 +70,15 @@ export const conversationsApi = {
   /** Mở hội thoại 1–1 (chỉ bạn bè); đã có thì backend trả lại hội thoại cũ. */
   async openDirect(userId: string): Promise<Conversation> {
     const { data } = await http.post<Conversation>('/api/conversations/direct', { userId })
+    return data
+  },
+
+  /** Tạo nhóm chat (NC GĐ 3): 3–10 thành viên, tất cả phải là bạn bè. */
+  async createGroup(name: string, participantIds: string[]): Promise<Conversation> {
+    const { data } = await http.post<Conversation>('/api/conversations/group', {
+      name,
+      participantIds,
+    })
     return data
   },
 

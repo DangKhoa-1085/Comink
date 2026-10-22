@@ -2,8 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { HubConnection } from '@microsoft/signalr'
 import type { ChatMessage } from '../api/conversations'
+import type { CallDto } from '../api/calls'
 import { createChatConnection, MESSAGE_CREATED_EVENT } from '../lib/chatConnection'
 import { appendMessageToCache, syncMissedMessages } from '../lib/messageCache'
+import { useAuthStore } from '../stores/authStore'
+import { useCallStore } from '../stores/callStore'
+
+/** Tên sự kiện cuộc gọi — khớp `CallEvents` ở backend. */
+const CALL_INCOMING_EVENT = 'CallIncoming'
+const CALL_UPDATED_EVENT = 'CallUpdated'
+const CALL_ENDED_EVENT = 'CallEnded'
 
 export interface ChatConnectionState {
   /** Đang có kết nối tới hub. */
@@ -70,6 +78,40 @@ export function useChatConnection(enabled: boolean): ChatConnectionState {
       appendMessageToCache(queryClient, message)
       queryClient.invalidateQueries({ queryKey: ['messages', message.conversationId] })
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    })
+
+    // --- Cuộc gọi: cuộc gọi đến / cập nhật / kết thúc (GĐ 4) ---
+    connection.on(CALL_INCOMING_EVENT, (call: CallDto) => {
+      useCallStore.getState().setIncoming(call)
+    })
+
+    connection.on(CALL_UPDATED_EVENT, (call: CallDto) => {
+      queryClient.invalidateQueries({ queryKey: ['call', call.id] })
+
+      const incoming = useCallStore.getState().incoming
+      if (!incoming || incoming.id !== call.id) {
+        return
+      }
+
+      // ⚠️ Lỗi đã gặp (2026-10-23): trước đây đóng modal ngay khi `status !== 'Ringing'`,
+      // nên vừa có MỘT người nghe là modal của những người còn lại biến mất và họ không thể
+      // vào cuộc gọi nhóm nữa. Chỉ đóng khi cuộc gọi kết thúc, hoặc chính tôi đã trả lời/từ chối.
+      const me = useAuthStore.getState().user?.id
+      const mine = call.participants.find((participant) => participant.userId === me)
+      const finished = ['Completed', 'Declined', 'Cancelled', 'Missed', 'Failed'].includes(call.status)
+
+      if (finished || (mine !== undefined && mine.status !== 'Invited')) {
+        useCallStore.getState().clearIncoming()
+      }
+    })
+
+    connection.on(CALL_ENDED_EVENT, (ended: { callId: string }) => {
+      if (useCallStore.getState().incoming?.id === ended.callId) {
+        useCallStore.getState().clearIncoming()
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['call', ended.callId] })
+      queryClient.invalidateQueries({ queryKey: ['calls'] })
     })
 
     connection.onreconnecting(() => {

@@ -13,6 +13,7 @@ import { FriendsPage } from '../pages/FriendsPage'
 import { UserProfilePage } from '../pages/UserProfilePage'
 import { MessagesPage } from '../pages/MessagesPage'
 import { ChatPage } from '../pages/ChatPage'
+import { CallPage } from '../pages/CallPage'
 
 /**
  * Bảng định tuyến của web.
@@ -39,6 +40,7 @@ export const router = createBrowserRouter([
           { path: 'feed', element: <FeedPage /> },
           { path: 'messages', element: <MessagesPage /> },
           { path: 'messages/:conversationId', element: <ChatPage /> },
+          { path: 'calls/:callId', element: <CallPage /> },
         ],
       },
       {
