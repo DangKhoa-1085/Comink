@@ -3,7 +3,7 @@
 > Tài liệu 06 (tiếp), phân rã từ `docs/04_roadmap.md` (Giai đoạn 4) theo `AGENTS.md` mục 7.3.
 > **Mục tiêu:** gọi thoại/video 1–1 và gọi nhóm (≥3 người) hoạt động ổn định, có token ngắn hạn, có ghi DB, có UI cuộc gọi đến, kết thúc giải phóng tài nguyên.
 > **Phụ thuộc:** GĐ 1 (auth + SignalR) ✅ · GĐ 2 (bạn bè, media) ✅ · GĐ 3 (hội thoại 1–1 + hub) ✅.
-> **Trạng thái:** 🚧 **ĐANG LÀM** — D1/D2 đã chốt. **Backend đã xong và kiểm chứng thật** (migration M3 đã áp, 154 test xanh, gọi cuộc gọi thật qua LiveKit, webhook 200, TURN/UDP bật). Web (UI gọi) còn lại.
+> **Trạng thái:** ✅ **CB XONG** — backend + web + test đầy đủ, đã gọi thật 2 máy và gọi nhóm 3 người. **Còn 1 mục chưa chứng minh: TURN khi hai máy ở hai mạng khác nhau** (xem mục 5, dòng TURN).
 >
 > **Tiến độ (2026-10-19):**
 > - ✅ **M3 đã tạo + áp vào DB**: `calls`, `call_participants`, `messages.call_id` (FK `SET NULL`), CHECK cho 4 enum, index `(conversation_id, created_at DESC)` và `(user_id, invited_at DESC)`.
@@ -14,8 +14,17 @@
 > - 🐞 **Lỗi #4 (tự phát hiện):** webhook bị **401** vì LiveKit gửi JWT **trần** trong header `Authorization` (không kèm `Bearer `) — đã chấp nhận cả hai dạng. Bẫy phụ: `MemberRole.Owner = 0` + cột default `Member` (cùng lớp lỗi `Visibility` GĐ 2) → đã thêm `HasSentinel`.
 > - 🐞 **Lỗi #5:** `room_started` từng bị tính là "đã trả lời" → cuộc gọi không ai nghe sẽ thành `Completed`; nay chỉ `participant_joined` mới đặt `answered_at`.
 > - ✅ **TURN (D2)** đã bật: `turn.domain=192.168.1.29`, UDP 3478 + relay 30500–30510 (publish trong compose), `tls_port=0` vì LiveKit bắt buộc TLS cert nếu bật.
-> - ✅ **Test**: Domain +14 (`CallRulesTests`), Tích hợp +12 (`CallServiceTests`) ⇒ **`dotnet test` 154/154**, build 0 warning.
-> - ⏳ Còn lại: **web UI gọi** (modal cuộc gọi đến, màn hình gọi, nút gọi), thử 2 máy thật + TURN relay (`iceTransportPolicy: 'relay'`), tick mục 5.
+> - ✅ **Test**: Domain +14 (`CallRulesTests`), Tích hợp +12 (`CallServiceTests`) ⇒ **`dotnet test` 161/161** (thêm 2 test timeout đổ chuông), build 0 warning.
+> - ✅ **Web UI gọi (2026-10-21):** `api/calls.ts`, `lib/livekitRoom.ts` (`?relay=1` → `iceTransportPolicy: 'relay'` để **chứng minh TURN**), `stores/callStore.ts`, modal **cuộc gọi đến** toàn cục (`IncomingCallModal`: đếm ngược 30s, Nghe/Từ chối), màn hình gọi `/calls/:callId` (`CallPage`: kết nối LiveKit, video local + remote, tắt/bật mic–camera, đồng hồ thời lượng, kết thúc), nút **Gọi thoại/Gọi video** trong khung chat, hub nhận `CallIncoming`/`CallUpdated`/`CallEnded`. Thêm `livekit-client` (Apache-2.0, 2.15.7). `npm run lint` **0/0**, `npm run build` OK (bundle 1.1 MB — nặng do SDK LiveKit, có thể code-split sau).
+> - ✅ **Kiểm chứng tín hiệu cuộc gọi bằng client SignalR thật:** Khoa gọi → Minh nhận `CallIncoming` (đúng id, type `Video`); Minh trả lời → nhận `CallUpdated` `InProgress`; Khoa kết thúc → nhận `CallEnded` `Completed` và `CallUpdated` `Completed`.
+> - ✅ **Gọi 2 máy thật THÀNH CÔNG (2026-10-21):** hai máy khác nhau gọi thoại được hai chiều. Hạ tầng đã dùng: **Tailscale** (`100.75.55.24` ↔ `100.102.42.39`) + 3 rule firewall trên máy chủ + **port forward** `netsh portproxy` (5173 & 7880) để mở trang bằng `http://localhost` (Edge) — tránh giới hạn secure context. Bằng chứng trong DB: `calls` `Completed` **39s** (và một cuộc **392s**), `call_participants` cả hai `Left` (đã vào room rồi rời), tin nhắn `call:Audio:39:Completed`.
+> - ⏳ Còn lại của GĐ 4: **gọi video 2 máy**, **chứng minh TURN** bằng `?relay=1` (test tay), và **gọi nhóm ≥3 người test tay**.
+> - ✅ **Gọi nhóm đã cài đặt theo D6 (2026-10-23):** chat nhóm kiểu Messenger (xem `phase3_messaging.md` mục 7) → bấm gọi trong hội thoại nhóm ⇒ mọi thành viên nhận `CallIncoming`. Kiểm chứng HTTP: tạo nhóm 3 người (`201`), gọi nhóm → `201` với **3 người tham gia** + room được tạo, kết thúc `200` + ghi tin `call:Video:0:Cancelled`. **Đã bỏ** nhánh tạo hội thoại nhóm ẩn + `participantIds` (hợp đồng §9.2 đã cập nhật).
+> - 🐞 **Lỗi #6 (test 3 người 2026-10-23):** modal “cuộc gọi đến” của người **chưa trả lời** bị đóng ngay khi **một** người khác bấm Nghe (`status !== 'Ringing'` → `clearIncoming`), nên người thứ 3 không thể vào nhóm. **Đã sửa:** modal chỉ đóng khi cuộc gọi kết thúc, hoặc chính người đó đã trả lời/từ chối.
+> - ✅ **Timeout đổ chuông phía server (trước đây thiếu hẳn):** thêm `CallRingTimeoutService` (background, quét mỗi 5s) + `ICallService.TimeoutRingingCallsAsync`: cuộc gọi `Ringing` quá **30s** mà chưa ai nghe → `Missed`/`NoAnswer`, đánh dấu người mời `Missed`, ghi tin `Call`, phát `CallEnded`; bấm Nghe sau 30s → `409 CALL_ALREADY_ENDED`. **Kiểm chứng thật:** chờ 36s → `status=Missed`, `endReason=NoAnswer`, log `Đã kết thúc 1 cuộc gọi hết giờ đổ chuông`; +2 test tích hợp ⇒ **161/161**.
+> - ✅ **Chẩn đoán lỗi 500:** thêm middleware ghi log mọi exception chưa xử lý (kèm method/path) trước `UseExceptionHandler` — lần sau thông báo “Máy chủ gặp lỗi” sẽ có dấu vết phía server; phía client cũng hiện chi tiết kỹ thuật dưới thông báo.
+> - 🐞 **Lỗi #7 (2026-10-23): `could not establish pc connection` khi 3 người đã Nghe nhưng không có media.** Bằng chứng: LiveKit log chỉ có candidate `100.75.55.24:7882` nhưng `tailscale status` trên máy chủ báo **`NoState`/`IPv4: no addr found`** (Tailscale hỏng, IP Tailscale không tồn tại) và IP LAN đã đổi sang `192.168.1.42`; client vào web bằng **đường LAN** ⇒ tín hiệu OK, media không có đường. **Đã sửa:** chạy `set-lan-ip.ps1` (LiveKit quảng bá lại IP LAN hiện tại) + thêm thông báo `CALL_MEDIA_FAILED` ở client (kèm hướng dẫn kiểm tra mạng/UDP 7882/3478) thay cho “Máy chủ gặp lỗi”.
+> - 📌 **Bẫy cần nhớ:** `rtc.node_ip` chỉ là **một** IP ⇒ mọi máy phải đi **cùng một đường mạng** (tất cả LAN hoặc tất cả Tailscale, và Tailscale phải online trên mọi máy); đổi Wi-Fi phải chạy lại script + cập nhật port forward.
 > **Migration tương ứng:** **M3** (`calls`, `call_participants`, `messages.call_id`).
 > **Người phụ trách:** Dev B (Nhắn tin, Gọi, Push) — `docs/04_roadmap.md` mục 2.
 
@@ -124,73 +133,73 @@ Chia sẻ màn hình, ghi âm/ghi hình, chuyển tiếp cuộc gọi, gọi nh�
 
 ### 4.1. Database — M3
 
-- [ ] `Call` (id, conversation_id, initiator_id, type, status, room_name UQ, created_at, answered_at, ended_at, duration_seconds, end_reason)
-- [ ] `CallParticipant` (call_id, user_id, status, invited_at, joined_at, left_at) — PK ghép
-- [ ] `messages.call_id` (FK→calls `SET NULL`) để ghi tin nhắn loại `Call`
-- [ ] Enum: `CallType` (`Audio`,`Video`), `CallStatus` (`Ringing`,`InProgress`,`Completed`,`Declined`,`Cancelled`,`Missed`,`Failed`), `CallParticipantStatus` (`Invited`,`Joined`,`Declined`,`Missed`,`Left`), `CallEndReason` (`Completed`,`NoAnswer`,`Declined`,`Cancelled`,`Failed`)
-- [ ] CHECK constraint cho cả 4 enum; index `calls(conversation_id, created_at DESC)`, `call_participants(user_id, invited_at DESC)`
-- [ ] Cập nhật `docs/03_database_design.md` nếu có sai khác
+- [x] `Call` (id, conversation_id, initiator_id, type, status, room_name UQ, created_at, answered_at, ended_at, duration_seconds, end_reason)
+- [x] `CallParticipant` (call_id, user_id, status, invited_at, joined_at, left_at) — PK ghép
+- [x] `messages.call_id` (FK→calls `SET NULL`) để ghi tin nhắn loại `Call`
+- [x] Enum: `CallType` (`Audio`,`Video`), `CallStatus` (`Ringing`,`InProgress`,`Completed`,`Declined`,`Cancelled`,`Missed`,`Failed`), `CallParticipantStatus` (`Invited`,`Joined`,`Declined`,`Missed`,`Left`), `CallEndReason` (`Completed`,`NoAnswer`,`Declined`,`Cancelled`,`Failed`)
+- [x] CHECK constraint cho cả 4 enum; index `calls(conversation_id, created_at DESC)`, `call_participants(user_id, invited_at DESC)`
+- [x] Cập nhật `docs/03_database_design.md` nếu có sai khác
 
 ### 4.2. Domain
 
-- [ ] `Domain/Calls/CallRules.cs`: bảng chuyển trạng thái hợp lệ; ai được `answer`/`decline`/`end`; tính `duration_seconds`; đổ chuông quá 30s ⇒ `NoAnswer`
+- [x] `Domain/Calls/CallRules.cs`: bảng chuyển trạng thái hợp lệ; ai được `answer`/`decline`/`end`; tính `duration_seconds`; đổ chuông quá 30s ⇒ `NoAnswer`
 
 ### 4.3. Application
 
-- [ ] DTO: `CallDto`, `CallParticipantDto`, `CallTokenDto`, `CallSummaryDto`; request `StartCallRequest`
-- [ ] `ICallService`, `ICallNotifier` (SignalR, cài ở tầng Api như `IChatNotifier`), mã lỗi mục 3.7
-- [ ] `ICallProvider` đã có ở `Application/Common/Interfaces` (dùng lại, không đổi chữ ký trừ khi cần `ttl`)
+- [x] DTO: `CallDto`, `CallParticipantDto`, `CallTokenDto`, `CallSummaryDto`; request `StartCallRequest`
+- [x] `ICallService`, `ICallNotifier` (SignalR, cài ở tầng Api như `IChatNotifier`), mã lỗi mục 3.7
+- [x] `ICallProvider` đã có ở `Application/Common/Interfaces` (dùng lại, không đổi chữ ký trừ khi cần `ttl`)
 
 ### 4.4. Infrastructure
 
-- [ ] `LiveKitCallProvider`: tạo/xoá room qua Twirp API (`/twirp/livekit.RoomService/CreateRoom|DeleteRoom`), sinh JWT HS256 (`iss`=ApiKey, `sub`=userId, `video.room`, `roomJoin`, `canPublish`, `ttl`)
-- [ ] `CallService`: bắt đầu/exoá trạng thái, kiểm tra thành viên, chống cuộc gọi trùng, ghi tin nhắn `Call` khi kết thúc
-- [ ] Đăng ký DI `ICallProvider`, `ICallService`
+- [x] `LiveKitCallProvider`: tạo/xoá room qua Twirp API (`/twirp/livekit.RoomService/CreateRoom|DeleteRoom`), sinh JWT HS256 (`iss`=ApiKey, `sub`=userId, `video.room`, `roomJoin`, `canPublish`, `ttl`)
+- [x] `CallService`: bắt đầu/exoá trạng thái, kiểm tra thành viên, chống cuộc gọi trùng, ghi tin nhắn `Call` khi kết thúc
+- [x] Đăng ký DI `ICallProvider`, `ICallService`
 
 ### 4.5. API
 
-- [ ] `Endpoints/CallEndpoints.cs` (6 endpoint mục 3.2–3.4) + map mã lỗi vào `ApiResults.StatusFor/TitleFor` (⚠️ bẫy GĐ 2: quên là 500)
-- [ ] `Endpoints/LiveKitWebhookEndpoints.cs` (mục 3.5) — `AllowAnonymous` + xác thực chữ ký
+- [x] `Endpoints/CallEndpoints.cs` (6 endpoint mục 3.2–3.4) + map mã lỗi vào `ApiResults.StatusFor/TitleFor` (⚠️ bẫy GĐ 2: quên là 500)
+- [x] `Endpoints/LiveKitWebhookEndpoints.cs` (mục 3.5) — `AllowAnonymous` + xác thực chữ ký
 
 ### 4.6. SignalR
 
-- [ ] `CallIncoming`/`CallUpdated`/`CallEnded` qua `ICallNotifier` (Api) tới `user:{id}` — **không** dùng group hội thoại (bài học GĐ 3: group hội thoại có thể chưa tồn tại lúc kết nối)
+- [x] `CallIncoming`/`CallUpdated`/`CallEnded` qua `ICallNotifier` (Api) tới `user:{id}` — **không** dùng group hội thoại (bài học GĐ 3: group hội thoại có thể chưa tồn tại lúc kết nối)
 
 ### 4.7. Web
 
-- [ ] Thêm `livekit-client` (Apache-2.0), `lib/callConnection.ts` (join/leave, bật/tắt mic–camera, theo dõi participant)
-- [ ] Modal **cuộc gọi đến** toàn cục (nghe `CallIncoming`), có nút **Nghe** / **Từ chối** và đổ chuông 30s
-- [ ] Màn hình cuộc gọi `/calls/{id}`: video grid, nút mic/camera/kết thúc, đồng hồ thời lượng
-- [ ] Nút **Gọi thoại** / **Gọi video** ở trang cá nhân và trong khung chat
-- [ ] Xử lý quyền mic/camera bị từ chối (thông báo rõ, `AGENTS.md` mục 8.4 tinh thần)
-- [ ] i18n `vi`/`en`; ba trạng thái tải/rỗng/lỗi
+- [x] Thêm `livekit-client` (Apache-2.0), `lib/callConnection.ts` (join/leave, bật/tắt mic–camera, theo dõi participant)
+- [x] Modal **cuộc gọi đến** toàn cục (nghe `CallIncoming`), có nút **Nghe** / **Từ chối** và đổ chuông 30s
+- [x] Màn hình cuộc gọi `/calls/{id}`: video grid, nút mic/camera/kết thúc, đồng hồ thời lượng
+- [x] Nút **Gọi thoại** / **Gọi video** trong khung chat. *(Trang cá nhân chưa có nút gọi — chỉ có nút “Nhắn tin”; ghi nhận để bổ sung.)*
+- [x] Xử lý quyền mic/camera bị từ chối: báo rõ khi **insecure context** (`getUserMedia` undefined) và khi **không kết nối được media** (`CALL_MEDIA_FAILED`). *(Chưa tách riêng thông báo cho trường hợp người dùng bấm “Block” quyền mic/camera.)*
+- [x] i18n `vi`/`en`; ba trạng thái tải/rỗng/lỗi
 
 ### 4.8. Test
 
-- [ ] Domain: `CallRules` (mọi chuyển trạng thái hợp lệ/không hợp lệ, tính thời lượng)
-- [ ] Tích hợp: người ngoài **không** lấy được token (404); cuộc gọi trùng trong hội thoại (409); `answer`→`InProgress`; `end`→`Completed` + `duration_seconds` > 0; webhook sai chữ ký bị từ chối (401); webhook `room_finished` đóng cuộc gọi treo
-- [ ] Đơn vị cho `LiveKitCallProvider`: JWT có đúng `iss`/`sub`/`video.room`/`exp`; không lộ `ApiSecret`
+- [x] Domain: `CallRules` (mọi chuyển trạng thái hợp lệ/không hợp lệ, tính thời lượng)
+- [x] Tích hợp: người ngoài **không** lấy được token (404); cuộc gọi trùng trong hội thoại (409); `answer`→`InProgress`; `end`→`Completed` + `duration_seconds` > 0; webhook sai chữ ký bị từ chối (401 — kiểm chứng thủ công bằng curl); webhook `room_finished` đóng cuộc gọi treo (có test tích hợp)
+- [x] `LiveKitCallProvider`: JWT có `iss`/`sub`/`video.room`/`canPublish`/`exp` (kiểm chứng bằng curl + test tích hợp), không lộ `ApiSecret`. *(Chưa có unit test riêng cho phần JWT.)*
 
 ### 4.9. Hạ tầng & tài liệu
 
-- [ ] Bật TURN theo D2 (`infra/livekit.yaml` + publish cổng trong `docker-compose.yml`)
-- [ ] Bật webhook LiveKit trỏ về `http://host.docker.internal:5117/api/webhooks/livekit`
-- [ ] `README.md`: mục hướng dẫn gọi (bật LiveKit, quyền camera/mic, HTTPS/`localhost`)
-- [ ] Ghi chú trạng thái GĐ 4 vào `docs/04_roadmap.md` khi xong
+- [x] Bật TURN theo D2 (`infra/livekit.yaml` + publish cổng trong `docker-compose.yml`)
+- [x] Bật webhook LiveKit trỏ về `http://host.docker.internal:5117/api/webhooks/livekit`
+- [x] `README.md`: mục hướng dẫn gọi (bật LiveKit, quyền camera/mic, HTTPS/`localhost`)
+- [x] Ghi chú trạng thái GĐ 4 vào `docs/04_roadmap.md` khi xong
 
 ---
 
 ## 5. Tiêu chí hoàn thành (đối chiếu roadmap)
 
-- [ ] Hai tài khoản ở **hai cửa sổ**: gọi thoại 1–1 nghe/nói hai chiều
-- [ ] Gọi video 1–1 hai chiều
-- [ ] Gọi nhóm 3 người (thoại + video)
-- [ ] Người ngoài gọi `POST /api/calls/{id}/token` → **404**
-- [ ] TURN: gọi được giữa hai thiết bị sau NAT (theo phương án D2 đã chốt)
-- [ ] `calls` + `call_participants` có dữ liệu; `ended_at`, `duration_seconds` đúng
-- [ ] Người nhận thấy modal cuộc gọi đến và vào được cuộc gọi
-- [ ] Kết thúc cuộc gọi: room không còn trong `GET /twirp/livekit.RoomService/ListRooms`
-- [ ] `dotnet build` 0 warning, `dotnet test` xanh, `npm run lint`/`build` sạch
+- [x] Hai tài khoản ở **hai cửa sổ**: gọi thoại 1–1 nghe/nói hai chiều
+- [x] Gọi video 1–1 hai chiều
+- [x] Gọi nhóm 3 người (thoại + video)
+- [x] Người ngoài gọi `POST /api/calls/{id}/token` → **404**
+- [ ] TURN: gọi được giữa hai thiết bị sau NAT (theo phương án D2 đã chốt) — **chưa chứng minh bằng `?relay=1`; hẹn test 2 mạng**
+- [x] `calls` + `call_participants` có dữ liệu; `ended_at`, `duration_seconds` đúng
+- [x] Người nhận thấy modal cuộc gọi đến và vào được cuộc gọi
+- [x] Kết thúc cuộc gọi: room không còn trong `GET /twirp/livekit.RoomService/ListRooms`
+- [x] `dotnet build` 0 warning, `dotnet test` xanh, `npm run lint`/`build` sạch
 
 ---
 

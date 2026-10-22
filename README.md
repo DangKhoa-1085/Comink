@@ -128,6 +128,64 @@ Lưu ý khi test gọi giữa hai máy:
 - TURN chỉ chạy UDP (LiveKit bắt buộc TLS cert nếu bật `tls_port`). Muốn TURN/TLS: cấu hình `cert_file`/`key_file` và mở cổng 5349.
 - Webhook LiveKit trỏ về `http://host.docker.internal:5117/api/webhooks/livekit`; LiveKit gửi JWT **trần** trong header `Authorization` (không kèm `Bearer `) — backend đã xử lý cả hai dạng.
 
+### 6d. Test gọi giữa **hai máy**
+
+| Cách | Khi nào dùng | Việc phải làm |
+|---|---|---|
+| **LAN** | Hai máy cùng Wi-Fi nhà (không bật AP isolation) | chạy `infra/set-lan-ip.ps1` → mở `http://<ip-lan>:5173` |
+| **Tailscale** | Wi-Fi trường/công cộng (thường bật AP isolation → hai máy không thấy nhau) | cài Tailscale trên **cả hai** máy, đăng nhập cùng tài khoản → máy A chạy `infra/set-lan-ip.ps1 -Tailscale` → máy B mở `http://<ip-tailscale-A>:5173` |
+
+**Mở firewall** (PowerShell **Admin**, chạy một lần):
+
+```powershell
+New-NetFirewallRule -DisplayName "Comink Vite" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5173 -Profile Any
+New-NetFirewallRule -DisplayName "Comink LiveKit TCP" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 7880,7881 -Profile Any
+New-NetFirewallRule -DisplayName "Comink LiveKit UDP" -Direction Inbound -Action Allow -Protocol UDP -LocalPort 7882,3478,30500-30510 -Profile Any
+```
+
+**Cờ Chrome cho camera** trên máy mở bằng IP (không phải `localhost`):
+
+```powershell
+& "C:\Program Files\Google\Chrome\Application\chrome.exe" `
+  --unsafely-treat-insecure-origin-as-secure=http://<ip-may-A>:5173
+```
+
+> **Microsoft Edge** (cũng là Chromium) dùng cùng cơ chế, chỉ đổi đường dẫn — nhớ tắt hết tiến trình
+> `msedge` trước, nếu không cờ bị bỏ qua:
+>
+> ```powershell
+> Get-Process msedge -ErrorAction SilentlyContinue | Stop-Process -Force
+> & "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" `
+>   --unsafely-treat-insecure-origin-as-secure=http://<ip-may-A>:5173
+> ```
+>
+> Một số bản Edge bỏ qua cờ này ⇒ cách **chắc chắn nhất và không phụ thuộc trình duyệt** là
+> port forward bên dưới rồi mở bằng `http://localhost` (localhost luôn là secure context).
+
+Kiểm tra nhanh từ máy B trước khi gọi: `Test-NetConnection <ip-may-A> -Port 5173` phải `TcpTestSucceeded: True`, và `http://<ip-may-A>:5173/health` phải trả JSON `healthy`.
+
+> Đổi mạng (hoặc bật/tắt Tailscale) thì **chạy lại** `set-lan-ip.ps1` để LiveKit quảng bá đúng IP; không cần khởi động lại backend.
+
+**Cách khác — không cần cờ Chrome** (vì `http://localhost` vẫn là secure context): trên **máy B** chuyển tiếp cổng về máy A (PowerShell **Admin**), rồi mở `http://localhost:5173`:
+
+```powershell
+netsh interface portproxy add v4tov4 listenport=5173 listenaddress=127.0.0.1 connectport=5173 connectaddress=<ip-may-A>
+netsh interface portproxy add v4tov4 listenport=7880 listenaddress=127.0.0.1 connectport=7880 connectaddress=<ip-may-A>
+netsh interface portproxy show all     # xem lại
+netsh interface portproxy reset        # xoá hết khi test xong
+```
+
+> Phải chuyển tiếp **cả 7880**: backend trả URL LiveKit `ws://localhost:7880`, trình duyệt ở máy B sẽ nối vào `localhost` **của chính nó**, nên cần cổng đó trỏ sang máy A.
+
+**Triệu chứng khi thiếu secure context:** LiveKit báo `Cannot read properties of undefined (reading 'getUserMedia')` — vì `navigator.mediaDevices` chỉ tồn tại trên HTTPS hoặc `localhost`. Kiểm tra trong Console: `isSecureContext` phải `true` và `navigator.mediaDevices` phải khác `undefined`.
+
+**⚠️ Lỗi `could not establish pc connection` (không có media):** LiveKit chỉ quảng bá **một** IP (`rtc.node_ip`) trong `infra/livekit.yaml`. Nếu máy khách vào web bằng đường **LAN** nhưng LiveKit lại quảng bá IP **Tailscale** (hoặc ngược lại) thì tín hiệu vẫn OK mà **media không có đường đi** → đúng lỗi này.
+
+- Mọi máy phải dùng **cùng một đường**: hoặc tất cả qua LAN (chạy `infra/set-lan-ip.ps1`), hoặc tất cả qua Tailscale (`-Tailscale`, **Tailscale phải đang online trên mọi máy** — kiểm tra `tailscale status`, máy nào `offline` là hỏng đường).
+- **Đổi Wi-Fi là IP đổi** (đã gặp: `192.168.1.29` → `10.12.25.24` → `192.168.1.42`) → phải chạy lại script, và **cập nhật lại port forward** trên máy B nếu có dùng.
+- Kiểm tra nhanh từ máy khách: mở `http://<ip-livekit>:7880` phải trả `200`; nếu dùng Tailscale thì `tailscale ping <ip-máy-chủ>` phải `pong`.
+- Ứng dụng giờ hiện thông báo `CALL_MEDIA_FAILED` (kèm chi tiết kỹ thuật) thay cho “Máy chủ gặp lỗi” khi gặp trường hợp này.
+
 ### 6b. Ảnh trong bài viết (Giai đoạn 2)
 
 Ảnh được tải lên **trực tiếp** bằng chữ ký do backend cấp (`docs/02_tech_stack_decisions.md` mục 3.4). Chọn một trong hai cách:

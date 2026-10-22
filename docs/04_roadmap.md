@@ -117,7 +117,7 @@ Mỗi giai đoạn gồm: **mục tiêu**, **phụ thuộc** và **checklist ho�
 **Mục tiêu:** hai người dùng nhắn tin được với nhau theo thời gian thực và xem lại lịch sử.
 **Phụ thuộc:** GĐ 1 (cần bạn bè từ GĐ 2 nếu giới hạn ai được nhắn cho ai).
 
-> 🚧 **Đang làm (2026-10-19):** backend + web đã cài đặt; migration **M2** đã áp; `dotnet test` **128/128**, `dotnet build` 0 warning, `npm run lint`/`build` sạch. Kiểm chứng thật: thời gian thực (thành viên nhận tin ngay, người ngoài không nhận — kể cả khi hội thoại tạo **sau** lúc kết nối), ảnh trong tin nhắn qua Cloudinary (gửi tin chỉ có ảnh → 201, URL `200 image/png`, media sai ngữ cảnh bị chặn), đồng bộ tin bị lỡ bằng `after` cursor. Chỉ còn tick mục 5 sau khi bạn test bằng mắt. Chi tiết: `docs/tasks/phase3_messaging.md`; hợp đồng API: `docs/05_api_contract.md` mục 8.
+> ✅ **GĐ 3 CB XONG:** backend + web đầy đủ, migration **M2** đã áp; `dotnet test` hiện **161/161**, `dotnet build` 0 warning, `npm run lint`/`build` sạch. Đã kiểm chứng thật: thời gian thực (thành viên nhận tin ngay, người ngoài không nhận — kể cả khi hội thoại tạo **sau** lúc kết nối), ảnh trong tin nhắn qua Cloudinary, đồng bộ tin bị lỡ bằng `after` cursor, 2 tài khoản thật. Chi tiết: `docs/tasks/phase3_messaging.md`; hợp đồng API: `docs/05_api_contract.md` mục 8.
 
 - [x] Tạo hoặc mở cuộc chat riêng 1–1 (mỗi cặp người chỉ có một cuộc chat)
 - [x] Gửi và nhận tin nhắn văn bản **theo thời gian thực** qua SignalR
@@ -129,21 +129,24 @@ Mỗi giai đoạn gồm: **mục tiêu**, **phụ thuộc** và **checklist ho�
 - [x] Người ngoài hội thoại **không** đọc được tin và **không** vào được group SignalR của hội thoại đó
 - [x] Có test cho quyền truy cập hội thoại và gửi/nhận tin
 
+> ✅ **NC của GĐ 3 — Chat nhóm (XONG 2026-10-23):** tạo nhóm từ bạn bè (3–10 người, người tạo `Owner`), danh sách hội thoại hiện cả nhóm (`type`, `title`, `memberCount`), chat nhóm **hiện tên người gửi**, và **gọi nhóm ngay trong nhóm** (mọi thành viên nhận `CallIncoming`) — giống Messenger. `dotnet test` **161/161**, lint 0/0. **Đã test tay 3 tài khoản thành công** (modal cuộc gọi đến + nghe/nói 3 chiều). Chi tiết: `docs/tasks/phase3_messaging.md` mục 7; hợp đồng: `docs/05_api_contract.md` §8.2b.
+
 ### Giai đoạn 4: Gọi trực tuyến CB
 
 **Mục tiêu:** gọi thoại/video giữa hai người và gọi nhóm hoạt động ổn định.
 **Phụ thuộc:** GĐ 3 (cuộc gọi gắn với hội thoại).
 
-- [ ] Gọi thoại 1–1 hai máy khác nhau, nghe/nói được hai chiều
-- [ ] Gọi video 1–1 hai chiều
-- [ ] Gọi nhóm có cả thoại và video (tối thiểu 3 người tham gia)
-- [ ] Backend cấp token gọi có thời hạn ngắn; người ngoài hội thoại không xin được token
+- [x] Gọi thoại 1–1 hai máy khác nhau, nghe/nói được hai chiều
+- [x] Gọi video 1–1 hai chiều
+- [x] Gọi nhóm có cả thoại và video (tối thiểu 3 người tham gia)
+- [x] Backend cấp token gọi có thời hạn ngắn; người ngoài hội thoại không xin được token
 - [ ] TURN hoạt động: gọi được khi hai máy ở **hai mạng khác nhau** hoặc sau NAT
-- [ ] Cuộc gọi được ghi vào DB (người gọi, người nhận, loại, thời điểm kết thúc)
-- [ ] Hiển thị được lúc cuộc gọi đến để người nhận có thể vào cuộc gọi
-- [ ] Kết thúc cuộc gọi giải phóng đúng tài nguyên (không còn room "treo")
+  - *Ghi chú 2026-10-23: **chưa chứng minh**. Cách kiểm tra nhanh: mở cả hai máy ở `…/calls/<id>?relay=1` (nhãn “TURN mode (relay)”), nếu vẫn nghe/nói được thì media đã đi qua TURN `:3478`. Hiện đã bật TURN/UDP 3478 + dải relay 30500–30510 trong `infra/livekit.yaml`/`docker-compose.yml`.*
+- [x] Cuộc gọi được ghi vào DB (người gọi, người nhận, loại, thời điểm kết thúc)
+- [x] Hiển thị được lúc cuộc gọi đến để người nhận có thể vào cuộc gọi
+- [x] Kết thúc cuộc gọi giải phóng đúng tài nguyên (không còn room "treo")
 
-> 🚧 **Đang làm (bắt đầu 2026-10-19):** **backend đã xong và kiểm chứng thật** — migration **M3** đã áp; `dotnet test` **154/154**, build 0 warning; tạo cuộc gọi qua LiveKit thật (room được tạo/xoá), token 10 phút, người ngoài `404`, answer/end đúng, ghi `calls` + tin nhắn `Call`; webhook `room_started`/`room_finished` trả **200**; TURN/UDP đã bật (IP LAN `192.168.1.29`, relay 30500–30510). Còn lại: **web UI gọi** + thử 2 máy thật với TURN relay. Chi tiết: `docs/tasks/phase4_calls.md`; hợp đồng API: `docs/05_api_contract.md` mục 9.
+> ✅ **Cập nhật 2026-10-23 — GĐ 4 đạt 7/8 mục:** gọi thoại 1–1 hai máy ✅, gọi video 1–1 ✅, **gọi nhóm 3 người ✅ (test tay thành công)**, token ngắn hạn + người ngoài `404` ✅, ghi DB ✅, modal cuộc gọi đến ✅, kết thúc giải phóng room ✅ (`ListRooms` 0→1→0). Đã sửa trong quá trình test: modal không còn biến mất khi người khác nghe; **timeout đổ chuông 30s phía server** (`CallRingTimeoutService`); thông báo `CALL_MEDIA_FAILED` thay cho “Máy chủ gặp lỗi”; bẫy `node_ip` phải đúng đường mạng của client. `dotnet test` **161/161**, build 0 warning, `npm run lint` 0/0. **Chỉ còn mục TURN** (chờ test `?relay=1` giữa hai mạng). Chi tiết: `docs/tasks/phase4_calls.md`; hợp đồng API: `docs/05_api_contract.md` mục 9.
 
 ### Giai đoạn 5: Quản trị viên CB
 

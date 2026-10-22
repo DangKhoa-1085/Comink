@@ -98,7 +98,7 @@ Kết luận: hook được **đơn giản hoá** — chỉ giữ các mẫu có
 
 - [x] ~~**Ba test placeholder**~~ — đã thay bằng test thật ở Giai đoạn 1 (29 test).
 - [x] ~~**`Jwt__Secret` trong `.env`**~~ — đã xoay thành chuỗi ngẫu nhiên 48 ký tự (2026-10-17).
-- [ ] **TURN chưa bật**: cấu hình đúng ở Giai đoạn 4 (domain/IP LAN thật + publish cổng UDP/TCP).
+- [x] **TURN đã bật ở Giai đoạn 4**: `turn.domain` + `rtc.node_ip` theo IP thật, publish UDP 3478 + dải relay 30500–30510 (`infra/livekit.yaml`, `infra/docker-compose.yml`). *(Phần chứng minh hai mạng khác nhau vẫn nằm ở checklist GĐ 4.)*
 - [ ] **Đổi cổng cho thiết bị thật**: khi test app Flutter trên điện thoại thật, cần cấu hình lại backend/DB cho truy cập qua LAN (xem `docs/02_tech_stack_decisions.md`, mục 3.8 về HTTPS).
 
 ---

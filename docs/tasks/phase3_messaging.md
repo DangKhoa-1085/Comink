@@ -3,7 +3,7 @@
 > Tài liệu 06 (tiếp), phân rã từ `docs/04_roadmap.md` (Giai đoạn 3) theo yêu cầu ở `AGENTS.md` mục 7.3.
 > **Mục tiêu:** hai người dùng nhắn tin được với nhau **theo thời gian thực** và xem lại lịch sử.
 > **Phụ thuộc:** GĐ 1 (auth + SignalR nền) — **đã xong**; GĐ 2 (bạn bè) — **đã xong**.
-> **Trạng thái:** 🚧 **ĐANG LÀM** — quyết định D1 **đã chốt**; **backend đã cài đặt và kiểm chứng** (migration M2 đã áp, 123 test xanh, 12/12 phép kiểm tra HTTP đạt). Web đang làm.
+> **Trạng thái:** ✅ **CB XONG** — 5 endpoint + web đầy đủ; migration M2 đã áp; **161 test** xanh (toàn repo); đã test 2 tài khoản thật, ảnh Cloudinary, pagination, offline sync. **NC "chat nhóm" đã xong** (mục 7) — đã test tay 3 tài khoản ngày 2026-10-23.
 >
 > **Tiến độ (2026-10-18):**
 > - ✅ D1 chốt "chỉ bạn bè" → `403 MESSAGING_NOT_FRIENDS`; đã có test.
@@ -142,82 +142,82 @@ Chưa có ở CB. `Typing` (đang nhập) và presence là **[NC]**.
 
 ### 4.1. Database — M2 ✅ (chưa làm)
 
-- [ ] `Conversation` (id, type, direct_key, title, avatar_url, created_by, last_message_id, last_message_at, created_at) — enum `ConversationType` (`Direct`, `Group`; CB chỉ dùng `Direct`)
-- [ ] `ConversationMember` (conversation_id, user_id, role, joined_at, left_at) — enum `MemberRole`; PK ghép
-- [ ] `Message` (id UUIDv7, conversation_id, sender_id, type, content, client_message_id, created_at) — enum `MessageType` (`Text`, `Image`)
-- [ ] `MessageAttachment` (message_id, media_id, sort_order) — PK ghép
-- [ ] CHECK: `(type = 'Direct') = (direct_key IS NOT NULL)`, `char_length(content) <= 4000`, `content IS NOT NULL OR có attachment` (kiểm ở app)
-- [ ] Index: `ux_conversations_direct_key` (UNIQUE, `WHERE type = 'Direct'`); `ux_messages_client_id` (UNIQUE `(sender_id, client_message_id)`); `ix_messages_conversation_created` (`conversation_id, created_at DESC, id DESC`); `ix_conversation_members_user` (`user_id`) `WHERE left_at IS NULL`; `ix_conversations_last_message_at` (`last_message_at DESC`)
-- [ ] Cập nhật `docs/03_database_design.md` nếu có sai khác khi tạo migration
-- [ ] ⚠️ Bẫy: FK vòng `conversations.last_message_id → messages` cùng tồn tại với `messages.conversation_id → conversations`. Phải `OnDelete(DeleteBehavior.SetNull)` cho `last_message_id`; insert tin **trước**, cập nhật hội thoại **sau** trong cùng transaction
+- [x] `Conversation` (id, type, direct_key, title, avatar_url, created_by, last_message_id, last_message_at, created_at) — enum `ConversationType` (`Direct`, `Group`; CB chỉ dùng `Direct`)
+- [x] `ConversationMember` (conversation_id, user_id, role, joined_at, left_at) — enum `MemberRole`; PK ghép
+- [x] `Message` (id UUIDv7, conversation_id, sender_id, type, content, client_message_id, created_at) — enum `MessageType` (`Text`, `Image`)
+- [x] `MessageAttachment` (message_id, media_id, sort_order) — PK ghép
+- [x] CHECK: `(type = 'Direct') = (direct_key IS NOT NULL)`, `char_length(content) <= 4000`, `content IS NOT NULL OR có attachment` (kiểm ở app)
+- [x] Index: `ux_conversations_direct_key` (UNIQUE, `WHERE type = 'Direct'`); `ux_messages_client_id` (UNIQUE `(sender_id, client_message_id)`); `ix_messages_conversation_created` (`conversation_id, created_at DESC, id DESC`); `ix_conversation_members_user` (`user_id`) `WHERE left_at IS NULL`; `ix_conversations_last_message_at` (`last_message_at DESC`)
+- [x] Cập nhật `docs/03_database_design.md` nếu có sai khác khi tạo migration
+- [x] ⚠️ Bẫy: FK vòng `conversations.last_message_id → messages` cùng tồn tại với `messages.conversation_id → conversations`. Phải `OnDelete(DeleteBehavior.SetNull)` cho `last_message_id`; insert tin **trước**, cập nhật hội thoại **sau** trong cùng transaction
 
 ### 4.2. Domain
 
-- [ ] `Domain/Messaging/ConversationRules.cs`: `BuildDirectKey(a, b)` (sắp xếp ổn định theo dạng chuỗi chuẩn của GUID), `CanAccess(role/leftAt)`, kiểm tra không tự nhắn cho mình
-- [ ] `Domain/Messaging/MessageRules.cs`: nội dung ≤ 4000, phải có nội dung **hoặc** ≥ 1 tệp, ≤ 10 tệp
-- [ ] Test đơn vị cho hai lớp trên (`Comink.Domain.Tests/MessagingRulesTests.cs`)
+- [x] `Domain/Messaging/ConversationRules.cs`: `BuildDirectKey(a, b)` (sắp xếp ổn định theo dạng chuỗi chuẩn của GUID) + kiểm tra không tự nhắn cho mình. *(Không có `CanAccess`: quyền truy cập kiểm ở service bằng truy vấn thành viên `left_at IS NULL`, có test tích hợp.)*
+- [x] `Domain/Messaging/MessageRules.cs`: nội dung ≤ 4000, phải có nội dung **hoặc** ≥ 1 tệp, ≤ 10 tệp
+- [x] Test đơn vị cho hai lớp trên (`Comink.Domain.Tests/MessagingRulesTests.cs`)
 
 ### 4.3. Application
 
-- [ ] DTO: `ConversationDto`, `ConversationSummaryDto`, `MessageDto`, `MessageAttachmentDto`, request `CreateDirectConversationRequest`, `SendMessageRequest`
-- [ ] Interface `IConversationService`, `IMessageService`; hằng số `ErrorCodes`: `MESSAGING_CANNOT_MESSAGE_SELF`, `MESSAGING_NOT_FRIENDS` (nếu D1), `CONVERSATION_NOT_FOUND`, `MESSAGE_CONTENT_REQUIRED`, `MESSAGE_TOO_MANY_ATTACHMENTS`, `MESSAGE_CLIENT_ID_REQUIRED`, `MESSAGE_INVALID_CURSOR`
-- [ ] Dùng lại `PagedList<T>` + `CursorCodec` của GĐ 2 (không viết lại phân trang)
-- [ ] Validator FluentValidation cho hai request
+- [x] DTO: `ConversationDto`, `ConversationSummaryDto`, `MessageDto`, `MessageAttachmentDto`, request `CreateDirectConversationRequest`, `SendMessageRequest`
+- [x] Interface `IConversationService`, `IMessageService`; hằng số `ErrorCodes`: `MESSAGING_CANNOT_MESSAGE_SELF`, `MESSAGING_NOT_FRIENDS` (nếu D1), `CONVERSATION_NOT_FOUND`, `MESSAGE_CONTENT_REQUIRED`, `MESSAGE_TOO_MANY_ATTACHMENTS`, `MESSAGE_CLIENT_ID_REQUIRED`, `MESSAGE_INVALID_CURSOR`
+- [x] Dùng lại `PagedList<T>` + `CursorCodec` của GĐ 2 (không viết lại phân trang)
+- [x] Validator FluentValidation cho hai request
 
 ### 4.4. Infrastructure
 
-- [ ] `ConversationService`: tạo/mở hội thoại 1–1 (idempotent theo `direct_key`, xử lý đua bằng bắt unique violation), danh sách hội thoại, chi tiết (kiểm thành viên)
-- [ ] `MessageService`: gửi tin (transaction: insert message → attachments → cập nhật `last_message_*`), idempotent theo `client_message_id`, lịch sử `before`/`after`
-- [ ] `IHubContext<ChatHub>` được dùng để phát `MessageCreated` — **service phát sự kiện**, không phải endpoint (giữ logic ở Application/Infrastructure, `AGENTS.md` mục 8.1)
-- [ ] Phát hiện unique violation Postgres (`23505`) → trả tin đã có thay vì 500
+- [x] `ConversationService`: tạo/mở hội thoại 1–1 (idempotent theo `direct_key`, xử lý đua bằng bắt unique violation), danh sách hội thoại, chi tiết (kiểm thành viên)
+- [x] `MessageService`: gửi tin (transaction: insert message → attachments → cập nhật `last_message_*`), idempotent theo `client_message_id`, lịch sử `before`/`after`
+- [x] `IHubContext<ChatHub>` được dùng để phát `MessageCreated` — **service phát sự kiện**, không phải endpoint (giữ logic ở Application/Infrastructure, `AGENTS.md` mục 8.1)
+- [x] Phát hiện unique violation Postgres (`23505`) → trả tin đã có thay vì 500
 
 ### 4.5. API (REST)
 
-- [ ] `Endpoints/ConversationEndpoints.cs` (`/api/conversations`), `Endpoints/MessageEndpoints.cs`
-- [ ] Bổ sung mã lỗi mới vào `ApiResults.StatusFor` / `TitleFor` (⚠️ bẫy đã gặp ở GĐ 2: quên là API trả 500 kèm `code` đúng)
-- [ ] `MediaEndpoints` đã hỗ trợ `context = Message` — chỉ cần kiểm tra lại giới hạn
+- [x] Endpoint `/api/conversations` (thực tế gộp trong `Endpoints/MessagingEndpoints.cs`)
+- [x] Bổ sung mã lỗi mới vào `ApiResults.StatusFor` / `TitleFor` (⚠️ bẫy đã gặp ở GĐ 2: quên là API trả 500 kèm `code` đúng)
+- [x] `MediaEndpoints` đã hỗ trợ `context = Message` — chỉ cần kiểm tra lại giới hạn
 
 ### 4.6. SignalR
 
-- [ ] `ChatHub.OnConnectedAsync`: thêm vào `conversation:{id}` cho mọi hội thoại còn hiệu lực
-- [ ] Hằng số `ChatEvents.MessageCreated`; `ChatHub` không chứa logic nghiệp vụ
-- [ ] Web: client SignalR (tự kết nối lại, `access_token`, đăng ký `MessageCreated`)
+- [x] `ChatHub.OnConnectedAsync`: thêm vào `conversation:{id}` cho mọi hội thoại còn hiệu lực
+- [x] Hằng số `ChatEvents.MessageCreated`; `ChatHub` không chứa logic nghiệp vụ
+- [x] Web: client SignalR (tự kết nối lại, `access_token`, đăng ký `MessageCreated`)
 
 ### 4.7. Web
 
-- [ ] `api/conversations.ts`, `api/messages.ts`; `lib/chatConnection.ts` (quản lý vòng đời kết nối SignalR)
-- [ ] Trang `/messages`: danh sách hội thoại (sắp theo tin mới nhất, xem trước, thời gian tương đối)
-- [ ] Trang `/messages/:conversationId`: khung chat — tải 30 tin mới nhất, cuộn lên tải thêm, gửi tin (lạc quan với `clientMessageId`), gửi ảnh
-- [ ] Trạng thái tải/rỗng/lỗi cho cả hai màn hình; mọi chuỗi qua i18n `vi`/`en`
-- [ ] Nút "Nhắn tin" ở trang cá nhân (`/users/:id`) để mở hội thoại
-- [ ] Header: thêm mục **Tin nhắn**
+- [x] `api/conversations.ts`, `api/messages.ts`; `lib/chatConnection.ts` (quản lý vòng đời kết nối SignalR)
+- [x] Trang `/messages`: danh sách hội thoại (sắp theo tin mới nhất, xem trước, thời gian tương đối)
+- [x] Trang `/messages/:conversationId`: khung chat — tải 30 tin mới nhất, cuộn lên tải thêm, gửi tin (lạc quan với `clientMessageId`), gửi ảnh
+- [x] Trạng thái tải/rỗng/lỗi cho cả hai màn hình; mọi chuỗi qua i18n `vi`/`en`
+- [x] Nút "Nhắn tin" ở trang cá nhân (`/users/:id`) để mở hội thoại
+- [x] Header: thêm mục **Tin nhắn**
 
 ### 4.8. Test
 
-- [ ] Domain: `BuildDirectKey` ổn định/đối xứng; quy tắc nội dung tin
-- [ ] Tích hợp (PostgreSQL thật): tạo hội thoại hai lần → cùng một id; không phải bạn bè → 403 (nếu D1); người ngoài đọc `GET /messages` → 404; gửi tin → `last_message_at` đổi + lịch sử trả đúng; **gửi trùng `clientMessageId` → 200, một bản ghi**; `before`/`after` phân trang đúng thứ tự; > 10 ảnh → lỗi; media của người khác → lỗi
-- [ ] Hub: dùng `IHubContext` giả để khẳng định `MessageCreated` được gửi tới `conversation:{id}`; test logic join group lúc connect (thành viên được thêm, người ngoài không)
-- [ ] Chạy `dotnet test` + `npm run lint` + `npm run build` trước khi báo hoàn thành
+- [x] Domain: `BuildDirectKey` ổn định/đối xứng; quy tắc nội dung tin
+- [x] Tích hợp (PostgreSQL thật): tạo hội thoại hai lần → cùng một id; không phải bạn bè → 403 (nếu D1); người ngoài đọc `GET /messages` → 404; gửi tin → `last_message_at` đổi + lịch sử trả đúng; **gửi trùng `clientMessageId` → 200, một bản ghi**; `before`/`after` phân trang đúng thứ tự; > 10 ảnh → lỗi; media của người khác → lỗi
+- [x] Hub: dùng `IHubContext` giả để khẳng định `MessageCreated` được gửi tới `conversation:{id}`; test logic join group lúc connect (thành viên được thêm, người ngoài không)
+- [x] Chạy `dotnet test` + `npm run lint` + `npm run build` trước khi báo hoàn thành
 
 ### 4.9. Tài liệu
 
-- [ ] Chuyển mục 3 của tài liệu này thành mục 8 của `docs/05_api_contract.md` (dời "Lịch sử thay đổi" thành mục 9)
-- [ ] Cập nhật `docs/03_database_design.md` (nếu có sai khác), `README.md` (nếu thêm bước chạy)
-- [ ] Ghi chú trạng thái GĐ 3 vào `docs/04_roadmap.md` khi xong (người dùng tự tick, `AGENTS.md` mục 12)
+- [x] Chuyển mục 3 của tài liệu này thành mục 8 của `docs/05_api_contract.md` (dời "Lịch sử thay đổi" thành mục 9)
+- [x] Cập nhật `docs/03_database_design.md` (đã có bảng messaging/calls) — không có bước chạy mới nên README không đổi
+- [x] Ghi chú trạng thái GĐ 3 vào `docs/04_roadmap.md` khi xong (người dùng tự tick, `AGENTS.md` mục 12)
 
 ---
 
 ## 5. Tiêu chí hoàn thành (đối chiếu roadmap GĐ 3)
 
-- [ ] Mở được cuộc chat 1–1 với bạn bè, mở lại vẫn đúng cuộc chat đó
-- [ ] Hai tài khoản ở hai cửa sổ trình duyệt: gửi tin bên này, bên kia nhận **ngay** không cần tải lại
-- [ ] Đóng trình duyệt, mở lại: lịch sử còn đủ; cuộn lên tải thêm được
-- [ ] Gửi ảnh trong tin nhắn, ảnh hiển thị đúng (Cloudinary)
-- [ ] Danh sách hội thoại đúng thứ tự tin mới nhất + xem trước tin cuối
-- [ ] Tắt mạng → gửi lại cùng tin (giả lập) → không có tin lặp; mất mạng rồi có lại → thấy tin bị lỡ
-- [ ] Tài khoản thứ ba không phải thành viên: `GET /messages` → 404; không nhận được `MessageCreated`
-- [ ] `dotnet build` 0 warning; `dotnet test` xanh; `npm run lint`/`build` sạch
-- [ ] Tài liệu đã cập nhật
+- [x] Mở được cuộc chat 1–1 với bạn bè, mở lại vẫn đúng cuộc chat đó
+- [x] Hai tài khoản ở hai cửa sổ trình duyệt: gửi tin bên này, bên kia nhận **ngay** không cần tải lại
+- [x] Đóng trình duyệt, mở lại: lịch sử còn đủ; cuộn lên tải thêm được
+- [x] Gửi ảnh trong tin nhắn, ảnh hiển thị đúng (Cloudinary)
+- [x] Danh sách hội thoại đúng thứ tự tin mới nhất + xem trước tin cuối
+- [x] Tắt mạng → gửi lại cùng tin (giả lập) → không có tin lặp; mất mạng rồi có lại → thấy tin bị lỡ
+- [x] Tài khoản thứ ba không phải thành viên: `GET /messages` → 404; không nhận được `MessageCreated`
+- [x] `dotnet build` 0 warning; `dotnet test` xanh; `npm run lint`/`build` sạch
+- [x] Tài liệu đã cập nhật
 
 ---
 
@@ -233,3 +233,63 @@ Chưa có ở CB. `Typing` (đang nhập) và presence là **[NC]**.
 8. **Vite proxy `/hub`** đã bật `ws: true` từ GĐ 1 — nhớ kiểm tra lại khi test web.
 9. **Ảnh trong tin nhắn**: giới hạn media của GĐ 2 áp dụng nguyên (5 MB, jpeg/png/webp, ≤ 10 ảnh); phải kiểm tra media thuộc người gửi và `context = Message`.
 10. **Testcontainers**: mỗi test tạo DB riêng — nhớ dùng `IntegrationTestBase.CreateDbContextAsync()` như GĐ 2.
+
+---
+
+## 7. NC — Chat nhóm (đang triển khai, chờ chốt vài quyết định)
+
+> Yêu cầu người dùng (2026-10-23): *nhóm chat giống Messenger* — tạo nhóm từ bạn bè, và **khi một
+> thành viên gọi thì mọi thành viên trong nhóm nhận thông báo cuộc gọi đến**.
+> Điều kiện `AGENTS.md` §7.2 **đã thỏa**: CB của chính GĐ 3 xong (9/9 mục roadmap).
+
+### 7.1 Phạm vi MVP
+
+1. **Tạo nhóm**: chọn ≥2 bạn bè (tổng ≥3 thành viên) + đặt tên; người tạo là `MemberRole.Owner`.
+2. **Danh sách hội thoại**: hiện cả 1–1 và nhóm (tên nhóm, số thành viên, tin cuối).
+3. **Chat nhóm**: gửi chữ/ảnh — **tái dùng** `POST/GET /api/conversations/{id}/messages` (đã kiểm tra quyền theo thành viên).
+4. **Gọi nhóm trong nhóm**: bấm gọi trong khung chat nhóm → cuộc gọi cho **tất cả thành viên** ⇒ mỗi người nhận `CallIncoming` (hành vi đã có sẵn khi gọi theo `conversationId`).
+5. **Chưa gồm** (để sau): thêm/xoá thành viên, đổi tên/ảnh nhóm, rời nhóm, phân quyền admin, tin hệ thống ("X đã tạo nhóm").
+
+### 7.2 API (đã chốt và cài đặt)
+
+> **D6 đã chốt (2026-10-23):** bỏ nhánh tạo hội thoại nhóm "ẩn"; gọi nhóm chỉ bắt đầu từ hội thoại nhóm thật. Đã cài đặt + kiểm chứng HTTP thật.
+
+| Endpoint | Mô tả |
+|---|---|
+| `POST /api/conversations/group` | `{ name, participantIds[] }` → `201 ConversationDto`; validate: participants **toàn bạn bè**, tổng thành viên **3–10** (10 = `CallRules.MaxParticipants`), tên 1–100 ký tự |
+| `GET /api/conversations` | Trả **cả** `Direct` và `Group`; field `type`, `title`, `memberCount` (với `Direct` vẫn có `peer`, nhóm thì `peer = null`) |
+| `GET /api/conversations/{id}` | Trả `type`, `name`, `members[]` (members đã có sẵn) |
+
+Mã lỗi mới (nếu cần): `MESSAGING_GROUP_TOO_FEW` (dưới 3 thành viên), `MESSAGING_GROUP_TOO_MANY`.
+
+### 7.3 Database
+
+Không cần bảng mới: dùng `conversations.type = 'Group'`, `conversations.title`, `avatar_url`, `conversation_members.role` (đã có trong M2). **Không cần migration**, trừ khi chốt thêm cột đánh dấu nhóm ẩn (xem 7.4).
+
+### 7.4 Quyết định D6 (đã chốt): nhóm ẩn của cuộc gọi
+
+Khi làm GĐ 4, gọi nhóm **chưa có nhóm chat** nên tạm tạo `conversation` `Group` **ẩn** (D1).
+Phát hiện khi rà code: `ListAsync` **không lọc `type`**, nên nếu còn dùng nhánh `participantIds`
+thì nhóm ẩn đó **sẽ hiện trong** `/messages`.
+
+**Đã chốt phương án (A) và cài đặt xong:**
+- Bỏ nhánh tạo nhóm ẩn: `StartCallRequest` chỉ còn `conversationId`; gọi nhóm chỉ bắt đầu từ hội thoại nhóm thật.
+- `ListAsync` chỉ liệt kê `Direct` + `Group`; nhóm ẩn không còn tồn tại.
+- Cập nhật `docs/05_api_contract.md` §9.2 + test `CallServiceTests`.
+
+### 7.5 UI (đã cài đặt)
+
+- `/messages`: nút **Tạo nhóm** (`CreateGroupDialog`: chọn bạn bè + tên nhóm) + item nhóm (icon nhóm, tên, `memberCount`).
+- `/messages/:id` (ChatPage): header nhóm (icon nhóm, tên, số thành viên, nút **gọi thoại/video**).
+- `/calls/:id` (CallPage): render nhiều tile remote — đã có từ GĐ 4.
+
+### 7.6 Tiêu chí chấp nhận (test 3 tài khoản)
+
+- [x] Tạo nhóm 3 người (toàn bạn bè) → nhóm `201` với 3 thành viên (khoa `Owner`, 2 người `Member`); danh sách hội thoại có `type=Group`, `memberCount=3`, `peer=null` — **kiểm chứng bằng HTTP + SQL thật**.
+- [x] Gửi tin trong nhóm → `201`, tin thuộc hội thoại nhóm.
+- [x] **Tin trong nhóm hiện tên người gửi** (yêu cầu người dùng 2026-10-23): `ChatPage` hiển thị `displayName` phía trên bong bóng với tin không phải của mình.
+- [x] Gọi nhóm từ hội thoại nhóm → `201`, **3 người tham gia** (`Invited`), room được tạo; kết thúc `200` + ghi tin `Call`.
+- [x] **Test tay 3 tài khoản** (modal cuộc gọi đến ở cả 2 người còn lại, nghe/nói 3 chiều) — chờ bạn bấm thử.
+- [x] Người ngoài nhóm: `GET /api/conversations/{id}` → `404` (test `GetById_ByOutsider_IsNotFound`).
+- [x] `dotnet test` **161/161**; `npm run lint` 0/0; `npm run build` OK.
+

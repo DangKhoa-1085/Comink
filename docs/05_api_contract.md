@@ -439,12 +439,27 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 - Trả `ConversationDto`: `{ id, type, title?, avatarUrl?, createdAt, lastMessageAt?, members: [{ userId, displayName, userName, avatarUrl }], lastMessage?: MessageDto }`
 - Lỗi: `MESSAGING_CANNOT_MESSAGE_SELF` (400), `MESSAGING_NOT_FRIENDS` (403 — nếu D1 chọn "chỉ bạn bè"), `USER_NOT_FOUND` (404).
 
+### 8.2b. Tạo nhóm chat (NC GĐ 3)
+
+`POST /api/conversations/group`
+
+| Trường | Kiểu | Bắt buộc | Ghi chú |
+|---|---|---|---|
+| `name` | string(1–100) | ✔ | Tên nhóm |
+| `participantIds` | uuid[] | ✔ | Danh sách bạn bè được mời (không cần gửi kèm chính mình; gửi kèm sẽ bị bỏ qua) |
+
+- `201 Created` kèm `ConversationDto` (người tạo là `MemberRole.Owner`, người mời là `Member`).
+- Tổng thành viên = `participantIds` (đã khử trùng) + người tạo, phải trong **3–10**.
+- Lỗi: `MESSAGING_GROUP_TOO_FEW` (400), `MESSAGING_GROUP_TOO_MANY` (400), `MESSAGING_NOT_FRIENDS` (403), `USER_NOT_FOUND` (404), `VALIDATION_FAILED` (400 — tên rỗng/quá dài).
+- Gọi nhóm dùng chính hội thoại này: `POST /api/calls` với `conversationId` (xem 9.2) — **không** còn `participantIds` (quyết định D6).
+
 ### 8.3. Danh sách hội thoại
 
 `GET /api/conversations?limit=&cursor=`
 
 - Sắp xếp `last_message_at DESC` (`NULLS LAST` cho hội thoại chưa có tin).
-- Trả `PagedList<ConversationSummaryDto>`: `{ id, type, title?, peer: { userId, displayName, avatarUrl }, lastMessage?: { id, senderId, preview, type, createdAt }, unreadCount }` — `unreadCount = 0` ở CB.
+- Trả cả hội thoại **1–1** và **nhóm**.
+- Trả `PagedList<ConversationSummaryDto>`: `{ id, type, title?, peer?: { userId, displayName, avatarUrl } | null, lastMessage?: { id, senderId, preview, type, createdAt }, unreadCount, memberCount }` — `peer` chỉ có với `type = "Direct"`; nhóm dùng `title` + `memberCount`; `unreadCount = 0` ở CB.
 
 ### 8.4. Chi tiết hội thoại
 
@@ -496,6 +511,8 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 | `CONVERSATION_NOT_FOUND` | 404 | Không tìm thấy hội thoại **hoặc** người dùng không phải thành viên |
 | `MESSAGING_CANNOT_MESSAGE_SELF` | 400 | Không thể tự mở hội thoại với chính mình |
 | `MESSAGING_NOT_FRIENDS` | 403 | Chưa là bạn bè nên chưa nhắn tin được *(chỉ khi D1 chọn "chỉ bạn bè")* |
+| `MESSAGING_GROUP_TOO_FEW` | 400 | Nhóm dưới 3 thành viên (NC GĐ 3) |
+| `MESSAGING_GROUP_TOO_MANY` | 400 | Nhóm quá 10 thành viên (NC GĐ 3) |
 | `MESSAGE_CONTENT_REQUIRED` | 400 | Tin không có nội dung và cũng không có tệp |
 | `MESSAGE_TOO_MANY_ATTACHMENTS` | 400 | Quá 10 tệp trong một tin |
 | `MESSAGE_CLIENT_ID_REQUIRED` | 400 | Thiếu `clientMessageId` |
@@ -514,8 +531,8 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 |---|---|
 | Người ngoài cuộc gọi | `404 CALL_NOT_FOUND` cho **mọi** endpoint (kể cả xin token) |
 | Token | JWT **HS256** ký bằng `LiveKit:ApiSecret`, TTL **10 phút**, chứa `video.room`, `roomJoin`, `canPublish`; backend **không** trả `ApiSecret` |
-| Cuộc gọi nhóm | Không có `conversationId` → backend tạo conversation `Group` **ẩn** (không hiện trong danh sách chat) từ `participantIds` (≥2, phải là bạn bè) |
-| Đổ chuông | Tối đa **30 giây**, quá hạn → `NoAnswer` |
+| Cuộc gọi nhóm | **Quyết định D6 (2026-10-23):** cuộc gọi luôn bắt đầu **trong một hội thoại** (1–1 hoặc nhóm thật, xem 8.2b). Mọi thành viên còn hiệu lực nhận `CallIncoming`. **Đã bỏ** nhánh tạo hội thoại nhóm "ẩn" từ `participantIds` |
+| Đổ chuông | Tối đa **30 giây** (`CallRules.RingTimeoutSeconds`), quá hạn → `Missed`/`NoAnswer`. **Thực thi phía server** bởi `CallRingTimeoutService` (background, quét 5s/lần) — không phụ thuộc việc client còn mở tab; nghe sau 30s → `409 CALL_ALREADY_ENDED` |
 | Ghi lịch sử | Khi kết thúc, ghi một tin nhắn loại `Call` vào hội thoại (`messages.call_id`) |
 
 ### 9.2. Bắt đầu cuộc gọi
@@ -524,13 +541,12 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 
 | Trường | Kiểu | Bắt buộc | Ghi chú |
 |---|---|---|---|
-| `conversationId` | uuid? | ✖ | Có → cuộc gọi 1–1 trong hội thoại đó |
-| `participantIds` | uuid[]? | ✖ | Có → cuộc gọi nhóm (≥2 người, phải là bạn bè); bỏ trống `conversationId` |
+| `conversationId` | uuid | ✔ | Cuộc gọi diễn ra trong hội thoại này (1–1 hoặc nhóm); người gọi phải là thành viên |
 | `type` | `Audio` \| `Video` | ✔ | |
 
 - `201` + `CallDto`: `{ id, conversationId, type, status, roomName, initiatedBy, createdAt, answeredAt, endedAt, participants: [{ userId, displayName, status }] }`
-- Phát SignalR `CallIncoming` tới `user:{id}` của từng người được mời.
-- Lỗi: `CALL_ALREADY_ACTIVE` (409), `CONVERSATION_NOT_FOUND` (404), `MESSAGING_NOT_FRIENDS` (403).
+- Phát SignalR `CallIncoming` tới `user:{id}` của từng người được mời (với nhóm: tất cả thành viên còn lại).
+- Lỗi: `CALL_ALREADY_ACTIVE` (409), `CONVERSATION_NOT_FOUND` (404), `VALIDATION_FAILED` (400 — hội thoại chỉ còn 1 người).
 
 ### 9.3. Lấy token vào room
 
@@ -594,3 +610,7 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 | 2026-10-18 | Thêm mục 8 (đề xuất): hợp đồng nhắn tin GĐ 3 — hội thoại 1–1, gửi/nhận tin, phân trang, ảnh trong tin, SignalR group theo hội thoại. Chờ chốt quyết định D1 |
 | 2026-10-19 | Mục 8 đã cài đặt và kiểm chứng; `MessageCreated` phát thêm tới `user:{id}` của từng thành viên (sửa lỗi phải tải lại trang) |
 | 2026-10-19 | Thêm mục 9 (đề xuất): hợp đồng gọi trực tuyến GĐ 4 — bắt đầu cuộc gọi, token LiveKit ngắn hạn, answer/decline/end, webhook, SignalR `CallIncoming`/`CallUpdated`/`CallEnded` |
+| 2026-10-21 | Mục 9 đã cài đặt; **LiveKit gửi JWT trần** trong header `Authorization` (không có `Bearer `) — endpoint webhook chấp nhận cả hai dạng (nếu không sẽ 401) |
+| 2026-10-21 | Bật TURN/UDP 3478 + dải relay 30500–30510; ghi chú `rtc.node_ip` phải là IP mà client tới được |
+| 2026-10-23 | Thêm **mục 8.2b** `POST /api/conversations/group` (nhóm 3–10, chỉ bạn bè, người tạo `Owner`); danh sách hội thoại có thêm `memberCount`, `peer` nullable; thêm mã lỗi `MESSAGING_GROUP_TOO_FEW`/`MESSAGING_GROUP_TOO_MANY` |
+| 2026-10-23 | **D6:** bỏ nhánh `participantIds` khỏi `POST /api/calls` — cuộc gọi luôn bắt đầu trong hội thoại (1–1 hoặc nhóm); đổ chuông quá 30s do **server** đóng (`Missed`/`NoAnswer`), nghe sau hạn → `409 CALL_ALREADY_ENDED` |

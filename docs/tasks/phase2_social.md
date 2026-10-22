@@ -3,7 +3,7 @@
 > Tài liệu 06, phân rã từ `docs/04_roadmap.md` (Giai đoạn 2) theo yêu cầu ở `AGENTS.md` mục 7.3.
 > **Mục tiêu:** có một mạng xã hội dùng được — kết nối bạn bè, theo dõi, đăng bài kèm ảnh, tương tác, bảng tin.
 > **Phụ thuộc:** Giai đoạn 1 — **đã hoàn tất** (`docs/tasks/phase1_foundation_auth.md`).
-> **Trạng thái:** ✅ **HOÀN TẤT** (backend + web), đã kiểm chứng trên trình duyệt thật (2026-10-17).
+> **Trạng thái:** ✅ **HOÀN TẤT** (backend + web), đã kiểm chứng trên trình duyệt thật (2026-10-17). *Số test dưới đây là tại thời điểm hoàn tất GĐ 2; toàn repo hiện là **161 test**.*
 >
 > Kiểm chứng cuối cùng:
 > - `dotnet build`: 7/7 project, 0 warning, 0 error; `dotnet test`: **81 test pass** (Domain 24 · Application 15 · Tích hợp 42 trên PostgreSQL thật).
@@ -280,16 +280,16 @@ Ba phương án đã cân nhắc:
 - [x] Quy tắc nghiệp vụ test được: `PostVisibilityRules.CanView/IsVisible`, `FriendshipRules.IsSelfPair/CanAccept/CanSendRequest/Increment/Decrement`, `CommentRules.CanReplyTo/IsContentValid` (`Domain/Social`)
 - [x] Không đặt logic truy cập DB ở Domain
 - [x] Test quy tắc ở `Comink.Domain.Tests/SocialRulesTests.cs` (**23 test**: ma trận quyền xem 3×3, trạng thái bạn bè, độ sâu trả lời)
-- [ ] `Post.EnsureContentOrMedia(...)` — sẽ thêm cùng `IPostService` (mục 4.3)
+- [x] Kiểm tra “có nội dung hoặc có ≥1 tệp” — thực tế đặt ở `PostService`/validator (không có method `EnsureContentOrMedia` trên entity), có test `CreatePost_EmptyContentWithoutMedia_IsRejected`
 
 ### 4.3. Application — `Social/` 🚧
 
 - [x] `IFriendshipService`: gửi / chấp nhận / từ chối / hủy / danh sách bạn / đếm `friend_count`
 - [x] `IFollowService`: theo dõi / bỏ theo dõi / danh sách / đếm
 - [x] `IUserDirectoryService`: tìm người dùng (không dấu), hồ sơ công khai + quan hệ
-- [ ] `IPostService`: tạo / xem / sửa / xóa / bảng tin / bài trên trang cá nhân + **kiểm tra quyền xem** tập trung một chỗ (quy tắc đã có ở `PostVisibilityRules`)
-- [ ] `ILikeService`, `ICommentService` (1 cấp trả lời, đếm)
-- [ ] `IMediaService`: cấp chữ ký, đăng ký tài sản, kiểm tra loại và dung lượng
+- [x] `IPostService`: tạo / xem / sửa / xóa / bảng tin / bài trên trang cá nhân + **kiểm tra quyền xem** tập trung một chỗ (quy tắc đã có ở `PostVisibilityRules`)
+- [x] `ILikeService`, `ICommentService` (1 cấp trả lời, đếm)
+- [x] `IMediaService`: cấp chữ ký, đăng ký tài sản, kiểm tra loại và dung lượng
 - [x] DTO cho mọi request/response (không trả entity — `AGENTS.md` mục 8.1): `SocialDtos.cs`
 - [x] FluentValidation cho request body và tham số truy vấn: `SocialValidators.cs`
 - [x] Mã lỗi mới vào `ErrorCodes`: 5 mã `SOCIAL_*`
@@ -339,7 +339,7 @@ Ba phương án đã cân nhắc:
 
 - [x] Unit test: gửi lời mời trùng (idempotent), tự kết bạn, chuyển trạng thái bạn bè, đếm bạn bè khi chấp nhận/hủy → `Comink.Domain.Tests/SocialRulesTests.cs` + `Comink.Api.IntegrationTests/SocialServiceTests.cs`
 - [x] Unit test: **quyền xem bài** (Public/Friends/OnlyMe × tác giả/bạn bè/người lạ) — mục tiêu chính của GĐ 2 → `PostVisibilityRulesTests` (8 ca `CanView` + 3 ca `IsVisible`)
-- [ ] Unit test: tạo bài rỗng không ảnh → lỗi; quá 10 ảnh → lỗi; ảnh của người khác → lỗi (khi làm `PostService`)
+- [x] Test: bài rỗng không ảnh → lỗi (`CreatePost_EmptyContentWithoutMedia_IsRejected`); ảnh của người khác → lỗi (`CreatePost_WithMediaOfAnotherUser_IsRejected`). *(Quá 10 ảnh: kiểm ở validator `PostLimits.MaxMediaPerPost`, chưa có test riêng.)*
 - [x] Unit test: bình luận trả lời 2 cấp → lỗi (quy tắc `CommentRules.CanReplyTo`) — phần service khi làm `CommentService`
 - [x] Integration test (Testcontainers PostgreSQL): tìm người dùng **không dấu**, luồng kết bạn → chấp nhận → cột đếm, lời mời chéo chiều tự động chấp nhận, quan hệ trong hồ sơ công khai
 - [x] Integration test: "kết bạn → thấy bài `Friends`", người lạ **không** thấy, bảng tin đúng đối tượng và phân trang con trỏ (`PostServiceTests`)
@@ -363,16 +363,16 @@ Ba phương án đã cân nhắc:
 
 ## 5. Tiêu chí hoàn thành (lấy từ `docs/04_roadmap.md` Giai đoạn 2)
 
-- [ ] Kết bạn hai chiều: gửi, chấp nhận, từ chối lời mời; xem danh sách bạn
-- [ ] Theo dõi / bỏ theo dõi (một chiều)
-- [ ] Tìm kiếm người dùng (có hỗ trợ gõ không dấu)
-- [ ] Đăng, sửa, xóa bài viết; chọn phạm vi hiển thị (công khai/bạn bè/chỉ mình tôi)
-- [ ] Đính kèm ảnh vào bài viết (tải lên cloud, hiển thị đúng)
-- [ ] Bảng tin hiển thị bài của bạn bè và người theo dõi, phân trang cuộn
-- [ ] Thích, bình luận (có trả lời) và chia sẻ bài viết
-- [ ] Trang cá nhân hiển thị bài viết, số bạn bè/người theo dõi
-- [ ] Quyền xem bài viết đúng (không xem được bài `Friends` của người lạ)
-- [ ] Có test cho quyền xem bài và trạng thái kết bạn
+- [x] Kết bạn hai chiều: gửi, chấp nhận, từ chối lời mời; xem danh sách bạn
+- [x] Theo dõi / bỏ theo dõi (một chiều)
+- [x] Tìm kiếm người dùng (có hỗ trợ gõ không dấu)
+- [x] Đăng, sửa, xóa bài viết; chọn phạm vi hiển thị (công khai/bạn bè/chỉ mình tôi)
+- [x] Đính kèm ảnh vào bài viết (tải lên cloud, hiển thị đúng)
+- [x] Bảng tin hiển thị bài của bạn bè và người theo dõi, phân trang cuộn
+- [x] Thích, bình luận (có trả lời) và chia sẻ bài viết
+- [x] Trang cá nhân hiển thị bài viết, số bạn bè/người theo dõi
+- [x] Quyền xem bài viết đúng (không xem được bài `Friends` của người lạ)
+- [x] Có test cho quyền xem bài và trạng thái kết bạn
 
 Cộng thêm **Definition of Done** chung ở `docs/04_roadmap.md` mục 4 và `AGENTS.md` mục 16.
 
