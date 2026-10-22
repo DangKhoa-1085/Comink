@@ -9,8 +9,12 @@ port: 7880
 rtc:
   tcp_port: 7881
   udp_port: 7882
-  # Cho phép kết nối từ localhost khi dev
+  # Không dùng IP công cộng khi dev
   use_external_ip: false
+  # ⚠️ BẮT BUỘC khi test 2 máy trong LAN: LiveKit chạy trong Docker nên mặc định quảng bá
+  # IP container (172.18.x.x) mà máy khác KHÔNG kết nối được. `node_ip` ép LiveKit quảng bá
+  # IP LAN của máy host để máy thứ hai vào được phòng.
+  node_ip: 192.168.1.42
 
 keys:
   # Khóa dev — LiveKit yêu cầu api_secret dài tối thiểu 32 ký tự; nếu ngắn hơn
@@ -32,7 +36,7 @@ logging:
 # - Đổi mạng thì phải sửa `domain` ở đây rồi `docker restart comink_livekit`.
 turn:
   enabled: true
-  domain: 192.168.1.29
+  domain: 192.168.1.42
   udp_port: 3478
   tls_port: 0
   external_tls: false
