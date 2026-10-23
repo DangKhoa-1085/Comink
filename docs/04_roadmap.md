@@ -159,6 +159,14 @@ Mỗi giai đoạn gồm: **mục tiêu**, **phụ thuộc** và **checklist ho�
 - [ ] Tài khoản bị khóa không đăng nhập được, phiên hiện tại bị thu hồi và kết nối SignalR bị ngắt
 - [ ] Admin không tự khóa được chính mình
 
+> **Trạng thái (cập nhật 2026-10-24):** **đã cài đặt và kiểm chứng** cả 5 mục ở backend + web (chưa tick — người dùng tick theo `AGENTS.md` mục 12).
+> - Backend: `AdminUserRules` (domain), `AdminService`, 2 endpoint `lock`/`unlock`, kiểm tra `account_status` ở **mọi request JWT**, thu hồi toàn bộ refresh token, phát `AccountLocked` + **ngắt kết nối SignalR**.
+> - Đăng nhập tài khoản bị khóa nay trả `403 AUTH_ACCOUNT_LOCKED` (sửa lệch hợp đồng GĐ 1; chỉ khi đúng mật khẩu).
+> - Test: **185/185** (`Domain 68 · Application 25 · Tích hợp 92` trên PostgreSQL thật), `dotnet build` 0 warning; web `npm run lint` 0/0, `npm run build` thành công.
+> - Kiểm chứng HTTP thật **17/17**: admin xem/tìm danh sách; người thường `403`; tự khóa `400 ADMIN_CANNOT_LOCK_SELF`; khóa ghi đúng `locked_*`; access token cũ `401`; refresh token bị thu hồi; đăng nhập bị khóa `403`; sai mật khẩu vẫn `401`; khóa idempotent; mở khóa đăng nhập lại được; khóa không kèm body.
+> - Kiểm chứng SignalR thật: client của tài khoản bị khóa nhận `AccountLocked` và kết nối bị server đóng (`Đã ngắt 1 kết nối SignalR`).
+> - Chi tiết: `docs/tasks/phase5_admin.md`; hợp đồng API: `docs/05_api_contract.md` mục 4.
+
 ### ◆ Mốc A: Web CB hoàn chỉnh (cuối tuần 7)
 
 Điều kiện để qua mốc: **tất cả checklist của GĐ 1 đến GĐ 5 đã tick**, cộng thêm:

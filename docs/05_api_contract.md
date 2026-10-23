@@ -199,7 +199,11 @@ Ràng buộc: `language` ∈ {`vi`, `en`}. Phản hồi `200 OK`: như `GET /api
 
 Yêu cầu role `Admin` (trả `403 FORBIDDEN` nếu không đủ quyền).
 
-### `GET /api/admin/users` — danh sách tài khoản
+> **Cập nhật Giai đoạn 5 (2026-10-24):** bổ sung khóa/mở khóa tài khoản, hai trường
+> `lockedReason`/`lockedAt` trong danh sách, và sự kiện SignalR `AccountLocked`.
+> Giai đoạn 5 **không cần migration mới** — dùng các cột `locked_*` đã có từ M0.
+
+### 4.1. `GET /api/admin/users` — danh sách tài khoản
 
 Tham số: `cursor`, `limit`, `search` (tùy chọn, tìm theo email/user_name/display_name).
 
@@ -211,12 +215,54 @@ Phản hồi `200 OK`: phân trang `AdminUserSummary`:
   "userName": "khoa.nguyen",
   "email": "khoa@example.com",
   "displayName": "Nguyễn Khoa",
-  "accountStatus": "Active",
+  "accountStatus": "Locked",
+  "lockedReason": "Vi phạm quy định cộng đồng",
+  "lockedAt": "2026-10-24T06:00:00Z",
   "createdAt": "2026-10-15T10:00:00Z"
 }
 ```
 
-> Khóa/mở khóa tài khoản là **Giai đoạn 5**, chưa thuộc GĐ 1.
+`accountStatus` ∈ `Active` · `Locked` · `Deleted`. `lockedReason`/`lockedAt` là `null` khi tài
+khoản đang `Active`. **Lý do khóa chỉ trả cho admin**, không có trong hồ sơ công khai.
+
+### 4.2. `POST /api/admin/users/{id}/lock` — khóa tài khoản
+
+Body **tùy chọn** (bỏ trống = khóa không kèm lý do):
+
+```json
+{ "reason": "Vi phạm quy định cộng đồng" }
+```
+
+- `reason` tùy chọn, tối đa **500** ký tự; chuỗi rỗng/toàn khoảng trắng được lưu thành `null`.
+- `200 OK` + `AdminUserSummary` với `accountStatus = Locked`.
+- **Idempotent:** khóa lại tài khoản đã `Locked` trả `200`, **không** ghi đè lý do/thời điểm khóa ban đầu.
+- Tác dụng phụ khi khóa thành công:
+  1. Thu hồi **toàn bộ** refresh token còn hiệu lực của người dùng.
+  2. Phát `AccountLocked` tới `user:{id}` và **ngắt** mọi kết nối SignalR đang mở.
+  3. Access token cũ bị từ chối ở request kế tiếp (`401 UNAUTHORIZED`) vì server kiểm tra lại
+     `account_status` ở mọi request đã xác thực.
+- Lỗi: `USER_NOT_FOUND` (404), `ADMIN_CANNOT_LOCK_SELF` (400), `VALIDATION_FAILED` (400 — lý do
+  quá 500 ký tự hoặc body JSON không đọc được), `FORBIDDEN` (403), `UNAUTHORIZED` (401).
+
+### 4.3. `POST /api/admin/users/{id}/unlock` — mở khóa tài khoản
+
+Không cần body.
+
+- `200 OK` + `AdminUserSummary` với `accountStatus = Active`; `lockedReason`, `lockedAt` (và
+  `locked_by` trong DB) được xóa.
+- **Idempotent:** mở khóa tài khoản đang `Active` trả `200` mà không đổi dữ liệu.
+- Lỗi: `USER_NOT_FOUND` (404), `FORBIDDEN` (403), `UNAUTHORIZED` (401).
+
+### 4.4. SignalR — sự kiện quản trị
+
+| Sự kiện | Gửi tới | Payload | Khi nào |
+|---|---|---|---|
+| `AccountLocked` | `user:{id}` | `{ userId }` | Ngay sau khi admin khóa tài khoản, **trước** khi server ngắt kết nối |
+
+> Client nhận sự kiện phải xóa phiên và về trang đăng nhập. Việc ngắt kết nối (`Abort`) là lớp bảo
+> vệ thứ hai — không phụ thuộc client có xử lý sự kiện hay không (`docs/tasks/phase5_admin.md` D2).
+> Người dùng đang giữ refresh token đã bị thu hồi sẽ nhận `AUTH_REFRESH_TOKEN_REUSED` khi thử làm
+> mới token (token đã bị đánh dấu thu hồi được coi như dấu hiệu bị đánh cắp — hành vi có từ GĐ 1).
 
 ---
 
@@ -226,7 +272,7 @@ Phản hồi `200 OK`: phân trang `AdminUserSummary`:
 |---|---|---|
 | `VALIDATION_FAILED` | 400 | Dữ liệu đầu vào không hợp lệ (kèm `errors`) — **hoặc** body JSON không đọc được (sai định dạng, sai kiểu, thiếu trường bắt buộc); trường hợp này không có `errors` |
 | `AUTH_INVALID_CREDENTIALS` | 401 | Sai tài khoản hoặc mật khẩu |
-| `AUTH_ACCOUNT_LOCKED` | 403 | Tài khoản bị admin khóa (`account_status = Locked`) |
+| `AUTH_ACCOUNT_LOCKED` | 403 | Tài khoản bị admin khóa (`account_status = Locked`) — trả khi đăng nhập **đúng mật khẩu**, hoặc khi làm mới token của tài khoản vừa bị khóa |
 | `AUTH_REFRESH_TOKEN_INVALID` | 401 | Refresh token không hợp lệ/hết hạn/đã thu hồi |
 | `AUTH_REFRESH_TOKEN_REUSED` | 401 | Phát hiện dùng lại refresh token cũ; đã thu hồi cả họ |
 | `AUTH_EMAIL_ALREADY_EXISTS` | 409 | Email đã được dùng |
@@ -234,6 +280,8 @@ Phản hồi `200 OK`: phân trang `AdminUserSummary`:
 | `FORBIDDEN` | 403 | Không đủ quyền |
 | `UNAUTHORIZED` | 401 | Thiếu/token không hợp lệ |
 | `NOT_FOUND` | 404 | Không tìm thấy tài nguyên |
+| `USER_NOT_FOUND` | 404 | Không tìm thấy người dùng *(GĐ 5 — khóa/mở khóa tài khoản)* |
+| `ADMIN_CANNOT_LOCK_SELF` | 400 | Admin không được tự khóa tài khoản của chính mình *(GĐ 5)* |
 | `INTERNAL_ERROR` | 500 | Lỗi không mong đợi |
 
 Mã lỗi là **hằng số tiếng Anh** ở backend; web/app dịch sang `vi`/`en`.
@@ -614,3 +662,4 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 | 2026-10-21 | Bật TURN/UDP 3478 + dải relay 30500–30510; ghi chú `rtc.node_ip` phải là IP mà client tới được |
 | 2026-10-23 | Thêm **mục 8.2b** `POST /api/conversations/group` (nhóm 3–10, chỉ bạn bè, người tạo `Owner`); danh sách hội thoại có thêm `memberCount`, `peer` nullable; thêm mã lỗi `MESSAGING_GROUP_TOO_FEW`/`MESSAGING_GROUP_TOO_MANY` |
 | 2026-10-23 | **D6:** bỏ nhánh `participantIds` khỏi `POST /api/calls` — cuộc gọi luôn bắt đầu trong hội thoại (1–1 hoặc nhóm); đổ chuông quá 30s do **server** đóng (`Missed`/`NoAnswer`), nghe sau hạn → `409 CALL_ALREADY_ENDED` |
+| 2026-10-24 | Thêm **mục 4 GĐ 5:** `POST /api/admin/users/{id}/lock` + `/unlock`, trường `lockedReason`/`lockedAt`, sự kiện `AccountLocked`; mã lỗi `USER_NOT_FOUND`, `ADMIN_CANNOT_LOCK_SELF`. Đăng nhập tài khoản bị khóa nay trả đúng `403 AUTH_ACCOUNT_LOCKED` (chỉ khi đúng mật khẩu) |
