@@ -125,6 +125,9 @@ namespace Comink.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_users");
 
+                    b.HasIndex("LockedBy")
+                        .HasDatabaseName("ix_users_locked_by");
+
                     b.HasIndex("NormalizedEmail")
                         .IsUnique()
                         .HasDatabaseName("EmailIndex");
@@ -1215,6 +1218,15 @@ namespace Comink.Infrastructure.Persistence.Migrations
                         .HasName("pk_user_tokens");
 
                     b.ToTable("user_tokens", (string)null);
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Identity.ApplicationUser", b =>
+                {
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("LockedBy")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_users_users_locked_by");
                 });
 
             modelBuilder.Entity("Comink.Infrastructure.Identity.UserProfile", b =>

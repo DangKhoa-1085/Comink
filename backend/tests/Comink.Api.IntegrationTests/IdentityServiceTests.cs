@@ -238,7 +238,11 @@ public class IdentityServiceTests : IntegrationTestBase
 
         await sut.CreateUserAsync("doitrangthai", "doitrangthai@example.com", "MatKhau@123", "Đổi trạng thái");
         var user = await db.Users.SingleAsync(u => u.UserName == "doitrangthai");
-        var adminId = Guid.CreateVersion7();
+
+        // `locked_by` có FK → users.id (migration Admin_AddLockedByForeignKey), nên admin phải tồn tại thật.
+        await sut.CreateUserAsync("adminkhoa", "adminkhoa@example.com", "MatKhau@123", "Admin Khóa");
+        var admin = await db.Users.SingleAsync(u => u.UserName == "adminkhoa");
+        var adminId = admin.Id;
 
         var locked = await sut.SetAccountStatusAsync(user.Id, "Locked", "Vi phạm quy định", adminId);
         Assert.True(locked.Succeeded);
@@ -262,6 +266,20 @@ public class IdentityServiceTests : IntegrationTestBase
         Assert.Null(user.LockedAt);
         Assert.Null(user.LockedBy);
         Assert.Equal("Active", await sut.GetAccountStatusAsync(user.Id));
+    }
+
+    [Fact]
+    public async Task SetAccountStatus_voi_nguoi_thuc_hien_khong_ton_tai_bi_khoa_ngoai_chan()
+    {
+        var (sut, db, provider) = await CreateIdentityServiceAsync();
+        await using var _ = provider;
+
+        await sut.CreateUserAsync("fkcheck", "fkcheck@example.com", "MatKhau@123", "Kiểm tra FK");
+        var user = await db.Users.SingleAsync(u => u.UserName == "fkcheck");
+
+        // users.locked_by → users.id (ON DELETE SET NULL): không thể ghi id admin không tồn tại.
+        await Assert.ThrowsAsync<DbUpdateException>(() =>
+            sut.SetAccountStatusAsync(user.Id, "Locked", "x", Guid.CreateVersion7()));
     }
 
     [Fact]

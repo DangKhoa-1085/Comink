@@ -58,6 +58,16 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
             .WithOne(t => t.User)
             .HasForeignKey(t => t.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Người thực hiện khóa tài khoản — tự tham chiếu users.id (docs/03 mục 3.1: "uuid FK→users").
+        // - SET NULL: nếu sau này có xóa cứng một admin, cột `locked_by` về null thay vì chặn xóa
+        //   hoặc xóa lan sang tài khoản bị họ khóa (không dùng CASCADE).
+        // - Không khai báo navigation: danh sách/hồ sơ người dùng không cần nạp admin đã khóa,
+        //   tránh join thừa; muốn hiển thị "khóa bởi ai" thì query tường minh theo `LockedBy`.
+        builder.HasOne<ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(u => u.LockedBy)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
 
