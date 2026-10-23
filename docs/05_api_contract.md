@@ -201,7 +201,8 @@ Yêu cầu role `Admin` (trả `403 FORBIDDEN` nếu không đủ quyền).
 
 > **Cập nhật Giai đoạn 5 (2026-10-24):** bổ sung khóa/mở khóa tài khoản, hai trường
 > `lockedReason`/`lockedAt` trong danh sách, và sự kiện SignalR `AccountLocked`.
-> Giai đoạn 5 **không cần migration mới** — dùng các cột `locked_*` đã có từ M0.
+> Migration **M5** (`Admin_AddLockedByForeignKey`) thêm FK `users.locked_by → users(id)`
+> `ON DELETE SET NULL` + chỉ mục — **không đổi hình dạng API**.
 
 ### 4.1. `GET /api/admin/users` — danh sách tài khoản
 
@@ -663,3 +664,4 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 | 2026-10-23 | Thêm **mục 8.2b** `POST /api/conversations/group` (nhóm 3–10, chỉ bạn bè, người tạo `Owner`); danh sách hội thoại có thêm `memberCount`, `peer` nullable; thêm mã lỗi `MESSAGING_GROUP_TOO_FEW`/`MESSAGING_GROUP_TOO_MANY` |
 | 2026-10-23 | **D6:** bỏ nhánh `participantIds` khỏi `POST /api/calls` — cuộc gọi luôn bắt đầu trong hội thoại (1–1 hoặc nhóm); đổ chuông quá 30s do **server** đóng (`Missed`/`NoAnswer`), nghe sau hạn → `409 CALL_ALREADY_ENDED` |
 | 2026-10-24 | Thêm **mục 4 GĐ 5:** `POST /api/admin/users/{id}/lock` + `/unlock`, trường `lockedReason`/`lockedAt`, sự kiện `AccountLocked`; mã lỗi `USER_NOT_FOUND`, `ADMIN_CANNOT_LOCK_SELF`. Đăng nhập tài khoản bị khóa nay trả đúng `403 AUTH_ACCOUNT_LOCKED` (chỉ khi đúng mật khẩu) |
+| 2026-10-24 | Migration **M5** `Admin_AddLockedByForeignKey`: FK `users.locked_by → users(id)` `ON DELETE SET NULL` + chỉ mục `ix_users_locked_by` (khớp `docs/03` mục 3.1); không đổi API |

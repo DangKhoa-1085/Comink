@@ -334,7 +334,7 @@ Lớp `ApplicationUser : IdentityUser<Guid>`, đổi tên bảng Identity sang `
 | `lockout_end`, `lockout_enabled`, `access_failed_count` | | Khóa tạm do đăng nhập sai (cơ chế Identity) |
 | `account_status` | varchar(16) | NN, mặc định `Active` (xem enum). **Khóa do quản trị** dùng cột này, tách khỏi lockout của Identity |
 | `locked_reason` | varchar(500) | Lý do khóa |
-| `locked_at`, `locked_by` | timestamptz, uuid FK→users | Thời điểm và admin thực hiện |
+| `locked_at`, `locked_by` | timestamptz, uuid FK→users | Thời điểm và admin thực hiện. FK tự tham chiếu `users(id)`, **ON DELETE SET NULL** (migration M5 `Admin_AddLockedByForeignKey`), cột nullable nên hợp lệ |
 | `last_active_at` | timestamptz | Cập nhật thưa (ví dụ 5 phút/lần) để thống kê |
 | `created_at` | timestamptz | NN |
 
@@ -868,6 +868,7 @@ CREATE UNIQUE INDEX ux_messages_client_id
 | Hàng đợi báo cáo | `reports (status, created_at DESC)` |
 | Báo cáo theo đối tượng | `reports (target_type, target_id)` |
 | Nhật ký theo admin/thời gian | `audit_logs (admin_id, created_at DESC)`, `audit_logs (created_at DESC)` |
+| Ai đã khóa tài khoản | `users (locked_by)` — chỉ mục cho FK tự tham chiếu, `ON DELETE SET NULL` |
 | Dọn token hết hạn | `refresh_tokens (expires_at)`, `refresh_tokens (user_id)` |
 
 ### 5.3. Truy vấn tham chiếu: bảng tin
@@ -949,7 +950,7 @@ Chỉ tạo bảng khi cần, mỗi nhóm một migration riêng:
 | M2 | `conversations`, `conversation_members`, `messages`, `message_attachments` (cột `reply_to`, `forwarded_from`, `edited_at`, `deleted_at`, `content_search` **chưa thêm**) | Nhắn tin **cơ bản** |
 | M3 | `calls`, `call_participants` (+ cột `messages.call_id`) | Gọi **cơ bản** |
 | M4 | `user_devices`, `notifications` | Push/thông báo |
-| M5 | Cột quản trị trên `users` đã có sẵn từ M0. Thêm hàng đợi kiểm duyệt: `reports`, `audit_logs` | Quản trị cơ bản/nâng cao |
+| M5 | **FK `users.locked_by` → `users(id)` `ON DELETE SET NULL` + chỉ mục `users (locked_by)`** (migration `Admin_AddLockedByForeignKey`, GĐ 5). Cột quản trị trên `users` đã có sẵn từ M0. Khi làm NC: thêm hàng đợi kiểm duyệt `reports`, `audit_logs` | Quản trị cơ bản/nâng cao |
 | N-x | Từng nhóm **nâng cao** khi làm tới: hashtags/saved_posts, reactions/pins/reply/forward/edit/search, `blocks`, albums, `daily_stats`, `banned_keywords`, cài đặt riêng tư và mute | Chỉ sau khi mức cơ bản của nhóm đó xong |
 | Cuối | `ai_conversations`, `ai_messages`, `ai_usage_logs` | Sau khi các chức năng chính ổn định |
 

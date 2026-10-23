@@ -4,7 +4,7 @@
 > **Mục tiêu:** quản trị viên đăng nhập web, xem/tìm kiếm danh sách tài khoản và **khóa/mở khóa** tài khoản; tài khoản bị khóa mất phiên ngay (REST + SignalR) và không đăng nhập lại được.
 > **Phụ thuộc:** GĐ 1 — auth, phân quyền hai role, trang `/admin/users` nền, SignalR có xác thực ✅.
 > **Trạng thái:** ✅ **CB XONG** (2026-10-24) — backend + web + test đầy đủ, đã kiểm chứng HTTP và SignalR thật.
-> **Migration tương ứng:** **không cần migration mới** — các cột `account_status`, `locked_reason`, `locked_at`, `locked_by` đã có từ **M0** (`docs/03_database_design.md` mục 3.1 và 6.3, dòng M5).
+> **Migration tương ứng:** **M5** — `20261023234300_Admin_AddLockedByForeignKey` (FK `users.locked_by → users(id)` `ON DELETE SET NULL` + chỉ mục `ix_users_locked_by`). Các cột `account_status`, `locked_reason`, `locked_at`, `locked_by` đã có từ **M0**.
 > **Người phụ trách:** Dev A (Tài khoản/bảo mật, mạng xã hội, ảnh/tệp, quản trị) — `docs/04_roadmap.md` mục 2.
 
 ---
@@ -86,6 +86,14 @@ Dashboard, quản lý bài viết/bình luận, báo cáo vi phạm, `audit_logs
 ---
 
 ## 4. Công việc
+
+### 4.0. Database — M5
+
+- [x] Cấu hình FK tự tham chiếu `users.locked_by → users.id` `ON DELETE SET NULL` (không CASCADE) trong `IdentityConfigurations`
+- [x] Migration `20261023234300_Admin_AddLockedByForeignKey` (index `ix_users_locked_by` + FK) — đã áp lên DB dev
+- [x] Đọc trước SQL sinh ra: `CREATE INDEX …` + `ADD CONSTRAINT … ON DELETE SET NULL`
+- [x] Kiểm chứng `SET NULL` bằng transaction + `ROLLBACK` (không thay đổi dữ liệu thật)
+- [x] Test tích hợp: FK chặn `locked_by` trỏ tới user không tồn tại
 
 ### 4.1. Domain
 
@@ -173,7 +181,7 @@ Dashboard, quản lý bài viết/bình luận, báo cáo vi phạm, `audit_logs
 | `dotnet build` | **0 warning, 0 error** |
 | `dotnet test` (Domain) | **68/68** — thêm `AdminUserRulesTests` (tự khóa, idempotent, chuẩn hóa lý do, giới hạn 500) |
 | `dotnet test` (Application) | **25/25** — thêm `AdminServiceTests` (khóa → thu hồi token + phát sự kiện, tự khóa, không tồn tại, idempotent, lý do quá dài, mở khóa) |
-| `dotnet test` (Tích hợp, PostgreSQL thật) | **92/92** — thêm test `SetAccountStatus`/`GetAccountStatus` ghi đúng `locked_*`; cập nhật test `ValidateCredentials` (tài khoản khóa + mật khẩu đúng trả id để AuthService trả `AUTH_ACCOUNT_LOCKED`) |
+| `dotnet test` (Tích hợp, PostgreSQL thật) | **93/93** — thêm test `SetAccountStatus`/`GetAccountStatus` ghi đúng `locked_*`; test FK chặn `locked_by` không tồn tại; cập nhật test `ValidateCredentials` (tài khoản khóa + mật khẩu đúng trả id để AuthService trả `AUTH_ACCOUNT_LOCKED`) |
 | `npm run lint` | **0 warning, 0 error** |
 | `npm run build` | thành công (còn cảnh báo cũ: bundle > 1 MB do SDK LiveKit) |
 
@@ -215,7 +223,14 @@ Dashboard, quản lý bài viết/bình luận, báo cáo vi phạm, `audit_logs
   **“Đang hoạt động”**, lý do khóa biến mất.
 - Toàn bộ chuỗi hiển thị lấy từ i18n `vi` (cùng bộ khoá đã thêm cho `en`).
 
-### 7.5. Lỗi/bẫy tự phát hiện trong quá trình làm
+### 7.5. Kiểm chứng migration M5 — đạt
+
+- `dotnet ef migrations script` xem trước: `CREATE INDEX ix_users_locked_by` + `ADD CONSTRAINT fk_users_users_locked_by … ON DELETE SET NULL`.
+- `dotnet ef database update` áp lên DB dev thành công; `pg_constraint` xác nhận FK đúng, `pg_indexes` có `ix_users_locked_by`.
+- Thử `SET NULL` trong **transaction + ROLLBACK**: tạo 1 admin + 1 người bị khóa tạm, xóa admin → `locked_by` về `null`; rollback nên **không thay đổi dữ liệu thật**.
+- `dotnet test` sau migration: **186/186** (Domain 68 · Application 25 · Tích hợp 93).
+
+### 7.6. Lỗi/bẫy tự phát hiện trong quá trình làm
 
 1. **Body tùy chọn của `POST .../lock` trả `415`** khi client không gửi body/`Content-Type`, kể cả với
    `[FromBody(EmptyBodyBehavior = Allow)]`. **Đã sửa:** đọc body thủ công bằng `HttpRequest.ReadFromJsonAsync`
@@ -229,7 +244,7 @@ Dashboard, quản lý bài viết/bình luận, báo cáo vi phạm, `audit_logs
    bằng công cụ chẩn đoán quyền tệp của DSH (cấp quyền toàn quyền cho tài khoản đang đăng nhập ở
    `backend/src/Comink.Domain/obj/Debug` + `net10.0`, có bản sao lưu/lệnh hoàn tác trong `D:\DACN\acl-reports`).
 
-### 7.6. Dữ liệu thử đã tạo trong DB dev (có thể xoá khi không cần)
+### 7.7. Dữ liệu thử đã tạo trong DB dev (có thể xoá khi không cần)
 
 > Tạo để kiểm chứng thủ công, **không** nằm trong migration/seed. Không xoá tự động (quy định `AGENTS.md`).
 
@@ -237,14 +252,13 @@ Dashboard, quản lý bài viết/bình luận, báo cáo vi phạm, `audit_logs
 - `phase5.target` — role `User`, mật khẩu test `MatKhau@123`; đã mở khóa lại sau khi thử.
 - Các tài khoản này chỉ tồn tại trong database local; **không** ảnh hưởng môi trường khác.
 
-### 7.7. Việc ghi nhận nhưng **không** sửa (ngoài phạm vi)
+### 7.8. Việc ghi nhận nhưng **không** sửa (ngoài phạm vi)
 
-- `docs/03_database_design.md` mô tả `users.locked_by` là **FK → users**, nhưng model EF hiện **không** khai
-  báo quan hệ này (không có ràng buộc khoá ngoại trong migration M0). GĐ 5 chỉ ghi giá trị; muốn khớp tài
-  liệu cần một migration mới (M5) — chưa làm vì không cần cho mục tiêu CB và cần bạn chốt.
 - **Access token cấp trước lúc khóa** vẫn còn hạn 15 phút; nếu admin **mở khóa trong khoảng 15 phút đó**
   thì token cũ *có thể* dùng lại (JWT không mang mã phiên). Trong luồng bình thường client đã xóa phiên và
   refresh token đã bị thu hồi khi khóa, nên không ảnh hưởng demo. Muốn chặn tuyệt đối cần thêm
   security-stamp/mã phiên vào access token — thuộc nhóm “quản lý phiên” của GĐ 7.
 - Giao diện chưa có màn hình chi tiết người dùng; danh sách đã đủ cho mục tiêu CB.
+- API chưa trả `lockedBy` (chỉ có trong DB). Có FK + index sẵn nên khi cần hiển thị “khóa bởi ai” chỉ phải
+  thêm một truy vấn/trường DTO, không cần đổi schema.
 

@@ -162,7 +162,8 @@ Mỗi giai đoạn gồm: **mục tiêu**, **phụ thuộc** và **checklist ho�
 > **Trạng thái (cập nhật 2026-10-24):** **đã cài đặt và kiểm chứng** cả 5 mục ở backend + web (chưa tick — người dùng tick theo `AGENTS.md` mục 12).
 > - Backend: `AdminUserRules` (domain), `AdminService`, 2 endpoint `lock`/`unlock`, kiểm tra `account_status` ở **mọi request JWT**, thu hồi toàn bộ refresh token, phát `AccountLocked` + **ngắt kết nối SignalR**.
 > - Đăng nhập tài khoản bị khóa nay trả `403 AUTH_ACCOUNT_LOCKED` (sửa lệch hợp đồng GĐ 1; chỉ khi đúng mật khẩu).
-> - Test: **185/185** (`Domain 68 · Application 25 · Tích hợp 92` trên PostgreSQL thật), `dotnet build` 0 warning; web `npm run lint` 0/0, `npm run build` thành công.
+> - Test: **186/186** (`Domain 68 · Application 25 · Tích hợp 93` trên PostgreSQL thật), `dotnet build` 0 warning; web `npm run lint` 0/0, `npm run build` thành công.
+> - Migration **M5** (`20261023234300_Admin_AddLockedByForeignKey`): thêm FK `users.locked_by → users(id)` `ON DELETE SET NULL` + chỉ mục `ix_users_locked_by` (khớp `docs/03` mục 3.1).
 > - Kiểm chứng HTTP thật **17/17**: admin xem/tìm danh sách; người thường `403`; tự khóa `400 ADMIN_CANNOT_LOCK_SELF`; khóa ghi đúng `locked_*`; access token cũ `401`; refresh token bị thu hồi; đăng nhập bị khóa `403`; sai mật khẩu vẫn `401`; khóa idempotent; mở khóa đăng nhập lại được; khóa không kèm body.
 > - Kiểm chứng SignalR thật: client của tài khoản bị khóa nhận `AccountLocked` và kết nối bị server đóng (`Đã ngắt 1 kết nối SignalR`).
 > - Chi tiết: `docs/tasks/phase5_admin.md`; hợp đồng API: `docs/05_api_contract.md` mục 4.
@@ -276,6 +277,6 @@ Một tính năng chỉ được coi là **xong** khi thỏa tất cả:
 | GĐ 2 | M1 |
 | GĐ 3 | M2 |
 | GĐ 4 | M3 |
-| GĐ 5 | M5 (phần quản trị cơ bản dùng sẵn cột trên `users` từ M0) |
+| GĐ 5 | M5 — FK `users.locked_by → users(id)` (`SET NULL`) + chỉ mục; phần quản trị cơ bản dùng sẵn cột trên `users` từ M0 |
 | GĐ 6 | M4 (thiết bị push, thông báo) |
 | GĐ 7 | Các migration N-x và nhóm AI cuối cùng |
