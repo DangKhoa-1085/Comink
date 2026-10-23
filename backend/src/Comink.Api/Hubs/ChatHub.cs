@@ -2,6 +2,7 @@
 // xác thực, group và tín hiệu nhẹ (docs/02_tech_stack_decisions.md mục 1.4, 5.3).
 using Comink.Application.Messaging;
 using Comink.Application.Messaging.Abstractions;
+using Comink.Api.Realtime;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
@@ -16,11 +17,16 @@ namespace Comink.Api.Hubs;
 public class ChatHub : Hub
 {
     private readonly IConversationService _conversations;
+    private readonly IUserConnectionRegistry _connections;
     private readonly ILogger<ChatHub> _logger;
 
-    public ChatHub(IConversationService conversations, ILogger<ChatHub> logger)
+    public ChatHub(
+        IConversationService conversations,
+        IUserConnectionRegistry connections,
+        ILogger<ChatHub> logger)
     {
         _conversations = conversations;
+        _connections = connections;
         _logger = logger;
     }
 
@@ -37,6 +43,9 @@ public class ChatHub : Hub
         var userId = Context.UserIdentifier;
         if (!string.IsNullOrEmpty(userId) && Guid.TryParse(userId, out var userGuid))
         {
+            // Ghi nhận kết nối để có thể ngắt ngay khi tài khoản bị admin khóa (Giai đoạn 5, D2).
+            _connections.Register(userGuid, Context);
+
             await Groups.AddToGroupAsync(Context.ConnectionId, ChatEvents.UserGroup(userGuid));
 
             var conversationIds = await _conversations.GetActiveConversationIdsAsync(userGuid);
@@ -52,6 +61,18 @@ public class ChatHub : Hub
         }
 
         await base.OnConnectedAsync();
+    }
+
+    /// <summary>Gỡ kết nối khỏi sổ đăng ký khi client ngắt (kể cả khi bị server ngắt).</summary>
+    public override async Task OnDisconnectedAsync(Exception? exception)
+    {
+        var userId = Context.UserIdentifier;
+        if (!string.IsNullOrEmpty(userId) && Guid.TryParse(userId, out var userGuid))
+        {
+            _connections.Unregister(userGuid, Context.ConnectionId);
+        }
+
+        await base.OnDisconnectedAsync(exception);
     }
 
     /// <summary>Tên nhóm riêng của một người dùng.</summary>

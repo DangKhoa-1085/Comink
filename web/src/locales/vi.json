@@ -122,7 +122,24 @@
     "total_shown_other": "Đang hiển thị {{count}} tài khoản",
     "status_active": "Đang hoạt động",
     "status_locked": "Đã khóa",
-    "status_deleted": "Đã vô hiệu hóa"
+    "status_deleted": "Đã vô hiệu hóa",
+    "actions": "Thao tác",
+    "lock": "Khóa",
+    "unlock": "Mở khóa",
+    "lock_title": "Khóa tài khoản",
+    "unlock_title": "Mở khóa tài khoản",
+    "lock_confirm": "Khóa tài khoản @{{userName}}? Người dùng sẽ bị đăng xuất ngay và không thể đăng nhập lại cho tới khi được mở khóa.",
+    "unlock_confirm": "Mở khóa tài khoản @{{userName}}? Người dùng sẽ đăng nhập lại được.",
+    "lock_reason": "Lý do khóa (không bắt buộc)",
+    "lock_reason_placeholder": "Ví dụ: vi phạm quy định cộng đồng",
+    "lock_reason_hint": "Tối đa 500 ký tự. Chỉ quản trị viên thấy lý do này.",
+    "confirm": "Xác nhận",
+    "locking": "Đang khóa...",
+    "unlocking": "Đang mở khóa...",
+    "locked_success": "Đã khóa tài khoản",
+    "unlocked_success": "Đã mở khóa tài khoản",
+    "cannot_lock_self": "Bạn không thể tự khóa tài khoản của chính mình",
+    "you": "Bạn"
   },
   "call": {
     "start_audio": "Gọi thoại",
@@ -261,6 +278,8 @@
     "AUTH_REFRESH_TOKEN_INVALID": "Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại.",
     "AUTH_REFRESH_TOKEN_REUSED": "Phát hiện dấu hiệu bất thường của phiên đăng nhập. Vì an toàn, bạn đã được đăng xuất khỏi mọi thiết bị.",
     "AUTH_EMAIL_ALREADY_EXISTS": "Email này đã được sử dụng.",
-    "AUTH_USERNAME_ALREADY_EXISTS": "Tên đăng nhập này đã được sử dụng."
+    "AUTH_USERNAME_ALREADY_EXISTS": "Tên đăng nhập này đã được sử dụng.",
+    "USER_NOT_FOUND": "Không tìm thấy người dùng.",
+    "ADMIN_CANNOT_LOCK_SELF": "Bạn không thể tự khóa tài khoản của chính mình."
   }
 }

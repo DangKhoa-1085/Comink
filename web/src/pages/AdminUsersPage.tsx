@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { Search, ShieldCheck, Users } from 'lucide-react'
+import { Lock, Search, ShieldCheck, Unlock, Users } from 'lucide-react'
 import { adminApi } from '../api/admin'
+import type { AdminUserSummary } from '../api/types'
+import { AccountStatusDialog } from '../components/admin/AccountStatusDialog'
+import { useAuthStore } from '../stores/authStore'
 import { ApiError } from '../lib/http'
 import { translateErrorCode } from '../lib/errorMessages'
 import { Button } from '../components/ui/Button'
@@ -11,12 +14,15 @@ import { Alert, Card, Spinner } from '../components/ui/Feedback'
 
 const PAGE_SIZE = 10
 
-/** Trang quản trị: danh sách tài khoản, tìm kiếm, phân trang con trỏ (nút "tải thêm"). */
+/** Trang quản trị: danh sách tài khoản, tìm kiếm, phân trang con trỏ, khóa/mở khóa (GĐ 5). */
 export function AdminUsersPage() {
   const { t } = useTranslation()
   // `searchInput` là giá trị đang gõ; `search` là giá trị đã chốt để gọi API.
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
+  // Tài khoản đang mở hộp thoại khóa/mở khóa (null = đóng).
+  const [dialogUser, setDialogUser] = useState<AdminUserSummary | null>(null)
+  const currentUserId = useAuthStore((state) => state.user?.id)
 
   const {
     data,
@@ -116,6 +122,7 @@ export function AdminUsersPage() {
                   <th className="px-4 py-3 font-medium">{t('admin.display_name')}</th>
                   <th className="px-4 py-3 font-medium">{t('admin.status')}</th>
                   <th className="px-4 py-3 font-medium">{t('admin.created_at')}</th>
+                  <th className="px-4 py-3 text-right font-medium">{t('admin.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -128,9 +135,33 @@ export function AdminUsersPage() {
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusClass(user.accountStatus)}`}>
                         {statusLabel(user.accountStatus)}
                       </span>
+                      {/* Lý do khóa chỉ admin thấy (hợp đồng API mục 4). */}
+                      {user.accountStatus === 'Locked' && user.lockedReason && (
+                        <p className="mt-1 max-w-[16rem] truncate text-xs text-slate-500" title={user.lockedReason}>
+                          {user.lockedReason}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-slate-500">
                       {new Date(user.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {user.id === currentUserId ? (
+                        // Roadmap GĐ 5 #5: admin không tự khóa được chính mình (backend cũng chặn).
+                        <span className="text-xs text-slate-400" title={t('admin.cannot_lock_self')}>
+                          {t('admin.you')}
+                        </span>
+                      ) : user.accountStatus === 'Locked' ? (
+                        <Button size="sm" variant="outline" onClick={() => setDialogUser(user)}>
+                          <Unlock className="h-4 w-4" />
+                          {t('admin.unlock')}
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="danger" onClick={() => setDialogUser(user)}>
+                          <Lock className="h-4 w-4" />
+                          {t('admin.lock')}
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -160,6 +191,10 @@ export function AdminUsersPage() {
             </Button>
           )}
         </div>
+      )}
+
+      {dialogUser && (
+        <AccountStatusDialog user={dialogUser} onClose={() => setDialogUser(null)} />
       )}
     </div>
   )

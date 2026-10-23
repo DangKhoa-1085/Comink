@@ -123,7 +123,24 @@
     "total_shown_other": "Showing {{count}} accounts",
     "status_active": "Active",
     "status_locked": "Locked",
-    "status_deleted": "Deactivated"
+    "status_deleted": "Deactivated",
+    "actions": "Actions",
+    "lock": "Lock",
+    "unlock": "Unlock",
+    "lock_title": "Lock account",
+    "unlock_title": "Unlock account",
+    "lock_confirm": "Lock @{{userName}}? The user is signed out immediately and cannot sign in again until unlocked.",
+    "unlock_confirm": "Unlock @{{userName}}? The user can sign in again.",
+    "lock_reason": "Reason (optional)",
+    "lock_reason_placeholder": "e.g. community guidelines violation",
+    "lock_reason_hint": "Up to 500 characters. Only administrators can see this reason.",
+    "confirm": "Confirm",
+    "locking": "Locking...",
+    "unlocking": "Unlocking...",
+    "locked_success": "Account locked",
+    "unlocked_success": "Account unlocked",
+    "cannot_lock_self": "You cannot lock your own account",
+    "you": "You"
   },
   "call": {
     "start_audio": "Voice call",
@@ -263,6 +280,8 @@
     "AUTH_REFRESH_TOKEN_INVALID": "Your session has expired. Please sign in again.",
     "AUTH_REFRESH_TOKEN_REUSED": "Suspicious session activity was detected. For your safety you have been signed out of all devices.",
     "AUTH_EMAIL_ALREADY_EXISTS": "This email is already in use.",
-    "AUTH_USERNAME_ALREADY_EXISTS": "This username is already in use."
+    "AUTH_USERNAME_ALREADY_EXISTS": "This username is already in use.",
+    "USER_NOT_FOUND": "User not found.",
+    "ADMIN_CANNOT_LOCK_SELF": "You cannot lock your own account."
   }
 }

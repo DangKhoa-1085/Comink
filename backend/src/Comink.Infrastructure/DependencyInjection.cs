@@ -1,5 +1,8 @@
 // DI registration cho Infrastructure layer
+using System.Security.Claims;
 using System.Text;
+using Comink.Application.Admin;
+using Comink.Application.Admin.Abstractions;
 using Comink.Application.Common.Interfaces;
 using Comink.Application.Identity;
 using Comink.Application.Identity.Abstractions;
@@ -7,6 +10,7 @@ using Comink.Application.Messaging.Abstractions;
 using Comink.Application.Calls.Abstractions;
 using Comink.Application.Social;
 using Comink.Application.Social.Abstractions;
+using Comink.Domain.Admin;
 using Comink.Infrastructure.Identity;
 using Comink.Infrastructure.Media;
 using Comink.Infrastructure.Persistence;
@@ -122,6 +126,30 @@ public static class DependencyInjection
                         }
 
                         return Task.CompletedTask;
+                    },
+
+                    // Giai đoạn 5 (D1): access token không thu hồi được nên phải kiểm tra lại trạng thái
+                    // tài khoản ở MỌI request. Thiếu bước này thì tài khoản vừa bị khóa vẫn dùng được
+                    // access token cũ tới khi hết hạn (15 phút).
+                    OnTokenValidated = async context =>
+                    {
+                        var rawUserId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+                        if (!Guid.TryParse(rawUserId, out var userId))
+                        {
+                            context.Fail("Access token thiếu định danh người dùng hợp lệ.");
+                            return;
+                        }
+
+                        var identityService = context.HttpContext.RequestServices
+                            .GetRequiredService<IIdentityService>();
+                        var accountStatus = await identityService.GetAccountStatusAsync(
+                            userId,
+                            context.HttpContext.RequestAborted);
+
+                        if (!AdminUserRules.IsActive(accountStatus))
+                        {
+                            context.Fail("Tài khoản đã bị khóa.");
+                        }
                     }
                 };
             });
@@ -147,6 +175,9 @@ public static class DependencyInjection
         services.AddScoped<ITokenService, JwtTokenService>();
         services.AddScoped<AuthService>();
         services.AddScoped<ProfileService>();
+
+        // --- Quản trị (Giai đoạn 5) ---
+        services.AddScoped<IAdminService, AdminService>();
 
         // --- Mạng xã hội (Giai đoạn 2) ---
         services.AddScoped<IUserDirectoryService, UserDirectoryService>();

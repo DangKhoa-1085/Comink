@@ -42,6 +42,8 @@ public class FakeIdentityService : IIdentityService
             FriendCount: 0,
             Language: "vi",
             AccountStatus: accountStatus,
+            LockedReason: null,
+            LockedAt: null,
             CreatedAt: new DateTimeOffset(2026, 10, 15, 10, 0, 0, TimeSpan.Zero));
 
         _users[id] = (userName, email, password, data);
@@ -105,13 +107,9 @@ public class FakeIdentityService : IIdentityService
             string.Equals(u.Value.UserName, emailOrUserName, StringComparison.OrdinalIgnoreCase));
 
         // Không tiết lộ tài khoản có tồn tại: sai tài khoản và sai mật khẩu đều trả null.
+        // Tài khoản bị khóa mà mật khẩu đúng vẫn trả id — AuthService tự quyết định mã lỗi
+        // AUTH_ACCOUNT_LOCKED (giống IdentityService thật).
         if (match.Value.Data is null || match.Value.Password != password)
-        {
-            return Task.FromResult<Guid?>(null);
-        }
-
-        // Tài khoản bị khóa cũng không cho đăng nhập (giống IdentityService thật).
-        if (!string.Equals(match.Value.Data.AccountStatus, "Active", StringComparison.Ordinal))
         {
             return Task.FromResult<Guid?>(null);
         }
@@ -189,9 +187,39 @@ public class FakeIdentityService : IIdentityService
                 u.Email,
                 u.DisplayName,
                 u.AccountStatus,
+                u.LockedReason,
+                u.LockedAt,
                 u.CreatedAt))
             .ToArray();
 
         return Task.FromResult<IReadOnlyList<AdminUserData>>(result);
+    }
+
+    public Task<string?> GetAccountStatusAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_users.TryGetValue(userId, out var user) ? user.Data.AccountStatus : null);
+
+    public Task<IdentityOperationResult> SetAccountStatusAsync(
+        Guid userId,
+        string accountStatus,
+        string? reason,
+        Guid? changedBy,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_users.TryGetValue(userId, out var user))
+        {
+            return Task.FromResult(IdentityOperationResult.Fail(IdentityFailure.NotFound));
+        }
+
+        var updated = user.Data with
+        {
+            AccountStatus = accountStatus,
+            LockedReason = string.Equals(accountStatus, "Locked", StringComparison.Ordinal) ? reason : null,
+            LockedAt = string.Equals(accountStatus, "Locked", StringComparison.Ordinal)
+                ? new DateTimeOffset(2026, 10, 24, 6, 0, 0, TimeSpan.Zero)
+                : null
+        };
+
+        _users[userId] = (user.UserName, user.Email, user.Password, updated);
+        return Task.FromResult(IdentityOperationResult.Ok());
     }
 }

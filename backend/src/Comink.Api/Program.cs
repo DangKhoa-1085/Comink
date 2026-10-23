@@ -1,6 +1,8 @@
 // Program.cs — Entry point của Comink.Api
 using Comink.Api.Endpoints;
 using Comink.Api.Hubs;
+using Comink.Api.Realtime;
+using Comink.Application.Admin.Abstractions;
 using Comink.Application.Common;
 using Comink.Application.Common.Interfaces;
 using Comink.Application.Identity.Validators;
@@ -68,6 +70,11 @@ try
     // --- Phát sự kiện cuộc gọi (CallIncoming/CallUpdated/CallEnded) ---
     builder.Services.AddScoped<Comink.Application.Calls.Abstractions.ICallNotifier,
         Comink.Api.Realtime.SignalRCallNotifier>();
+
+    // --- Quản trị (Giai đoạn 5): thông báo + ngắt kết nối SignalR khi tài khoản bị khóa ---
+    // Sổ đăng ký kết nối phải là singleton: nó sống lâu hơn từng request/hub connection.
+    builder.Services.AddSingleton<IUserConnectionRegistry, UserConnectionRegistry>();
+    builder.Services.AddScoped<IAccountNotifier, SignalRAccountNotifier>();
 
     // --- Dọn cuộc gọi đổ chuông quá hạn (30s) — bắt buộc phía server, client có thể đóng tab ---
     builder.Services.AddHostedService<Comink.Api.Realtime.CallRingTimeoutService>();

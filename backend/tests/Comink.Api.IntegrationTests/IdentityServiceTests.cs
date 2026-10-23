@@ -222,9 +222,60 @@ public class IdentityServiceTests : IntegrationTestBase
         Assert.Null(await sut.ValidateCredentialsAsync("kiemtra@example.com", "SaiMatKhau@999"));
         Assert.Null(await sut.ValidateCredentialsAsync("khongton@example.com", "MatKhau@123"));
 
-        // Admin khóa tài khoản → không đăng nhập được dù mật khẩu đúng.
+        // Admin khóa tài khoản: mật khẩu đúng vẫn trả id để AuthService trả đúng mã
+        // AUTH_ACCOUNT_LOCKED (403) — đã chốt 2026-10-24; sai mật khẩu vẫn null.
         user.AccountStatus = "Locked";
         await db.SaveChangesAsync();
-        Assert.Null(await sut.ValidateCredentialsAsync("kiemtra@example.com", "MatKhau@123"));
+        Assert.Equal(user.Id, await sut.ValidateCredentialsAsync("kiemtra@example.com", "MatKhau@123"));
+        Assert.Null(await sut.ValidateCredentialsAsync("kiemtra@example.com", "SaiMatKhau@999"));
+    }
+
+    [Fact]
+    public async Task SetAccountStatus_khoa_va_mo_khoa_ghi_dung_cac_cot_locked()
+    {
+        var (sut, db, provider) = await CreateIdentityServiceAsync();
+        await using var _ = provider;
+
+        await sut.CreateUserAsync("doitrangthai", "doitrangthai@example.com", "MatKhau@123", "Đổi trạng thái");
+        var user = await db.Users.SingleAsync(u => u.UserName == "doitrangthai");
+        var adminId = Guid.CreateVersion7();
+
+        var locked = await sut.SetAccountStatusAsync(user.Id, "Locked", "Vi phạm quy định", adminId);
+        Assert.True(locked.Succeeded);
+
+        await db.Entry(user).ReloadAsync();
+        Assert.Equal("Locked", user.AccountStatus);
+        Assert.Equal("Vi phạm quy định", user.LockedReason);
+        Assert.NotNull(user.LockedAt);
+        Assert.Equal(adminId, user.LockedBy);
+        Assert.NotNull(user.UpdatedAt);
+
+        // Đường dẫn kiểm tra ở mỗi request đọc đúng trạng thái.
+        Assert.Equal("Locked", await sut.GetAccountStatusAsync(user.Id));
+
+        var unlocked = await sut.SetAccountStatusAsync(user.Id, "Active", null, adminId);
+        Assert.True(unlocked.Succeeded);
+
+        await db.Entry(user).ReloadAsync();
+        Assert.Equal("Active", user.AccountStatus);
+        Assert.Null(user.LockedReason);
+        Assert.Null(user.LockedAt);
+        Assert.Null(user.LockedBy);
+        Assert.Equal("Active", await sut.GetAccountStatusAsync(user.Id));
+    }
+
+    [Fact]
+    public async Task SetAccountStatus_va_GetAccountStatus_voi_nguoi_dung_khong_ton_tai()
+    {
+        var (sut, _, provider) = await CreateIdentityServiceAsync();
+        await using var _provider = provider;
+
+        var missingId = Guid.CreateVersion7();
+
+        var result = await sut.SetAccountStatusAsync(missingId, "Locked", "x", Guid.CreateVersion7());
+        Assert.False(result.Succeeded);
+        Assert.Equal(IdentityFailure.NotFound, result.Error);
+
+        Assert.Null(await sut.GetAccountStatusAsync(missingId));
     }
 }

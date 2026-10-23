@@ -125,13 +125,28 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task Login_tai_khoan_bi_khoa_tra_AUTH_INVALID_CREDENTIALS()
+    public async Task Login_tai_khoan_bi_khoa_tra_AUTH_ACCOUNT_LOCKED()
     {
-        // IdentityService thật cũng chặn ở bước kiểm tra mật khẩu khi account_status != Active.
+        // Đã chốt 2026-10-24: đúng mật khẩu nhưng tài khoản bị khóa → 403 AUTH_ACCOUNT_LOCKED
+        // (đúng hợp đồng docs/05_api_contract.md mục 2). Sai mật khẩu vẫn AUTH_INVALID_CREDENTIALS,
+        // nên người dò tài khoản không nhận được thông tin gì thêm.
         _identity.AddUser("bikhoa", "bikhoa@example.com", ValidPassword, accountStatus: "Locked");
 
         var result = await _sut.LoginAsync(
             new LoginRequest("bikhoa@example.com", ValidPassword, null),
+            Context());
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(ErrorCodes.AuthAccountLocked, result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task Login_tai_khoan_bi_khoa_sai_mat_khau_van_tra_AUTH_INVALID_CREDENTIALS()
+    {
+        _identity.AddUser("bikhoa2", "bikhoa2@example.com", ValidPassword, accountStatus: "Locked");
+
+        var result = await _sut.LoginAsync(
+            new LoginRequest("bikhoa2@example.com", "SaiMatKhau@999", null),
             Context());
 
         Assert.False(result.Succeeded);

@@ -1,6 +1,7 @@
 // Cài đặt cổng IIdentityService trên nền ASP.NET Core Identity.
 // Tầng Application chỉ thấy dữ liệu trung lập (IdentityUserData), không thấy entity Identity.
 using Comink.Application.Identity.Abstractions;
+using Comink.Domain.Admin;
 using Comink.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -154,14 +155,59 @@ public class IdentityService : IIdentityService
             return null;
         }
 
-        // Tài khoản bị admin khóa thì không cho đăng nhập, dù mật khẩu đúng.
-        if (!string.Equals(user.AccountStatus, "Active", StringComparison.Ordinal))
-        {
-            return null;
-        }
-
+        // Chỉ sai mật khẩu mới trả null. Tài khoản bị khóa mà mật khẩu đúng vẫn trả id để
+        // AuthService trả đúng mã lỗi AUTH_ACCOUNT_LOCKED (403) theo hợp đồng API mục 2 —
+        // nhưng người dò tài khoản không nhận được thông tin gì nếu không biết mật khẩu.
         var passwordValid = await _userManager.CheckPasswordAsync(user, password);
         return passwordValid ? user.Id : null;
+    }
+
+    /// <inheritdoc />
+    public async Task<string?> GetAccountStatusAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        // Chỉ đọc một cột theo khóa chính: đường dẫn này chạy ở MỌI request đã xác thực
+        // (JwtBearerEvents.OnTokenValidated) nên phải nhẹ, không Include hồ sơ/cài đặt.
+        return await _db.Users
+            .AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => u.AccountStatus)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<IdentityOperationResult> SetAccountStatusAsync(
+        Guid userId,
+        string accountStatus,
+        string? reason,
+        Guid? changedBy,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+        if (user is null)
+        {
+            return IdentityOperationResult.Fail(IdentityFailure.NotFound);
+        }
+
+        var now = _timeProvider.GetUtcNow();
+        user.AccountStatus = accountStatus;
+        user.UpdatedAt = now;
+
+        if (string.Equals(accountStatus, AdminUserRules.LockedStatus, StringComparison.Ordinal))
+        {
+            user.LockedReason = reason;
+            user.LockedAt = now;
+            user.LockedBy = changedBy;
+        }
+        else
+        {
+            // Mở khóa: xóa dấu vết khóa để trạng thái và cột `locked_*` luôn nhất quán.
+            user.LockedReason = null;
+            user.LockedAt = null;
+            user.LockedBy = null;
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return IdentityOperationResult.Ok();
     }
 
     /// <inheritdoc />
@@ -269,6 +315,8 @@ public class IdentityService : IIdentityService
                 u.Email ?? string.Empty,
                 u.Profile?.DisplayName ?? string.Empty,
                 u.AccountStatus,
+                u.LockedReason,
+                u.LockedAt,
                 u.CreatedAt))
             .ToArray();
     }
@@ -289,6 +337,8 @@ public class IdentityService : IIdentityService
             user.Profile?.FriendCount ?? 0,
             user.Settings?.Language ?? "vi",
             user.AccountStatus,
+            user.LockedReason,
+            user.LockedAt,
             user.CreatedAt);
 
     /// <summary>Ánh xạ lỗi của Identity sang mã lỗi trung lập của Application.</summary>

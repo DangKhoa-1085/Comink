@@ -56,7 +56,10 @@ export interface AdminUserSummary {
   userName: string
   email: string
   displayName: string
-  accountStatus: string
+  accountStatus: 'Active' | 'Locked' | 'Deleted'
+  /** Lý do khóa — chỉ admin thấy (null khi tài khoản đang hoạt động). */
+  lockedReason: string | null
+  lockedAt: string | null
   createdAt: string
 }
 

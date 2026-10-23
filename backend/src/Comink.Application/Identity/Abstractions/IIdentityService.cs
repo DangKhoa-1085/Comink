@@ -20,6 +20,8 @@ public record IdentityUserData(
     int FriendCount,
     string Language,
     string AccountStatus,
+    string? LockedReason,
+    DateTimeOffset? LockedAt,
     DateTimeOffset CreatedAt);
 
 /// <summary>Kết quả thực hiện một thao tác ở kho tài khoản.</summary>
@@ -109,6 +111,25 @@ public interface IIdentityService
         Guid? cursorId,
         int limit,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Đọc **nhanh** trạng thái tài khoản theo khóa chính (không nạp hồ sơ/cài đặt).
+    /// Dùng ở mỗi request đã xác thực để chặn ngay access token của tài khoản bị khóa
+    /// (Giai đoạn 5, quyết định D1). Trả null nếu không tìm thấy người dùng.
+    /// </summary>
+    Task<string?> GetAccountStatusAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Đổi trạng thái tài khoản (khóa/mở khóa) và ghi nhận người thực hiện.
+    /// Khóa: đặt <c>account_status = Locked</c> kèm lý do/thời điểm/admin.
+    /// Mở khóa: đưa về <c>Active</c> và xóa các cột `locked_*`.
+    /// </summary>
+    Task<IdentityOperationResult> SetAccountStatusAsync(
+        Guid userId,
+        string accountStatus,
+        string? reason,
+        Guid? changedBy,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>Một dòng trong danh sách tài khoản của trang quản trị.</summary>
@@ -118,4 +139,6 @@ public record AdminUserData(
     string Email,
     string DisplayName,
     string AccountStatus,
+    string? LockedReason,
+    DateTimeOffset? LockedAt,
     DateTimeOffset CreatedAt);

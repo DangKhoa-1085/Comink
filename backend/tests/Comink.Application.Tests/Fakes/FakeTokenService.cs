@@ -90,6 +90,21 @@ public class FakeTokenService : ITokenService
         return Task.CompletedTask;
     }
 
+    public Task<int> RevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var keys = _tokens
+            .Where(kv => kv.Value.UserId == userId && !kv.Value.Revoked)
+            .Select(kv => kv.Key)
+            .ToArray();
+
+        foreach (var key in keys)
+        {
+            _tokens[key] = _tokens[key] with { Revoked = true };
+        }
+
+        return Task.FromResult(keys.Length);
+    }
+
     private void RevokeFamily(Guid familyId)
     {
         foreach (var key in _tokens.Where(kv => kv.Value.FamilyId == familyId).Select(kv => kv.Key).ToArray())

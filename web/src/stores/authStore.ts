@@ -24,6 +24,8 @@ interface AuthState {
   login: (payload: LoginPayload) => Promise<boolean>
   register: (payload: RegisterPayload) => Promise<boolean>
   logout: () => Promise<void>
+  /** Xóa phiên tại client mà KHÔNG gọi API (tài khoản bị khóa hoặc phiên bị thu hồi phía server). */
+  forceLogout: () => void
   /** Khôi phục phiên khi tải lại trang bằng refresh token đã lưu. */
   restoreSession: () => Promise<void>
   /** Cập nhật thông tin người dùng sau khi sửa hồ sơ. */
@@ -84,6 +86,13 @@ export const useAuthStore = create<AuthState>((set) => ({
         // Bỏ qua: phiên phía client vẫn được xóa bên dưới.
       }
     }
+    session.clear()
+    set({ user: null, errorCode: null, fieldErrors: {} })
+  },
+
+  forceLogout() {
+    // Không gọi /api/auth/logout: tài khoản đã bị khóa thì mọi refresh token đã bị thu hồi
+    // phía server (Giai đoạn 5). Chỉ cần xóa phiên cục bộ; route bảo vệ sẽ đưa về trang đăng nhập.
     session.clear()
     set({ user: null, errorCode: null, fieldErrors: {} })
   },

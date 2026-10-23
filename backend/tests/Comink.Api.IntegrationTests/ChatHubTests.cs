@@ -75,7 +75,10 @@ public class ChatHubTests
         IReadOnlyList<Guid> conversationIds)
     {
         var groups = new FakeGroupManager();
-        var hub = new ChatHub(new StubConversationService(conversationIds), NullLogger<ChatHub>.Instance)
+        var hub = new ChatHub(
+            new StubConversationService(conversationIds),
+            new Comink.Api.Realtime.UserConnectionRegistry(),
+            NullLogger<ChatHub>.Instance)
         {
             Context = new FakeHubCallerContext(userIdentifier),
             Groups = groups

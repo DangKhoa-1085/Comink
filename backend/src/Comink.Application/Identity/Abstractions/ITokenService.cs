@@ -68,4 +68,11 @@ public interface ITokenService
 
     /// <summary>Thu hồi một refresh token (đăng xuất). Không báo lỗi nếu token không tồn tại.</summary>
     Task RevokeRefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Thu hồi **toàn bộ** refresh token còn hiệu lực của một người dùng — dùng khi tài khoản
+    /// bị khóa để mọi phiên đăng nhập mất hiệu lực ngay (Giai đoạn 5, quyết định D1).
+    /// Trả về số token vừa bị thu hồi.
+    /// </summary>
+    Task<int> RevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken = default);
 }

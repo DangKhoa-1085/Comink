@@ -14,16 +14,16 @@ export function App() {
   const { t } = useTranslation()
   const initialized = useAuthStore((state) => state.initialized)
   const restoreSession = useAuthStore((state) => state.restoreSession)
-  const logout = useAuthStore((state) => state.logout)
+  const forceLogout = useAuthStore((state) => state.forceLogout)
 
   useEffect(() => {
-    // Khi cả refresh token cũng hết hiệu lực, interceptor gọi handler này để xóa phiên.
+    // Khi refresh token hết hiệu lực hoặc tài khoản bị khóa, interceptor gọi handler này để xóa phiên.
     setSessionExpiredHandler(() => {
-      void logout()
+      forceLogout()
     })
 
     void restoreSession()
-  }, [restoreSession, logout])
+  }, [restoreSession, forceLogout])
 
   // Chờ biết chắc đã đăng nhập hay chưa để tránh nhấp nháy màn hình.
   if (!initialized) {

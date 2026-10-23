@@ -62,4 +62,8 @@ public static class ErrorCodes
     public const string CallAlreadyEnded = "CALL_ALREADY_ENDED";
     public const string CallNotRinging = "CALL_NOT_RINGING";
     public const string CallProviderUnavailable = "CALL_PROVIDER_UNAVAILABLE";
+
+    // --- Quản trị (Giai đoạn 5) — docs/05_api_contract.md mục 4 ---
+    public const string UserNotFound = "USER_NOT_FOUND";
+    public const string AdminCannotLockSelf = "ADMIN_CANNOT_LOCK_SELF";
 }

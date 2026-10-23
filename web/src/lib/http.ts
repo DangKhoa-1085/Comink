@@ -103,6 +103,15 @@ http.interceptors.response.use(
       }
     }
 
-    throw toApiError(error)
+    const apiError = toApiError(error)
+
+    // Tài khoản vừa bị quản trị viên khóa: access token cũ chưa hết hạn nhưng backend từ chối,
+    // còn refresh token đã bị thu hồi. Xóa phiên ngay để route bảo vệ đưa về trang đăng nhập.
+    if (apiError.code === 'AUTH_ACCOUNT_LOCKED' && !isAuthEndpoint) {
+      session.clear()
+      onSessionExpired?.()
+    }
+
+    throw apiError
   },
 )

@@ -142,6 +142,8 @@ public static class ApiResults
         ErrorCodes.CallAlreadyEnded => "Call already ended",
         ErrorCodes.CallNotRinging => "Call is not ringing",
         ErrorCodes.CallProviderUnavailable => "Call provider unavailable",
+        ErrorCodes.UserNotFound => "User not found",
+        ErrorCodes.AdminCannotLockSelf => "You cannot lock your own account",
         _ => "Unexpected error"
     };
 
@@ -187,6 +189,8 @@ public static class ApiResults
         ErrorCodes.CallAlreadyEnded => StatusCodes.Status409Conflict,
         ErrorCodes.CallNotRinging => StatusCodes.Status409Conflict,
         ErrorCodes.CallProviderUnavailable => StatusCodes.Status503ServiceUnavailable,
+        ErrorCodes.UserNotFound => StatusCodes.Status404NotFound,
+        ErrorCodes.AdminCannotLockSelf => StatusCodes.Status400BadRequest,
         _ => StatusCodes.Status500InternalServerError
     };
 

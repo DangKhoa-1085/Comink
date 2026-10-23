@@ -5,13 +5,18 @@ import type { ChatMessage } from '../api/conversations'
 import type { CallDto } from '../api/calls'
 import { createChatConnection, MESSAGE_CREATED_EVENT } from '../lib/chatConnection'
 import { appendMessageToCache, syncMissedMessages } from '../lib/messageCache'
+import i18n from '../lib/i18n'
 import { useAuthStore } from '../stores/authStore'
 import { useCallStore } from '../stores/callStore'
+import { toast } from '../stores/toastStore'
 
 /** Tên sự kiện cuộc gọi — khớp `CallEvents` ở backend. */
 const CALL_INCOMING_EVENT = 'CallIncoming'
 const CALL_UPDATED_EVENT = 'CallUpdated'
 const CALL_ENDED_EVENT = 'CallEnded'
+
+/** Tài khoản bị admin khóa — khớp `AdminEvents.AccountLocked` ở backend. */
+const ACCOUNT_LOCKED_EVENT = 'AccountLocked'
 
 export interface ChatConnectionState {
   /** Đang có kết nối tới hub. */
@@ -112,6 +117,14 @@ export function useChatConnection(enabled: boolean): ChatConnectionState {
 
       queryClient.invalidateQueries({ queryKey: ['call', ended.callId] })
       queryClient.invalidateQueries({ queryKey: ['calls'] })
+    })
+
+    // --- Quản trị (GĐ 5): tài khoản vừa bị khóa ---
+    // Server đã thu hồi mọi refresh token và sẽ ngắt kết nối SignalR; client chủ động xóa phiên
+    // ngay để không chờ tới request REST kế tiếp.
+    connection.on(ACCOUNT_LOCKED_EVENT, () => {
+      useAuthStore.getState().forceLogout()
+      toast.error(i18n.t('errors.AUTH_ACCOUNT_LOCKED'))
     })
 
     connection.onreconnecting(() => {
