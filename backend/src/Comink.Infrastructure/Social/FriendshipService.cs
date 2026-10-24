@@ -4,6 +4,7 @@ using Comink.Application.Social.Abstractions;
 using Comink.Application.Social.Dtos;
 using Comink.Domain.Enums;
 using Comink.Domain.Social;
+using Comink.Infrastructure.Identity;
 using Comink.Infrastructure.Persistence;
 using Comink.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -35,7 +36,9 @@ public class FriendshipService : IFriendshipService
             return OperationResult<FriendshipDto>.Failure(ErrorCodes.SocialCannotFriendSelf);
         }
 
-        if (!await SocialLookup.IsActiveUserAsync(_db, addresseeId, cancellationToken))
+        // Không gửi được lời mời tới tài khoản Admin (trừ khi người gửi là Admin) — trả 404
+        // như không tồn tại để không lộ tài khoản ẩn (Giai đoạn 5, bổ sung 2026-10-24).
+        if (!await AdminAccounts.IsActiveAndInteractableAsync(_db, currentUserId, addresseeId, cancellationToken))
         {
             return OperationResult<FriendshipDto>.Failure(ErrorCodes.NotFound);
         }

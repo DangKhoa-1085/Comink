@@ -2,6 +2,7 @@
 using Comink.Application.Common;
 using Comink.Application.Social.Abstractions;
 using Comink.Application.Social.Dtos;
+using Comink.Infrastructure.Identity;
 using Comink.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -39,7 +40,11 @@ public class UserDirectoryService : IUserDirectoryService
 
         var query = from u in _db.Users.AsNoTracking()
                     join p in _db.UserProfiles.AsNoTracking() on u.Id equals p.UserId
-                    where u.AccountStatus == ActiveAccountStatus && u.Id != currentUserId
+                    where u.AccountStatus == ActiveAccountStatus
+                          && u.Id != currentUserId
+                          // Tài khoản Admin là tài khoản ẩn: không xuất hiện trong danh bạ với bất kỳ ai
+                          // (kể cả admin khác) — quản lý ở /api/admin/users.
+                          && !AdminAccounts.Ids(_db).Contains(u.Id)
                     select new
                     {
                         u.Id,
@@ -111,6 +116,13 @@ public class UserDirectoryService : IUserDirectoryService
                 cancellationToken);
 
         if (user is null)
+        {
+            return OperationResult<PublicProfileDto>.Failure(ErrorCodes.NotFound);
+        }
+
+        // Tài khoản Admin ẩn với người dùng thường: trả 404 như không tồn tại (không dùng 403
+        // để không tiết lộ tài khoản). Admin khác và chính họ vẫn xem được.
+        if (!await AdminAccounts.IsVisibleToAsync(_db, currentUserId, targetUserId, cancellationToken))
         {
             return OperationResult<PublicProfileDto>.Failure(ErrorCodes.NotFound);
         }

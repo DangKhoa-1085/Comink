@@ -3,6 +3,7 @@ using Comink.Application.Common;
 using Comink.Application.Social.Abstractions;
 using Comink.Application.Social.Dtos;
 using Comink.Domain.Social;
+using Comink.Infrastructure.Identity;
 using Comink.Infrastructure.Persistence;
 using Comink.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -30,7 +31,8 @@ public class FollowService : IFollowService
             return OperationResult<bool>.Failure(ErrorCodes.SocialCannotFollowSelf);
         }
 
-        if (!await SocialLookup.IsActiveUserAsync(_db, targetUserId, cancellationToken))
+        // Không theo dõi được tài khoản Admin (trừ khi người theo dõi là Admin) — 404 để ẩn tài khoản.
+        if (!await AdminAccounts.IsActiveAndInteractableAsync(_db, currentUserId, targetUserId, cancellationToken))
         {
             return OperationResult<bool>.Failure(ErrorCodes.NotFound);
         }

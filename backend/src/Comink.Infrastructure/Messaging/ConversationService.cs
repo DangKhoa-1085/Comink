@@ -4,6 +4,7 @@ using Comink.Application.Messaging.Abstractions;
 using Comink.Application.Messaging.Dtos;
 using Comink.Domain.Enums;
 using Comink.Domain.Messaging;
+using Comink.Infrastructure.Identity;
 using Comink.Infrastructure.Persistence;
 using Comink.Infrastructure.Persistence.Entities;
 using Comink.Infrastructure.Social;
@@ -35,7 +36,8 @@ public class ConversationService : IConversationService
             return OperationResult<ConversationOpenResult>.Failure(ErrorCodes.MessagingCannotMessageSelf);
         }
 
-        if (!await SocialLookup.IsActiveUserAsync(_db, targetUserId, cancellationToken))
+        // Không mở được hội thoại với tài khoản Admin (trừ khi người gửi là Admin) — 404 để ẩn.
+        if (!await AdminAccounts.IsActiveAndInteractableAsync(_db, currentUserId, targetUserId, cancellationToken))
         {
             return OperationResult<ConversationOpenResult>.Failure(ErrorCodes.NotFound);
         }
@@ -146,7 +148,8 @@ public class ConversationService : IConversationService
         // Chỉ mời được bạn bè còn hoạt động (cùng quy tắc D1 với chat 1–1).
         foreach (var inviteeId in inviteeIds)
         {
-            if (!await SocialLookup.IsActiveUserAsync(_db, inviteeId, cancellationToken))
+            // Không mời được tài khoản Admin vào nhóm (trừ khi người tạo là Admin).
+            if (!await AdminAccounts.IsActiveAndInteractableAsync(_db, currentUserId, inviteeId, cancellationToken))
             {
                 return OperationResult<ConversationDto>.Failure(ErrorCodes.NotFound);
             }

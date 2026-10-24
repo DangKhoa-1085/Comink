@@ -4,6 +4,7 @@ using Comink.Application.Social.Abstractions;
 using Comink.Application.Social.Dtos;
 using Comink.Domain.Enums;
 using Comink.Domain.Social;
+using Comink.Infrastructure.Identity;
 using Comink.Infrastructure.Persistence;
 using Comink.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -279,6 +280,12 @@ public class PostService : IPostService
         CancellationToken cancellationToken = default)
     {
         if (!await SocialLookup.IsActiveUserAsync(_db, targetUserId, cancellationToken))
+        {
+            return OperationResult<PagedList<PostDto>>.Failure(ErrorCodes.NotFound);
+        }
+
+        // Trang cá nhân của tài khoản Admin cũng ẩn với người dùng thường (đồng bộ với hồ sơ).
+        if (!await AdminAccounts.IsVisibleToAsync(_db, currentUserId, targetUserId, cancellationToken))
         {
             return OperationResult<PagedList<PostDto>>.Failure(ErrorCodes.NotFound);
         }
