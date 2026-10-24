@@ -332,6 +332,16 @@ Thứ tự kết quả tìm kiếm: `created_at DESC, id DESC` (để phân tran
 `friendship` ∈ `None` · `OutgoingPending` · `IncomingPending` · `Friends`.
 `GET /api/users/{id}` trả thêm `coverUrl`, `location`, `followerCount`, `followingCount`, `friendCount`, `createdAt`. Người không tồn tại hoặc bị khóa → `NOT_FOUND`.
 
+> **Tài khoản Admin là tài khoản ẩn (bổ sung GĐ 5, chốt 2026-10-24):**
+> - Không xuất hiện trong `GET /api/users?search=` với **bất kỳ ai**, kể cả Admin khác.
+> - `GET /api/users/{id}` và `GET /api/users/{id}/posts` trả `404 NOT_FOUND` cho người dùng
+>   thường; chỉ **chính tài khoản đó** hoặc **một Admin khác** xem được.
+> - Người dùng thường gửi lời mời kết bạn/theo dõi/mở chat 1–1/mời vào nhóm tới Admin →
+>   `404 NOT_FOUND` (ẩn sự tồn tại, không dùng 403).
+> - Trang quản trị `GET /api/admin/users` **không** bị ảnh hưởng — admin vẫn thấy đủ tài khoản.
+> - Phạm vi: chỉ chặn **khám phá và hành động mới**. Quan hệ cũ (nếu đã có), danh sách bạn bè/
+>   người theo dõi và nội dung đã tồn tại không bị lọc (xem giới hạn ở `docs/tasks/phase5_admin.md` mục 8).
+
 Lỗi: `VALIDATION_FAILED` (400 — từ khóa rỗng/quá dài), `NOT_FOUND` (404).
 
 ### 7.2. Bạn bè hai chiều — `/api/friendships`
@@ -356,6 +366,7 @@ Quy tắc đã cài đặt:
 4. Tự kết bạn → `400 SOCIAL_CANNOT_FRIEND_SELF`.
 5. Chấp nhận/từ chối lời mời không phải của mình → `403 SOCIAL_NOT_REQUEST_ADDRESSEE` (không tồn tại → `404 SOCIAL_FRIEND_REQUEST_NOT_FOUND`).
 6. Chấp nhận lại → `200` (idempotent); `friend_count` của cả hai tăng/giảm cùng transaction.
+7. Gửi lời mời tới tài khoản Admin khi người gửi là người dùng thường → `404 NOT_FOUND` (ẩn tài khoản); Admin gửi cho Admin vẫn hợp lệ.
 
 ### 7.3. Theo dõi một chiều — `/api/follows` và `/api/users/{id}/followers|following`
 
@@ -367,6 +378,7 @@ Quy tắc đã cài đặt:
 | `GET` | `/api/users/{id}/following` | Đang theo dõi |
 
 Tự theo dõi → `400 SOCIAL_CANNOT_FOLLOW_SELF`; người dùng không tồn tại → `404 NOT_FOUND`.
+Người dùng thường theo dõi tài khoản Admin → `404 NOT_FOUND` (ẩn tài khoản); Admin theo dõi Admin vẫn hợp lệ.
 `follower_count` (người được theo dõi) và `following_count` (người theo dõi) cập nhật cùng transaction.
 Vì bảng `follows` không có cột id riêng, con trỏ phân trang dùng `(created_at, user_id)`.
 
@@ -487,6 +499,7 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 - `201 Created` — tạo mới; `200 OK` — hội thoại đã tồn tại (idempotent theo `direct_key`).
 - Trả `ConversationDto`: `{ id, type, title?, avatarUrl?, createdAt, lastMessageAt?, members: [{ userId, displayName, userName, avatarUrl }], lastMessage?: MessageDto }`
 - Lỗi: `MESSAGING_CANNOT_MESSAGE_SELF` (400), `MESSAGING_NOT_FRIENDS` (403 — nếu D1 chọn "chỉ bạn bè"), `USER_NOT_FOUND` (404).
+- Mở chat 1–1 với tài khoản Admin khi người gửi là người dùng thường → `404 NOT_FOUND` (ẩn tài khoản); Admin với Admin vẫn hợp lệ.
 
 ### 8.2b. Tạo nhóm chat (NC GĐ 3)
 
@@ -500,6 +513,7 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 - `201 Created` kèm `ConversationDto` (người tạo là `MemberRole.Owner`, người mời là `Member`).
 - Tổng thành viên = `participantIds` (đã khử trùng) + người tạo, phải trong **3–10**.
 - Lỗi: `MESSAGING_GROUP_TOO_FEW` (400), `MESSAGING_GROUP_TOO_MANY` (400), `MESSAGING_NOT_FRIENDS` (403), `USER_NOT_FOUND` (404), `VALIDATION_FAILED` (400 — tên rỗng/quá dài).
+- Mời tài khoản Admin vào nhóm khi người tạo là người dùng thường → `404 NOT_FOUND` (ẩn tài khoản).
 - Gọi nhóm dùng chính hội thoại này: `POST /api/calls` với `conversationId` (xem 9.2) — **không** còn `participantIds` (quyết định D6).
 
 ### 8.3. Danh sách hội thoại
@@ -665,3 +679,4 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 | 2026-10-23 | **D6:** bỏ nhánh `participantIds` khỏi `POST /api/calls` — cuộc gọi luôn bắt đầu trong hội thoại (1–1 hoặc nhóm); đổ chuông quá 30s do **server** đóng (`Missed`/`NoAnswer`), nghe sau hạn → `409 CALL_ALREADY_ENDED` |
 | 2026-10-24 | Thêm **mục 4 GĐ 5:** `POST /api/admin/users/{id}/lock` + `/unlock`, trường `lockedReason`/`lockedAt`, sự kiện `AccountLocked`; mã lỗi `USER_NOT_FOUND`, `ADMIN_CANNOT_LOCK_SELF`. Đăng nhập tài khoản bị khóa nay trả đúng `403 AUTH_ACCOUNT_LOCKED` (chỉ khi đúng mật khẩu) |
 | 2026-10-24 | Migration **M5** `Admin_AddLockedByForeignKey`: FK `users.locked_by → users(id)` `ON DELETE SET NULL` + chỉ mục `ix_users_locked_by` (khớp `docs/03` mục 3.1); không đổi API |
+| 2026-10-24 | **Tài khoản Admin ẩn:** không xuất hiện trong `GET /api/users?search=` (kể cả với Admin); hồ sơ/bài viết trang cá nhân của Admin → `404` cho người dùng thường; chặn kết bạn/theo dõi/chat 1–1/mời nhóm tới Admin từ người dùng thường. Trang `/api/admin/users` giữ nguyên |

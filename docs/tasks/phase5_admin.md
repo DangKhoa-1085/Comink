@@ -3,7 +3,7 @@
 > Tài liệu 06 (tiếp), phân rã từ `docs/04_roadmap.md` (Giai đoạn 5) theo `AGENTS.md` mục 7.3.
 > **Mục tiêu:** quản trị viên đăng nhập web, xem/tìm kiếm danh sách tài khoản và **khóa/mở khóa** tài khoản; tài khoản bị khóa mất phiên ngay (REST + SignalR) và không đăng nhập lại được.
 > **Phụ thuộc:** GĐ 1 — auth, phân quyền hai role, trang `/admin/users` nền, SignalR có xác thực ✅.
-> **Trạng thái:** ✅ **CB XONG** (2026-10-24) — backend + web + test đầy đủ, đã kiểm chứng HTTP và SignalR thật.
+> **Trạng thái:** ✅ **CB XONG** (2026-10-24) — backend + web + test đầy đủ, đã kiểm chứng HTTP và SignalR thật. Bổ sung **tài khoản Admin ẩn** (mục 8).
 > **Migration tương ứng:** **M5** — `20261023234300_Admin_AddLockedByForeignKey` (FK `users.locked_by → users(id)` `ON DELETE SET NULL` + chỉ mục `ix_users_locked_by`). Các cột `account_status`, `locked_reason`, `locked_at`, `locked_by` đã có từ **M0**.
 > **Người phụ trách:** Dev A (Tài khoản/bảo mật, mạng xã hội, ảnh/tệp, quản trị) — `docs/04_roadmap.md` mục 2.
 
@@ -181,7 +181,7 @@ Dashboard, quản lý bài viết/bình luận, báo cáo vi phạm, `audit_logs
 | `dotnet build` | **0 warning, 0 error** |
 | `dotnet test` (Domain) | **68/68** — thêm `AdminUserRulesTests` (tự khóa, idempotent, chuẩn hóa lý do, giới hạn 500) |
 | `dotnet test` (Application) | **25/25** — thêm `AdminServiceTests` (khóa → thu hồi token + phát sự kiện, tự khóa, không tồn tại, idempotent, lý do quá dài, mở khóa) |
-| `dotnet test` (Tích hợp, PostgreSQL thật) | **93/93** — thêm test `SetAccountStatus`/`GetAccountStatus` ghi đúng `locked_*`; test FK chặn `locked_by` không tồn tại; cập nhật test `ValidateCredentials` (tài khoản khóa + mật khẩu đúng trả id để AuthService trả `AUTH_ACCOUNT_LOCKED`) |
+| `dotnet test` (Tích hợp, PostgreSQL thật) | **99/99** (sau bổ sung mục 8) — thêm test `SetAccountStatus`/`GetAccountStatus` ghi đúng `locked_*`; test FK chặn `locked_by` không tồn tại; 6 test “tài khoản Admin ẩn”; cập nhật test `ValidateCredentials` |
 | `npm run lint` | **0 warning, 0 error** |
 | `npm run build` | thành công (còn cảnh báo cũ: bundle > 1 MB do SDK LiveKit) |
 
@@ -228,7 +228,7 @@ Dashboard, quản lý bài viết/bình luận, báo cáo vi phạm, `audit_logs
 - `dotnet ef migrations script` xem trước: `CREATE INDEX ix_users_locked_by` + `ADD CONSTRAINT fk_users_users_locked_by … ON DELETE SET NULL`.
 - `dotnet ef database update` áp lên DB dev thành công; `pg_constraint` xác nhận FK đúng, `pg_indexes` có `ix_users_locked_by`.
 - Thử `SET NULL` trong **transaction + ROLLBACK**: tạo 1 admin + 1 người bị khóa tạm, xóa admin → `locked_by` về `null`; rollback nên **không thay đổi dữ liệu thật**.
-- `dotnet test` sau migration: **186/186** (Domain 68 · Application 25 · Tích hợp 93).
+- `dotnet test` sau migration: **186/186** (Domain 68 · Application 25 · Tích hợp 93) — trước khi bổ sung quy tắc “Admin ẩn” (mục 8).
 
 ### 7.6. Lỗi/bẫy tự phát hiện trong quá trình làm
 
@@ -261,4 +261,55 @@ Dashboard, quản lý bài viết/bình luận, báo cáo vi phạm, `audit_logs
 - Giao diện chưa có màn hình chi tiết người dùng; danh sách đã đủ cho mục tiêu CB.
 - API chưa trả `lockedBy` (chỉ có trong DB). Có FK + index sẵn nên khi cần hiển thị “khóa bởi ai” chỉ phải
   thêm một truy vấn/trường DTO, không cần đổi schema.
+
+---
+
+## 8. Bổ sung 2026-10-24 — Tài khoản Admin ẩn
+
+**Yêu cầu:** các tài khoản Admin là tài khoản ẩn; người dùng không thể tìm kiếm được.
+**Đã chốt với người dùng:** ẩn **hoàn toàn với người dùng thường** (hồ sơ 404, chặn kết bạn/theo dõi/
+nhắn tin); **danh bạ ẩn với mọi người, kể cả Admin khác** (admin quản lý ở `/admin/users`).
+
+### 8.1. Quy tắc đã cài đặt
+
+| Bề mặt | Hành vi |
+|---|---|
+| `GET /api/users?search=` | Tài khoản role `Admin` **không bao giờ** xuất hiện, với mọi người xem |
+| `GET /api/users/{id}` | 404 `NOT_FOUND` với người dùng thường; chính họ hoặc Admin khác → `200` |
+| `GET /api/users/{id}/posts` | Cùng quy tắc với hồ sơ (người thường → `404`) |
+| Gửi lời mời kết bạn / theo dõi | Người thường → Admin: `404 NOT_FOUND`; Admin → Admin: vẫn được |
+| Mở chat 1–1 / mời vào nhóm | Người thường → Admin: `404 NOT_FOUND`; Admin → Admin: vẫn được |
+| `GET /api/admin/users` | **Không đổi** — admin vẫn thấy và quản lý cả tài khoản Admin |
+| Danh sách bạn bè/người theo dõi, quan hệ cũ | **Không lọc** (phạm vi đã chốt là ẩn khám phá + hành động mới, không phải “ẩn triệt để”) |
+
+### 8.2. Công việc
+
+- [x] `Infrastructure/Identity/AdminAccounts`: truy vấn role Admin dùng chung (`Ids`, `IsAdminAsync`, `IsVisibleToAsync`, `IsActiveAndInteractableAsync`) — lọc bằng truy vấn con, không tải danh sách về bộ nhớ
+- [x] `UserDirectoryService`: loại Admin khỏi tìm kiếm; hồ sơ Admin theo quy tắc hiển thị
+- [x] `FriendshipService`, `FollowService`: chặn người thường tương tác tới Admin (404, không lộ tồn tại)
+- [x] `ConversationService`: chặn mở chat 1–1 và mời Admin vào nhóm từ người thường
+- [x] `PostService.GetUserPostsAsync`: trang cá nhân Admin ẩn với người thường
+- [x] 6 test tích hợp (`AdminVisibilityTests`) + chạy lại toàn bộ
+- [x] Cập nhật hợp đồng API mục 7.1–7.3, 8.2–8.2b + lịch sử thay đổi
+
+### 8.3. Kiểm chứng
+
+- `dotnet build` 0 warning; `dotnet test` **192/192** (Domain 68 · Application 25 · Tích hợp 99).
+- **HTTP thật 12/12** (backend `localhost:5117`, DB dev):
+  1. Người thường tìm `admin` → không có tài khoản Admin nào.
+  2. Admin tìm `admin` → **cũng không thấy** Admin khác.
+  3. Tìm `khoa` → vẫn thấy người dùng thường.
+  4. Hồ sơ admin seed: người thường `404 NOT_FOUND`; admin khác `200`; chính admin `200`.
+  5. Bài viết trang cá nhân admin với người thường `404`.
+  6. Kết bạn / theo dõi / mở chat 1–1 tới admin từ người thường: đều `404`.
+  7. `GET /api/admin/users` vẫn trả đủ tài khoản admin.
+  8. Hồ sơ người dùng thường vẫn `200`.
+- Không cần đổi web: trang tìm kiếm tự loại admin; trang hồ sơ admin hiện trạng thái “Không tìm thấy người dùng”.
+
+### 8.4. Giới hạn đã ghi nhận
+
+- Quan hệ cũ (nếu có) và danh sách bạn bè/người theo dõi **không bị lọc** — muốn “ẩn triệt để” cần thêm bước lọc danh sách và nội dung đã tồn tại (ngoài phạm vi đã chốt).
+- Admin **chủ động** gửi lời mời kết bạn tới người dùng thường vẫn được phép (phục vụ quản trị); khi đó admin sẽ xuất hiện trong danh sách lời mời của người đó. Muốn cấm cả chiều này cần chốt thêm.
+- Bài viết công khai của admin (nếu có) vẫn xem được qua `/api/posts/{id}`; trang cá nhân và danh bạ đã ẩn. Không xử lý vì admin là tài khoản hệ thống, không dùng mạng xã hội.
+- Quy tắc dựa trực tiếp trên role `Admin`; gán/bỏ role có hiệu lực ngay ở request kế tiếp (không cần đăng nhập lại).
 
