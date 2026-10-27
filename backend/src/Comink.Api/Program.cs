@@ -227,6 +227,7 @@ try
     app.MapMessagingEndpoints();
     app.MapCallEndpoints();
     app.MapLiveKitWebhookEndpoints();
+    app.MapNotificationEndpoints();
 
     // --- Hub SignalR ---
     // Group hội thoại được thêm khi kết nối (ChatHub.OnConnectedAsync); phát sự kiện qua IChatNotifier.

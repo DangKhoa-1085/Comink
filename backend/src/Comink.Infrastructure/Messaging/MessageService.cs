@@ -2,6 +2,7 @@
 using Comink.Application.Common;
 using Comink.Application.Messaging.Abstractions;
 using Comink.Application.Messaging.Dtos;
+using Comink.Application.Notifications.Abstractions;
 using Comink.Domain.Enums;
 using Comink.Domain.Messaging;
 using Comink.Infrastructure.Persistence;
@@ -15,11 +16,16 @@ public class MessageService : IMessageService
 {
     private readonly ApplicationDbContext _db;
     private readonly IChatNotifier _notifier;
+    private readonly INotificationService? _notifications;
 
-    public MessageService(ApplicationDbContext db, IChatNotifier notifier)
+    public MessageService(
+        ApplicationDbContext db,
+        IChatNotifier notifier,
+        INotificationService? notifications = null)
     {
         _db = db;
         _notifier = notifier;
+        _notifications = notifications;
     }
 
     /// <inheritdoc />
@@ -163,6 +169,36 @@ public class MessageService : IMessageService
             .ToListAsync(cancellationToken);
 
         await _notifier.MessageCreatedAsync(conversationId, memberUserIds, dto, cancellationToken);
+
+        // Push cho người nhận khi họ không mở app; không tạo dòng notifications (docs/03 mục 3.7).
+        if (_notifications is not null)
+        {
+            var recipientIds = memberUserIds.Where(id => id != currentUserId).ToList();
+            if (recipientIds.Count > 0)
+            {
+                var senderName = await _db.UserProfiles
+                    .AsNoTracking()
+                    .Where(p => p.UserId == currentUserId)
+                    .Select(p => p.DisplayName)
+                    .FirstOrDefaultAsync(cancellationToken) ?? "Comink";
+                var preview = string.IsNullOrWhiteSpace(dto.Content)
+                    ? (dto.Attachments.Count > 0 ? "Ảnh" : "Tin nhắn mới")
+                    : dto.Content!;
+                await _notifications.PushToUsersAsync(
+                    recipientIds,
+                    "Tin nhắn mới",
+                    $"{senderName}: {preview}",
+                    new Dictionary<string, string>
+                    {
+                        ["type"] = "Message",
+                        ["conversationId"] = conversationId.ToString(),
+                        ["messageId"] = message.Id.ToString(),
+                        ["senderId"] = currentUserId.ToString(),
+                    },
+                    highPriority: true,
+                    cancellationToken);
+            }
+        }
 
         return OperationResult<MessageSendResult>.Success(new MessageSendResult(dto, true));
     }

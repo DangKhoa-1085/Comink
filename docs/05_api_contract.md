@@ -667,7 +667,54 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 
 ---
 
-## 10. Lịch sử thay đổi
+## 10. Thông báo và thiết bị (GĐ 6)
+
+### 10.1. Đăng ký / hủy thiết bị nhận push
+
+`POST /api/devices` (Bearer)
+
+| Trường | Kiểu | Bắt buộc | Ghi chú |
+|---|---|---|---|
+| `pushToken` | string | ✔ | Token FCM/FID; 10–4096 ký tự |
+| `platform` | `Web` \| `Android` \| `iOS` | ✔ | |
+| `deviceName` | string | | Tối đa 100 ký tự |
+
+→ `200 { id, platform, deviceName, lastSeenAt }`. Cùng token đăng nhập lại (kể cả tài khoản khác) sẽ được gán lại cho người dùng hiện tại.
+
+`DELETE /api/devices?token=...` → `204` (đánh dấu `is_active=false`, idempotent).
+
+### 10.2. Hộp thư thông báo
+
+`GET /api/notifications?cursor=&limit=20` → `PagedList<NotificationDto>`:
+
+```json
+{
+  "id": "uuid",
+  "type": "FriendRequestReceived",
+  "actorId": "uuid|null",
+  "entityType": "Friendship",
+  "entityId": "uuid|null",
+  "data": "{\"type\":\"FriendRequest\"}",
+  "isRead": false,
+  "createdAt": "2026-10-27T...Z",
+  "readAt": null
+}
+```
+
+`POST /api/notifications/{id}/read` → `204` (idempotent; chỉ chủ sở hữu).
+
+### 10.3. Push FCM
+
+- Backend gửi FCM HTTP v1 qua service account (`Firebase:ServiceAccountJson` hoặc `Firebase:ServiceAccountPath`); **thiếu cấu hình thì bỏ qua push, không lỗi**.
+- Push được gửi khi:
+  - có tin nhắn mới (không tạo dòng `notifications`, data `type=Message`, `conversationId`, `messageId`);
+  - lời mời kết bạn / chấp nhận (`FriendRequestReceived`/`FriendRequestAccepted`, có dòng `notifications`, data `type=FriendRequest`/`FriendAccepted`);
+  - cuộc gọi đến (`type=CallIncoming`, `callId`, `conversationId`, `callType`; ưu tiên cao).
+- App Flutter đăng ký token khi đăng nhập, xin quyền thông báo, bấm notification để mở chat/cuộc gọi. FCM là kênh **bổ sung** cho SignalR; quyền mic/camera vẫn xin khi vào cuộc gọi.
+
+---
+
+## 11. Lịch sử thay đổi
 
 | Ngày | Thay đổi |
 |---|---|
@@ -686,3 +733,4 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 | 2026-10-24 | Migration **M5** `Admin_AddLockedByForeignKey`: FK `users.locked_by → users(id)` `ON DELETE SET NULL` + chỉ mục `ix_users_locked_by` (khớp `docs/03` mục 3.1); không đổi API |
 | 2026-10-24 | **Tài khoản Admin ẩn:** không xuất hiện trong `GET /api/users?search=` (kể cả với Admin); hồ sơ/bài viết trang cá nhân của Admin → `404` cho người dùng thường; chặn kết bạn/theo dõi/chat 1–1/mời nhóm tới Admin từ người dùng thường. Trang `/api/admin/users` giữ nguyên |
 | 2026-10-27 | **Mốc A:** thêm security scheme **Bearer JWT** vào OpenAPI (chỉ endpoint cần đăng nhập), chốt bản máy đọc `docs/openapi/comink.v1.json` (45 path); không đổi endpoint/DTO |
+| 2026-10-27 | **GĐ 6:** thêm mục 10 — `POST/DELETE /api/devices`, `GET /api/notifications`, `POST /api/notifications/{id}/read`; push FCM cho tin nhắn/lời mời/cuộc gọi; migration `20261027_Notifications_InitialCreate` |

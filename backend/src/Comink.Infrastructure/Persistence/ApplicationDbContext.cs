@@ -46,6 +46,10 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<Call> Calls => Set<Call>();
     public DbSet<CallParticipant> CallParticipants => Set<CallParticipant>();
 
+    // --- Thông báo / push (Giai đoạn 6) ---
+    public DbSet<UserDevice> UserDevices => Set<UserDevice>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);

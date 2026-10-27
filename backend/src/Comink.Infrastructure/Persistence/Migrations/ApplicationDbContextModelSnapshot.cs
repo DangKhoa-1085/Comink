@@ -852,6 +852,72 @@ namespace Comink.Infrastructure.Persistence.Migrations
                     b.ToTable("message_attachments", (string)null);
                 });
 
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Data")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("data");
+
+                    b.Property<Guid?>("EntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("entity_type");
+
+                    b.Property<bool>("IsRead")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_read");
+
+                    b.Property<DateTimeOffset?>("ReadAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("read_at");
+
+                    b.Property<Guid>("RecipientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recipient_id");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_notifications");
+
+                    b.HasIndex("ActorId")
+                        .HasDatabaseName("ix_notifications_actor_id");
+
+                    b.HasIndex("RecipientId", "CreatedAt")
+                        .HasDatabaseName("ix_notifications_recipient_id_created_at");
+
+                    b.HasIndex("RecipientId", "IsRead")
+                        .HasDatabaseName("ix_notifications_recipient_id_is_read");
+
+                    b.ToTable("notifications", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_notifications_type", "type IN ('FriendRequestReceived', 'FriendRequestAccepted', 'NewFollower', 'PostLiked', 'PostCommented', 'CommentReplied', 'PostShared', 'Mentioned', 'MissedCall', 'AddedToGroup', 'AdminAction')");
+                        });
+                });
+
             modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Post", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1056,6 +1122,60 @@ namespace Comink.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_refresh_tokens_user_id");
 
                     b.ToTable("refresh_tokens", (string)null);
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.UserDevice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DeviceName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("device_name");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<DateTimeOffset>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("platform");
+
+                    b.Property<string>("PushToken")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("push_token");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_user_devices");
+
+                    b.HasIndex("PushToken")
+                        .IsUnique()
+                        .HasDatabaseName("ix_user_devices_push_token");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_user_devices_user_id");
+
+                    b.ToTable("user_devices", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_user_devices_platform", "platform IN ('Web', 'Android', 'iOS')");
+                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", b =>
@@ -1469,6 +1589,26 @@ namespace Comink.Infrastructure.Persistence.Migrations
                     b.Navigation("Message");
                 });
 
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Notification", b =>
+                {
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "Actor")
+                        .WithMany()
+                        .HasForeignKey("ActorId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_notifications_users_actor_id");
+
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "Recipient")
+                        .WithMany()
+                        .HasForeignKey("RecipientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_notifications_users_recipient_id");
+
+                    b.Navigation("Actor");
+
+                    b.Navigation("Recipient");
+                });
+
             modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Post", b =>
                 {
                     b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "Author")
@@ -1539,6 +1679,18 @@ namespace Comink.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_refresh_tokens_users_user_id");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.UserDevice", b =>
+                {
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_devices_users_user_id");
 
                     b.Navigation("User");
                 });

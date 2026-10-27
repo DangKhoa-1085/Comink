@@ -1,5 +1,6 @@
 // Nghiệp vụ kết bạn hai chiều (docs/tasks/phase2_social.md mục 3.2).
 using Comink.Application.Common;
+using Comink.Application.Notifications.Abstractions;
 using Comink.Application.Social.Abstractions;
 using Comink.Application.Social.Dtos;
 using Comink.Domain.Enums;
@@ -19,10 +20,12 @@ public class FriendshipService : IFriendshipService
     private const string ModeOutgoing = "outgoing";
 
     private readonly ApplicationDbContext _db;
+    private readonly INotificationService? _notifications;
 
-    public FriendshipService(ApplicationDbContext db)
+    public FriendshipService(ApplicationDbContext db, INotificationService? notifications = null)
     {
         _db = db;
+        _notifications = notifications;
     }
 
     /// <inheritdoc />
@@ -64,6 +67,7 @@ public class FriendshipService : IFriendshipService
             existing.RespondedAt = DateTimeOffset.UtcNow;
             await AdjustFriendCountsAsync(existing.RequesterId, existing.AddresseeId, +1, cancellationToken);
             await _db.SaveChangesAsync(cancellationToken);
+            await NotifyFriendAcceptedAsync(currentUserId, existing.RequesterId, existing.Id, cancellationToken);
 
             return OperationResult<FriendshipDto>.Success(
                 await ToDtoAsync(existing, currentUserId, cancellationToken));
@@ -97,6 +101,8 @@ public class FriendshipService : IFriendshipService
                 ? OperationResult<FriendshipDto>.Failure(ErrorCodes.SocialAlreadyFriends)
                 : OperationResult<FriendshipDto>.Success(await ToDtoAsync(raced, currentUserId, cancellationToken));
         }
+
+        await NotifyFriendRequestAsync(currentUserId, addresseeId, friendship.Id, cancellationToken);
 
         return OperationResult<FriendshipDto>.Success(
             await ToDtoAsync(friendship, currentUserId, cancellationToken));
@@ -137,6 +143,7 @@ public class FriendshipService : IFriendshipService
         friendship.RespondedAt = DateTimeOffset.UtcNow;
         await AdjustFriendCountsAsync(friendship.RequesterId, friendship.AddresseeId, +1, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
+        await NotifyFriendAcceptedAsync(currentUserId, friendship.RequesterId, friendship.Id, cancellationToken);
 
         return OperationResult<FriendshipDto>.Success(
             await ToDtoAsync(friendship, currentUserId, cancellationToken));
@@ -320,6 +327,86 @@ public class FriendshipService : IFriendshipService
             profile.FriendCount = delta > 0
                 ? FriendshipRules.Increment(profile.FriendCount)
                 : FriendshipRules.Decrement(profile.FriendCount);
+        }
+    }
+
+    private async Task NotifyFriendRequestAsync(
+        Guid actorId,
+        Guid recipientId,
+        Guid friendshipId,
+        CancellationToken cancellationToken)
+    {
+        if (_notifications is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var actorName = await _db.UserProfiles
+                .AsNoTracking()
+                .Where(p => p.UserId == actorId)
+                .Select(p => p.DisplayName)
+                .FirstOrDefaultAsync(cancellationToken) ?? "Ai đó";
+            await _notifications.CreateAndPushAsync(
+                recipientId,
+                actorId,
+                NotificationType.FriendRequestReceived,
+                "Friendship",
+                friendshipId,
+                "Lời mời kết bạn",
+                $"{actorName} đã gửi lời mời kết bạn",
+                new Dictionary<string, string>
+                {
+                    ["type"] = "FriendRequest",
+                    ["friendshipId"] = friendshipId.ToString(),
+                    ["actorId"] = actorId.ToString(),
+                },
+                cancellationToken);
+        }
+        catch
+        {
+            // Push/thông báo không được làm hỏng thao tác kết bạn.
+        }
+    }
+
+    private async Task NotifyFriendAcceptedAsync(
+        Guid actorId,
+        Guid recipientId,
+        Guid friendshipId,
+        CancellationToken cancellationToken)
+    {
+        if (_notifications is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var actorName = await _db.UserProfiles
+                .AsNoTracking()
+                .Where(p => p.UserId == actorId)
+                .Select(p => p.DisplayName)
+                .FirstOrDefaultAsync(cancellationToken) ?? "Ai đó";
+            await _notifications.CreateAndPushAsync(
+                recipientId,
+                actorId,
+                NotificationType.FriendRequestAccepted,
+                "Friendship",
+                friendshipId,
+                "Đã chấp nhận lời mời kết bạn",
+                $"{actorName} đã chấp nhận lời mời kết bạn",
+                new Dictionary<string, string>
+                {
+                    ["type"] = "FriendAccepted",
+                    ["friendshipId"] = friendshipId.ToString(),
+                    ["actorId"] = actorId.ToString(),
+                },
+                cancellationToken);
+        }
+        catch
+        {
+            // Push/thông báo không được làm hỏng thao tác kết bạn.
         }
     }
 

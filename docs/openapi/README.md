@@ -9,7 +9,7 @@ và làm mốc so sánh khi backend thay đổi. File được sinh tự động
 |---|---|
 | Nguồn | `Comink.Api` (Minimal API) |
 | Định dạng | OpenAPI 3.1 (JSON) |
-| Số endpoint hiện tại | **45** |
+| Số endpoint hiện tại | **48** |
 | Xác thực | `securitySchemes.Bearer`: HTTP bearer, JWT |
 | Endpoint công khai | `/api/auth/login`, `/api/auth/register`, `/api/auth/refresh`, `/health`, webhook LiveKit (không có trong danh sách client) |
 | Endpoint cần token | Có `security: [{ "Bearer": [] }]` trong operation tương ứng |

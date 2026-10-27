@@ -8,11 +8,13 @@ using Comink.Application.Identity;
 using Comink.Application.Identity.Abstractions;
 using Comink.Application.Messaging.Abstractions;
 using Comink.Application.Calls.Abstractions;
+using Comink.Application.Notifications.Abstractions;
 using Comink.Application.Social;
 using Comink.Application.Social.Abstractions;
 using Comink.Domain.Admin;
 using Comink.Infrastructure.Identity;
 using Comink.Infrastructure.Media;
+using Comink.Infrastructure.Notifications;
 using Comink.Infrastructure.Persistence;
 using Comink.Infrastructure.Social;
 using Microsoft.Extensions.Options;
@@ -196,6 +198,11 @@ public static class DependencyInjection
         services.Configure<Calls.LiveKitOptions>(configuration.GetSection(Calls.LiveKitOptions.SectionName));
         services.AddSingleton<ICallProvider, Calls.LiveKitCallProvider>();
         services.AddScoped<ICallService, Calls.CallService>();
+
+        // --- Thông báo / push FCM (Giai đoạn 6) ---
+        services.Configure<FirebasePushOptions>(configuration.GetSection(FirebasePushOptions.SectionName));
+        services.AddSingleton<IPushSender, FcmPushSender>();
+        services.AddScoped<INotificationService, NotificationService>();
 
         // --- Lưu trữ media: Cloudinary khi có khoá, ngược lại lưu đĩa cục bộ (dev) ---
         services.Configure<MediaStorageOptions>(configuration.GetSection(MediaStorageOptions.SectionName));

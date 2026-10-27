@@ -3,6 +3,7 @@ using Comink.Application.Calls.Abstractions;
 using Comink.Application.Calls.Dtos;
 using Comink.Application.Common;
 using Comink.Application.Common.Interfaces;
+using Comink.Application.Notifications.Abstractions;
 using Comink.Domain.Calls;
 using Comink.Domain.Enums;
 using Comink.Infrastructure.Persistence;
@@ -25,19 +26,22 @@ public class CallService : ICallService
     private readonly ICallNotifier _notifier;
     private readonly LiveKitOptions _liveKit;
     private readonly ILogger<CallService> _logger;
+    private readonly INotificationService? _notifications;
 
     public CallService(
         ApplicationDbContext db,
         ICallProvider provider,
         ICallNotifier notifier,
         IOptions<LiveKitOptions> liveKit,
-        ILogger<CallService> logger)
+        ILogger<CallService> logger,
+        INotificationService? notifications = null)
     {
         _db = db;
         _provider = provider;
         _notifier = notifier;
         _liveKit = liveKit.Value;
         _logger = logger;
+        _notifications = notifications;
     }
 
     /// <inheritdoc />
@@ -122,6 +126,36 @@ public class CallService : ICallService
         var dto = await ToDtoAsync(call.Id, cancellationToken);
         var inviteeIds = memberIds.Where(id => id != currentUserId).ToList();
         await _notifier.CallIncomingAsync(inviteeIds, dto, cancellationToken);
+
+        // Push cho người được gọi khi app đóng/không mở SignalR.
+        if (_notifications is not null && inviteeIds.Count > 0)
+        {
+            try
+            {
+                var initiatorName = await _db.UserProfiles
+                    .AsNoTracking()
+                    .Where(p => p.UserId == currentUserId)
+                    .Select(p => p.DisplayName)
+                    .FirstOrDefaultAsync(cancellationToken) ?? "Ai đó";
+                await _notifications.PushToUsersAsync(
+                    inviteeIds,
+                    "Cuộc gọi đến",
+                    $"{initiatorName} đang gọi {(callType == CallType.Video ? "video" : "thoại")}",
+                    new Dictionary<string, string>
+                    {
+                        ["type"] = "CallIncoming",
+                        ["callId"] = call.Id.ToString(),
+                        ["conversationId"] = conversationId.ToString(),
+                        ["callType"] = callType.ToString(),
+                    },
+                    highPriority: true,
+                    cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(exception, "Không gửi được push cuộc gọi {CallId}", call.Id);
+            }
+        }
 
         return OperationResult<CallDto>.Success(dto);
     }

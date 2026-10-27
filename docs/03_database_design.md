@@ -398,6 +398,8 @@ Dữ liệu khởi tạo (seed): hai role `User`, `Admin`; tài khoản admin đ
 | `is_active` | bool | NN. Đặt `false` khi FCM báo token hết hạn |
 | `created_at`, `last_seen_at` | timestamptz | |
 
+> Migration GĐ 6: `20261027_Notifications_InitialCreate` (bảng `user_devices`, `notifications`).
+
 ### 3.2. Module Mạng xã hội
 
 #### `friendships` (bạn bè hai chiều)
