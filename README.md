@@ -260,8 +260,10 @@ Tài khoản demo: `an.demo` / `binh.demo` / `chi.demo` (mật khẩu do bạn �
 Hiện đã có: đăng nhập/đăng ký + secure storage + tự refresh token, hồ sơ (xem/sửa/đổi ngôn ngữ),
 bảng tin (văn bản/ảnh, thích, bình luận + trả lời, chia sẻ), bạn bè/tìm kiếm/kết bạn/theo dõi,
 hồ sơ công khai, chat 1–1 + nhóm (lịch sử, gửi văn bản/ảnh, SignalR real-time, tạo nhóm),
-gọi audio/video 1–1 và nhóm bằng LiveKit (quyền mic/camera, tắt/bật, kết thúc, thời lượng), i18n vi/en.
-Còn lại: push FCM, quyền thông báo/deep link và kiểm chứng trên thiết bị Android thật.
+gọi audio/video 1–1 và nhóm bằng LiveKit (quyền mic/camera, tắt/bật, kết thúc, thời lượng),
+đăng ký thiết bị + push FCM (tin nhắn/lời mời/cuộc gọi; bỏ qua an toàn nếu chưa cấu hình Firebase), i18n vi/en.
+Còn lại: kiểm chứng push thật, video/gọi nhóm trên thiết bị thật, phân trang cuộn và kiểm chứng
+trên thiết bị Android thật.
 
 Khi định gọi trên **máy thật/emulator**, đặt thêm biến môi trường cho backend trước khi chạy
 (vì `localhost` trên điện thoại trỏ về chính điện thoại):
@@ -274,6 +276,23 @@ $env:LiveKit__PublicUrl="ws://192.168.1.43:7880"
 ```
 
 Sau đó chạy app với `API_BASE_URL` tương ứng. Xem `docs/tasks/phase6_mobile_cb.md`.
+
+**Push FCM (tuỳ chọn, GĐ 6):** backend cần service account Firebase (không commit):
+
+```bash
+$env:Firebase__ServiceAccountPath="D:\secrets\comink-firebase.json"
+```
+
+và app nhận cấu hình công khai qua `--dart-define` (các giá trị này không phải secret):
+
+```bash
+flutter run --dart-define=FIREBASE_PROJECT_ID=... \
+  --dart-define=FIREBASE_APP_ID=... \
+  --dart-define=FIREBASE_API_KEY=... \
+  --dart-define=FIREBASE_MESSAGING_SENDER_ID=...
+```
+
+Nếu thiếu cấu hình, app vẫn chạy bình thường; backend bỏ qua push và ghi log.
 
 > Trên máy này Flutter SDK nằm ở `C:\src\flutter` nhưng chưa có trong PATH — thêm
 > `C:\src\flutter\bin` vào PATH (hoặc dùng `C:\src\flutter\bin\flutter.bat`). GĐ 6 còn cần

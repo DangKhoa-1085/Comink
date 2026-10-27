@@ -87,9 +87,9 @@
 
 ### 3.6. Push, i18n, thiết bị
 
-- [ ] Backend M4: `user_devices`, `notifications`; `IPushSender` FCM *(chưa làm — cần Firebase)*
-- [ ] Đăng ký FCM token, nhận push tin/lời mời/cuộc gọi
-- [ ] Xin quyền thông báo; deep link vào chat/cuộc gọi *(mới khai báo `POST_NOTIFICATIONS`)*
+- [x] Backend M4: `user_devices`, `notifications`; `IPushSender` FCM (HTTP v1, fallback bỏ qua nếu thiếu service account)
+- [x] Đăng ký FCM token, nhận push tin/lời mời/cuộc gọi (code; **chưa kiểm chứng do thiếu credentials Firebase**)
+- [x] Xin quyền thông báo; deep link vào chat/cuộc gọi
 - [x] i18n toàn bộ chuỗi hiển thị (vi/en)
 - [ ] Chạy trên thiết bị Android thật (và iOS nếu có)
 
@@ -127,6 +127,9 @@
 | `flutter test` | **5/5** (i18n vi/en, parse AuthResponse/AuthUser, app khởi động → login + validate form) |
 | `flutter pub get` | OK; thêm `shared_preferences 2.5.6`, `image_picker 1.2.4`, `permission_handler` (BSD-3/MIT) |
 | Backend `CallServiceTests` | **14/14**, gồm test `PublicUrl` (D7) |
+| Backend `NotificationServiceTests` | **4/4** (đăng ký thiết bị, hộp thư, mark read, push) |
+| Backend toàn bộ | **198/198** (Domain 68, Application 25, Integration 105) |
+| OpenAPI | tái sinh **48 path**, có `/api/devices`, `/api/notifications` |
 
 ### 5.2. Tích hợp thật trên Chrome (Flutter web) + backend `localhost:5117` — đạt
 
@@ -144,6 +147,7 @@ Chạy: `flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=ht
 - **Tạo nhóm:** từ tab Tin nhắn, chọn Chi + Bình, đặt tên “Nhóm kiểm thử” → tạo nhóm 3 người và mở khung chat ngay.
 - **Gọi audio (LiveKit thật):** Bình gọi An qua API → app An hiện “Cuộc gọi thoại đến”; bấm Nghe → kết nối room, hiện avatar + mic/kết thúc; kết thúc → DB `Completed`, thời lượng 16s. Gọi từ app (nút điện thoại trong chat) cũng tạo room và kết nối được.
 - **Ảnh bài viết:** upload ảnh PNG 96×96 lên Cloudinary qua chữ ký backend, đăng ký media, tạo bài “Bài có ảnh từ API” → bảng tin hiển thị đúng ảnh (`image` trong accessibility tree).
+- **FCM:** đã đăng ký endpoint thiết bị/hộp thư và nối push vào message/friend/call; **chưa gửi push thật** vì môi trường không có service account Firebase.
 - Giao diện Material 3, dark mode theo hệ thống; toàn bộ chuỗi qua i18n.
 
 ### 5.3. Chưa kiểm chứng / còn thiếu
@@ -152,8 +156,8 @@ Chạy: `flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=ht
 - **Chọn ảnh từ UI Flutter** chưa tự động hoá được trên web (file picker của trình duyệt); luồng upload Cloudinary đã kiểm chứng bằng script HTTP, code `image_picker`/`MediaService` mới chỉ `analyze`. Gửi ảnh trong chat cũng chưa thử upload từ UI.
 - **Video call** chưa kiểm chứng (Chrome test không có camera); **gọi nhóm** mới kiểm chứng tạo nhóm chat, chưa gọi nhóm thật.
 - Phân trang cuộn bảng tin/lịch sử chat, đồng bộ tin bị lỡ sau reconnect.
-- Push FCM, quyền thông báo/deep link (cần M4 + Firebase).
-- **Thiết bị Android thật**: chưa có Android SDK/`adb`/thiết bị; chỉ chạy Flutter web.
+- **Push FCM chưa kiểm chứng thật**: thiếu service account Firebase/`google-services.json`; code backend + app đã sẵn sàng, thiếu cấu hình thì bỏ qua an toàn.
+- **Thiết bị Android thật**: `flutter doctor` xác nhận chưa có Android SDK/`adb`; chỉ chạy Flutter web.
 - Widget test cho feed/lỗi bằng fake API.
 
 ---
