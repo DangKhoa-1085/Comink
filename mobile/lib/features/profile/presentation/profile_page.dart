@@ -9,6 +9,7 @@ import '../../../core/theme/theme_controller.dart';
 import '../../../core/widgets/app_avatar.dart';
 import '../../../core/widgets/states.dart';
 import '../../auth/data/session_controller.dart';
+import '../../notifications/data/push_service.dart';
 import '../data/profile_providers.dart';
 import '../domain/my_profile.dart';
 
@@ -217,6 +218,7 @@ class _ProfileContent extends ConsumerWidget {
     );
 
     if (confirmed == true) {
+      await ref.read(pushServiceProvider).unregister();
       await ref.read(sessionControllerProvider.notifier).logout();
     }
   }

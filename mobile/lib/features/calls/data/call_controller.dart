@@ -70,6 +70,30 @@ class CallController extends Notifier<CallState> {
   }
 
   /// Chấp nhận cuộc gọi đang đổ chuông.
+  /// Mở cuộc gọi từ push/notification (app vừa được mở).
+  Future<void> openFromPush(String callId) async {
+    if (!state.isIdle) {
+      return;
+    }
+    try {
+      final data = await ref.read(apiClientProvider).get('/api/calls/$callId');
+      if (data is! Map) {
+        return;
+      }
+      final call = CallInfo.fromJson(data.cast<String, dynamic>());
+      if (call.id.isEmpty || call.isTerminal) {
+        return;
+      }
+      state = CallState(
+        phase: CallPhase.incoming,
+        call: call,
+        cameraEnabled: call.isVideo,
+      );
+    } on ApiException {
+      // Cuộc gọi đã kết thúc/không còn hiệu lực.
+    }
+  }
+
   Future<void> accept() async {
     final call = state.call;
     if (call == null || state.phase != CallPhase.incoming || _busy) {

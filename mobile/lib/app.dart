@@ -8,10 +8,12 @@ import 'core/i18n/app_localizations.dart';
 import 'core/i18n/locale_controller.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
+import 'core/ui/app_keys.dart';
 import 'features/auth/data/session_controller.dart';
 import 'features/calls/data/call_controller.dart';
 import 'features/calls/presentation/call_overlay.dart';
 import 'features/chats/data/chat_realtime.dart';
+import 'features/notifications/data/push_service.dart';
 import 'router/app_router.dart';
 
 /// Gốc ứng dụng: router, theme, i18n.
@@ -29,8 +31,10 @@ class CominkApp extends ConsumerWidget {
       final realtime = ref.read(chatRealtimeProvider);
       if (next.isAuthenticated) {
         unawaited(realtime.connect());
+        unawaited(ref.read(pushServiceProvider).start());
       } else {
         ref.read(callControllerProvider.notifier).clear();
+        unawaited(ref.read(pushServiceProvider).stop());
         unawaited(realtime.disconnect());
       }
     });
@@ -38,6 +42,7 @@ class CominkApp extends ConsumerWidget {
     return MaterialApp.router(
       title: AppConfig.appName,
       debugShowCheckedModeBanner: false,
+      scaffoldMessengerKey: scaffoldMessengerKey,
       theme: buildAppTheme(Brightness.light),
       darkTheme: buildAppTheme(Brightness.dark),
       themeMode: themeMode,
