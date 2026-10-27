@@ -179,6 +179,16 @@ Mỗi giai đoạn gồm: **mục tiêu**, **phụ thuộc** và **checklist ho�
 - [ ] Danh sách lỗi đã biết được ghi lại và phân loại (chặn demo hay không)
 - [ ] Hợp đồng API (OpenAPI) đủ ổn định để bắt đầu làm app
 
+> **Trạng thái Mốc A (cập nhật 2026-10-27):** đã hoàn tất phần **có thể tự động hoá**; còn 2 việc cần người dùng chốt:
+> - ✅ **Seed demo** (`DemoDataSeeder`): 3 tài khoản `an.demo`/`binh.demo`/`chi.demo`, 2 bạn bè + 1 lời mời, 3 theo dõi, 5 bài (có `Public`/`Friends`/`OnlyMe` + chia sẻ), 3 bình luận, 4 thích, 2 chat 1–1 + 1 nhóm, 8 tin nhắn. Idempotent, transaction, chỉ Development, mật khẩu lấy từ `DemoSeed:Password`.
+> - ✅ **OpenAPI**: thêm security scheme **Bearer JWT** (chỉ gắn cho endpoint cần đăng nhập), giữ **45 path**; bản chụp tại `docs/openapi/comink.v1.json`, cách tái sinh ở `docs/openapi/README.md`.
+> - ✅ **Danh sách lỗi**: `docs/06_known_issues.md` (13 mục, có mức độ + cách xử lý tạm).
+> - ✅ **Docker + demo**: `docker compose … up -d` 4/4 service healthy; backend + web chạy theo README; kiểm chứng HTTP **12/12** với 3 tài khoản demo (feed, đếm like/comment/share, hồ sơ, bạn bè, lời mời, 2 hội thoại, lịch sử tin, visibility, admin khóa/mở khóa, tìm kiếm).
+> - ✅ Test: **193/193** (Domain 68 · Application 25 · Tích hợp 100) — thêm test seed demo; `dotnet build` 0 warning; web `npm run lint`/`build` sạch.
+> - ⏳ **TURN**: vẫn là mục duy nhất của GĐ 4 chưa chứng minh — cần test `…/calls/<id>?relay=1` giữa **hai mạng** (theo dõi ở KI-01).
+> - ⏳ **Người dùng cần tick** checklist GĐ 1–5 và mục TURN sau khi kiểm tra; Mốc A chỉ đạt khi các mục đã tick.
+> - Gọi thoại/video 1–1 và gọi nhóm đã được kiểm chứng thật ở GĐ 4 (2 máy, 3 người); kịch bản demo Mốc A dùng lại kết quả đó, không thay đổi code gọi trong đợt này.
+
 ### Giai đoạn 6: App Flutter CB
 
 **Mục tiêu:** đưa toàn bộ mức cơ bản sang app, dùng chung backend.

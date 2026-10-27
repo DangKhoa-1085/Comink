@@ -18,6 +18,10 @@
 | Lỗi | RFC 7807 ProblemDetails, có thêm trường `code` (mã lỗi) và `traceId` |
 | Ngôn ngữ | Backend **không** trả câu chữ hiển thị; client dịch từ `code` (`AGENTS.md` mục 3) |
 
+> **Bản máy đọc (Mốc A):** `docs/openapi/comink.v1.json` — OpenAPI 3.1, **45 path**, có security scheme
+> `Bearer` (JWT); endpoint công khai không gắn security. Cách tái sinh: `docs/openapi/README.md`.
+> Khi đổi endpoint/DTO, cập nhật tài liệu này trước rồi mới tái sinh file OpenAPI.
+
 ### 1.1. Định dạng lỗi
 
 ```json
@@ -680,3 +684,4 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 | 2026-10-24 | Thêm **mục 4 GĐ 5:** `POST /api/admin/users/{id}/lock` + `/unlock`, trường `lockedReason`/`lockedAt`, sự kiện `AccountLocked`; mã lỗi `USER_NOT_FOUND`, `ADMIN_CANNOT_LOCK_SELF`. Đăng nhập tài khoản bị khóa nay trả đúng `403 AUTH_ACCOUNT_LOCKED` (chỉ khi đúng mật khẩu) |
 | 2026-10-24 | Migration **M5** `Admin_AddLockedByForeignKey`: FK `users.locked_by → users(id)` `ON DELETE SET NULL` + chỉ mục `ix_users_locked_by` (khớp `docs/03` mục 3.1); không đổi API |
 | 2026-10-24 | **Tài khoản Admin ẩn:** không xuất hiện trong `GET /api/users?search=` (kể cả với Admin); hồ sơ/bài viết trang cá nhân của Admin → `404` cho người dùng thường; chặn kết bạn/theo dõi/chat 1–1/mời nhóm tới Admin từ người dùng thường. Trang `/api/admin/users` giữ nguyên |
+| 2026-10-27 | **Mốc A:** thêm security scheme **Bearer JWT** vào OpenAPI (chỉ endpoint cần đăng nhập), chốt bản máy đọc `docs/openapi/comink.v1.json` (45 path); không đổi endpoint/DTO |

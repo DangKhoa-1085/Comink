@@ -92,6 +92,42 @@ cd backend/src/Comink.Api
 dotnet ef database update --project ../Comink.Infrastructure
 ```
 
+> Khi chạy backend ở `Development`, ứng dụng cũng tự áp migration còn thiếu và seed role/tài khoản admin.
+
+### 4b. (Tuỳ chọn) Bật dữ liệu mẫu cho demo — Mốc A
+
+Seeder **chỉ chạy ở `Development`**, mặc định tắt và **idempotent** (đã có tài khoản demo thì bỏ qua).
+Nó tạo sẵn mạng xã hội mẫu để demo nhanh: bạn bè, theo dõi, bài viết (có `Public`/`Friends`/`OnlyMe`,
+bài chia sẻ), bình luận/thích, 2 chat 1–1 + 1 nhóm 3 người và tin nhắn.
+
+Bật bằng **một trong hai cách** (mật khẩu do bạn tự đặt, tối thiểu 8 ký tự có hoa/thường/số/ký tự đặc biệt):
+
+```bash
+# Cách 1: user-secrets (khuyến nghị, không vào Git)
+cd backend/src/Comink.Api
+dotnet user-secrets set "DemoSeed:Enabled" "true"
+dotnet user-secrets set "DemoSeed:Password" "<mật-khẩu-demo>"
+```
+
+```dotenv
+# Cách 2: thêm vào .env ở thư mục gốc (KHÔNG commit .env)
+DemoSeed__Enabled=true
+DemoSeed__Password=<mật-khẩu-demo>
+```
+
+Khởi động lại backend; log sẽ có dòng `Đã tạo dữ liệu demo…`. Nếu thiếu `DemoSeed:Password`, seeder chỉ
+ghi warning và bỏ qua (không làm hỏng ứng dụng).
+
+| Tài khoản | Email | Ghi chú |
+|---|---|---|
+| `an.demo` | `an.demo@comink.local` | 2 bạn bè, 2 người theo dõi, 2 bài viết (1 `OnlyMe`) |
+| `binh.demo` | `binh.demo@comink.local` | bạn của An; có 1 lời mời kết bạn đang chờ tới Chi |
+| `chi.demo` | `chi.demo@comink.local` | bạn của An; đã chia sẻ bài của An |
+| `admin` | `admin@comink.local` | role `Admin`, mật khẩu lấy từ `AdminSeed` (user-secrets) |
+
+Kịch bản demo gợi ý: đăng nhập `an.demo` → xem bảng tin/bài của bạn bè → bình luận/thích → mở chat 1–1
+và nhóm → gọi thoại/video → đăng nhập `admin` → khóa/mở khóa một tài khoản demo.
+
 ### 5. Chạy backend
 
 ```bash
@@ -100,6 +136,10 @@ dotnet run
 # OpenAPI: http://localhost:5117/openapi/v1.json
 # Health check: http://localhost:5117/health
 ```
+
+> Hợp đồng OpenAPI đã có **Bearer JWT**; bản chụp dùng cho app Flutter nằm ở
+> [`docs/openapi/comink.v1.json`](docs/openapi/comink.v1.json) — xem cách tái sinh trong
+> [`docs/openapi/README.md`](docs/openapi/README.md).
 
 ### 6. Chạy web
 
@@ -207,6 +247,10 @@ flutter pub get
 flutter run
 ```
 
+> Trên máy này Flutter SDK nằm ở `C:\src\flutter` nhưng chưa có trong PATH — thêm
+> `C:\src\flutter\bin` vào PATH (hoặc dùng `C:\src\flutter\bin\flutter.bat`). GĐ 6 còn cần
+> Android Studio/SDK, thiết bị thật và cấu hình FCM; xem `docs/06_known_issues.md` (KI-06, KI-07).
+
 ---
 
 ## Cấu trúc dự án
@@ -266,4 +310,6 @@ comink/
 - **PR:** phải được review chéo trước khi merge vào `main`
 - **Bí mật:** không bao giờ commit `.env` hoặc khóa API; chỉ commit `.env.example`
 
-Xem thêm: [`AGENTS.md`](./AGENTS.md) và [`docs/`](./docs/).
+Xem thêm: [`AGENTS.md`](./AGENTS.md), [`docs/`](./docs/), danh sách lỗi hiện tại
+[`docs/06_known_issues.md`](docs/06_known_issues.md), và phân rã Mốc A
+[`docs/tasks/milestone_a_web_cb.md`](docs/tasks/milestone_a_web_cb.md).
