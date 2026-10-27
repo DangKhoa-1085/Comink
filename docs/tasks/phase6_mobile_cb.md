@@ -3,7 +3,7 @@
 > Phân rã từ `docs/04_roadmap.md` (Giai đoạn 6) theo `AGENTS.md` mục 7.3.
 > **Mục tiêu:** đưa toàn bộ mức cơ bản của Comink sang app Flutter, dùng chung backend.
 > **Phụ thuộc:** Mốc A. *Trạng thái thực tế:* phần tự động của Mốc A đã xong (seed, OpenAPI Bearer, known issues, demo HTTP 12/12); **TURN hai mạng vẫn chờ người dùng test**. Người dùng đã chỉ định bắt đầu GĐ 6 — rủi ro còn lại được ghi ở mục 8.
-> **Trạng thái:** 🚧 **nền tảng + auth/hồ sơ/bảng tin có ảnh/bình luận/chia sẻ + bạn bè/hồ sơ công khai + chat real-time/tạo nhóm/gửi ảnh + gọi audio/video mobile** (2026-10-27). Đã chạy thử trên Chrome (Flutter web) với backend + LiveKit thật; **chưa chạy trên thiết bị Android thật** vì máy chưa có Android SDK/`adb`/thiết bị.
+> **Trạng thái:** 🚧 **nền tảng + auth/hồ sơ/bảng tin có ảnh/bình luận/chia sẻ + bạn bè/hồ sơ công khai + chat real-time/tạo nhóm/gửi ảnh + gọi audio/video mobile + FCM/hộp thư thông báo** (2026-10-27). Đã chạy thử trên Chrome (Flutter web) với backend + LiveKit thật; **chưa chạy trên thiết bị Android thật** vì máy chưa có Android SDK/`adb`/thiết bị.
 > **Người phụ trách:** Dev B chính (Flutter/push/call) + Dev A hỗ trợ backend/API; xem `docs/04_roadmap.md` mục 2.
 
 ---
@@ -129,7 +129,8 @@
 | `flutter pub get` | OK; thêm `shared_preferences 2.5.6`, `image_picker 1.2.4`, `permission_handler` (BSD-3/MIT) |
 | Backend `CallServiceTests` | **14/14**, gồm test `PublicUrl` (D7) |
 | Backend `NotificationServiceTests` | **4/4** (đăng ký thiết bị, hộp thư, mark read, push) |
-| Backend toàn bộ | **198/198** (Domain 68, Application 25, Integration 105) |
+| Backend `FcmPushSenderTests` | **3/3** (OAuth + FCM HTTP v1, nhiều token, thiếu cấu hình không gọi mạng) |
+| Backend toàn bộ | **201/201** (Domain 68, Application 25, Integration 108) |
 | OpenAPI | tái sinh **48 path**, có `/api/devices`, `/api/notifications` |
 
 ### 5.2. Tích hợp thật trên Chrome (Flutter web) + backend `localhost:5117` — đạt
@@ -148,7 +149,7 @@ Chạy: `flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=ht
 - **Tạo nhóm:** từ tab Tin nhắn, chọn Chi + Bình, đặt tên “Nhóm kiểm thử” → tạo nhóm 3 người và mở khung chat ngay.
 - **Gọi audio (LiveKit thật):** Bình gọi An qua API → app An hiện “Cuộc gọi thoại đến”; bấm Nghe → kết nối room, hiện avatar + mic/kết thúc; kết thúc → DB `Completed`, thời lượng 16s. Gọi từ app (nút điện thoại trong chat) cũng tạo room và kết nối được.
 - **Ảnh bài viết:** upload ảnh PNG 96×96 lên Cloudinary qua chữ ký backend, đăng ký media, tạo bài “Bài có ảnh từ API” → bảng tin hiển thị đúng ảnh (`image` trong accessibility tree).
-- **FCM:** đã đăng ký endpoint thiết bị/hộp thư và nối push vào message/friend/call; **chưa gửi push thật** vì môi trường không có service account Firebase.
+- **FCM:** đã đăng ký endpoint thiết bị/hộp thư và nối push vào message/friend/call; **sender đã test bằng mock OAuth/FCM**, nhưng **chưa gửi push thật** vì môi trường không có service account Firebase.
 - **Hộp thư:** sau khi tạo lời mời kết bạn từ tài khoản mới, chuông Bảng tin có badge; mở trang Thông báo thấy “Lời mời kết bạn”; bấm vào → đánh dấu đã đọc và chuyển tab Bạn bè, lời mời hiện để Chấp nhận/Từ chối.
 - Giao diện Material 3, dark mode theo hệ thống; toàn bộ chuỗi qua i18n.
 
