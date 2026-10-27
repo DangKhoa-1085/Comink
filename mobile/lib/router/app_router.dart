@@ -11,6 +11,7 @@ import '../features/chats/presentation/chats_page.dart';
 import '../features/feed/presentation/feed_page.dart';
 import '../features/friends/presentation/friends_page.dart';
 import '../features/profile/presentation/profile_page.dart';
+import '../features/profile/presentation/public_user_page.dart';
 import '../features/shell/home_shell.dart';
 import '../features/shell/splash_page.dart';
 
@@ -82,6 +83,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/chats/:id',
         builder: (context, state) => ChatPage(
           conversationId: state.pathParameters['id'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/users/:id',
+        builder: (context, state) => PublicUserPage(
+          userId: state.pathParameters['id'] ?? '',
         ),
       ),
     ],

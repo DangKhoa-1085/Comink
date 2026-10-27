@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/i18n/app_localizations.dart';
 import '../../../core/network/api_exception.dart';
@@ -386,6 +387,7 @@ class _FriendTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
+        onTap: () => context.push('/users/${friendship.user.id}'),
         leading: AppAvatar(name: friendship.user.displayName, url: friendship.user.avatarUrl),
         title: Text(friendship.user.displayName),
         subtitle: Text('@${friendship.user.userName}'),
@@ -432,44 +434,48 @@ class _SearchResultTile extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Row(
-          children: [
-            AppAvatar(name: user.displayName, url: user.avatarUrl, radius: 18),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(user.displayName, style: const TextStyle(fontWeight: FontWeight.w600)),
-                  Text(
-                    '@${user.userName}',
-                    style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
-                  ),
-                  if (statusText.isNotEmpty)
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => context.push('/users/${user.id}'),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            children: [
+              AppAvatar(name: user.displayName, url: user.avatarUrl, radius: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(user.displayName, style: const TextStyle(fontWeight: FontWeight.w600)),
                     Text(
-                      statusText,
-                      style: TextStyle(fontSize: 11, color: colors.primary),
+                      '@${user.userName}',
+                      style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
                     ),
-                ],
+                    if (statusText.isNotEmpty)
+                      Text(
+                        statusText,
+                        style: TextStyle(fontSize: 11, color: colors.primary),
+                      ),
+                  ],
+                ),
               ),
-            ),
-            if (showAdd)
-              FilledButton.tonal(
-                onPressed: onAddFriend,
-                child: Text(l10n.t('friends_add')),
+              if (showAdd)
+                FilledButton.tonal(
+                  onPressed: onAddFriend,
+                  child: Text(l10n.t('friends_add')),
+                ),
+              IconButton(
+                tooltip: user.relationship.following
+                    ? l10n.t('friends_following')
+                    : l10n.t('friends_follow'),
+                onPressed: onToggleFollow,
+                icon: Icon(
+                  user.relationship.following ? Icons.person_remove_outlined : Icons.person_add_alt,
+                ),
               ),
-            IconButton(
-              tooltip: user.relationship.following
-                  ? l10n.t('friends_following')
-                  : l10n.t('friends_follow'),
-              onPressed: onToggleFollow,
-              icon: Icon(
-                user.relationship.following ? Icons.person_remove_outlined : Icons.person_add_alt,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

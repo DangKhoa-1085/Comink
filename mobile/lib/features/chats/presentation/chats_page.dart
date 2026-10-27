@@ -8,6 +8,7 @@ import '../../../core/widgets/app_avatar.dart';
 import '../../../core/widgets/states.dart';
 import '../data/chat_providers.dart';
 import '../domain/chat_models.dart';
+import 'create_group_dialog.dart';
 
 /// Tab Tin nhắn: danh sách hội thoại 1–1 và nhóm.
 class ChatsPage extends ConsumerWidget {
@@ -28,6 +29,19 @@ class ChatsPage extends ConsumerWidget {
             icon: const Icon(Icons.refresh),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final conversationId = await showDialog<String>(
+            context: context,
+            builder: (_) => const CreateGroupDialog(),
+          );
+          if (conversationId != null && context.mounted) {
+            context.push('/chats/$conversationId');
+          }
+        },
+        icon: const Icon(Icons.group_add_outlined),
+        label: Text(l10n.t('chats_create_group')),
       ),
       body: conversations.when(
         data: (items) => RefreshIndicator(

@@ -1,5 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/i18n/app_localizations.dart';
 import '../../../core/network/api_exception.dart';
@@ -7,8 +11,10 @@ import '../../../core/network/providers.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../core/widgets/app_avatar.dart';
 import '../../../core/widgets/states.dart';
+import '../../media/data/media_service.dart';
 import '../data/feed_providers.dart';
 import '../domain/post.dart';
+import 'comments_sheet.dart';
 
 /// Tab Bảng tin: bài của bạn bè/người theo dõi, đăng bài, thích.
 class FeedPage extends ConsumerWidget {
@@ -95,21 +101,27 @@ class _PostCard extends ConsumerWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                AppAvatar(name: post.author.displayName, url: post.author.avatarUrl),
+                GestureDetector(
+                  onTap: () => context.push('/users/${post.author.id}'),
+                  child: AppAvatar(name: post.author.displayName, url: post.author.avatarUrl),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        post.author.displayName,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      Text(
-                        '@${post.author.userName} · ${_formatDate(context, post.createdAt)}',
-                        style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
-                      ),
-                    ],
+                  child: GestureDetector(
+                    onTap: () => context.push('/users/${post.author.id}'),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          post.author.displayName,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        Text(
+                          '@${post.author.userName} · ${_formatDate(context, post.createdAt)}',
+                          style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 _VisibilityChip(visibility: post.visibility),
@@ -121,21 +133,7 @@ class _PostCard extends ConsumerWidget {
             ],
             if (post.media.isNotEmpty) ...[
               const SizedBox(height: 10),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  post.media.first.url,
-                  fit: BoxFit.cover,
-                  height: 190,
-                  width: double.infinity,
-                  errorBuilder: (_, _, _) => Container(
-                    height: 120,
-                    color: colors.surfaceContainerHighest,
-                    alignment: Alignment.center,
-                    child: Icon(Icons.broken_image_outlined, color: colors.outline),
-                  ),
-                ),
-              ),
+              _PostImages(media: post.media),
             ],
             if (post.sharedPost != null) ...[
               const SizedBox(height: 10),
@@ -181,13 +179,13 @@ class _PostCard extends ConsumerWidget {
                   label: post.commentCount > 0
                       ? '${post.commentCount}'
                       : l10n.t('feed_comment'),
-                  onTap: () => _showComingSoon(context),
+                  onTap: () => _showComments(context),
                 ),
                 const SizedBox(width: 8),
                 _ActionButton(
                   icon: Icons.share_outlined,
                   label: post.shareCount > 0 ? '${post.shareCount}' : l10n.t('feed_share'),
-                  onTap: () => _showComingSoon(context),
+                  onTap: () => _confirmShare(context, ref),
                 ),
               ],
             ),
@@ -213,11 +211,49 @@ class _PostCard extends ConsumerWidget {
     }
   }
 
-  void _showComingSoon(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(l10n.t('common_coming_soon'))),
+  void _showComments(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => CommentsSheet(postId: post.id),
     );
+  }
+
+  Future<void> _confirmShare(BuildContext context, WidgetRef ref) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        content: Text(l10n.t('feed_share_confirm')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(l10n.t('common_cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(l10n.t('feed_share')),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    try {
+      await ref.read(apiClientProvider).post(
+        '/api/posts',
+        data: {'sharedPostId': post.id},
+      );
+      ref.invalidate(feedProvider);
+      messenger.showSnackBar(SnackBar(content: Text(l10n.t('feed_shared'))));
+    } on ApiException catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.error(error.code))));
+    }
   }
 
   static String _formatDate(BuildContext context, DateTime date) {
@@ -227,6 +263,45 @@ class _PostCard extends ConsumerWidget {
       alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
     );
     return '${localizations.formatShortDate(date)} $time';
+  }
+}
+
+class _PostImages extends StatelessWidget {
+  const _PostImages({required this.media});
+
+  final List<PostMediaItem> media;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    Widget image(PostMediaItem item) => ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Image.network(
+            item.url,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => Container(
+              color: colors.surfaceContainerHighest,
+              alignment: Alignment.center,
+              child: Icon(Icons.broken_image_outlined, color: colors.outline),
+            ),
+          ),
+        );
+
+    if (media.length == 1) {
+      return SizedBox(height: 210, width: double.infinity, child: image(media.first));
+    }
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: media.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 6,
+        crossAxisSpacing: 6,
+      ),
+      itemBuilder: (context, index) => image(media[index]),
+    );
   }
 }
 
@@ -315,16 +390,64 @@ class _CreatePostDialog extends ConsumerStatefulWidget {
   ConsumerState<_CreatePostDialog> createState() => _CreatePostDialogState();
 }
 
+class _PickedImage {
+  const _PickedImage({required this.file, required this.bytes});
+
+  final XFile file;
+  final Uint8List bytes;
+}
+
 class _CreatePostDialogState extends ConsumerState<_CreatePostDialog> {
   final _controller = TextEditingController();
+  final List<_PickedImage> _images = [];
   String _visibility = 'Friends';
   bool _posting = false;
+  bool _uploading = false;
   String? _errorCode;
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImages() async {
+    if (_posting) {
+      return;
+    }
+
+    final remaining = MediaService.maxImagesPerPost - _images.length;
+    if (remaining <= 0) {
+      setState(() => _errorCode = 'feed_too_many_images');
+      return;
+    }
+
+    try {
+      final files = await ImagePicker().pickMultiImage(imageQuality: 85, maxWidth: 1920);
+      if (files.isEmpty) {
+        return;
+      }
+
+      for (final file in files.take(remaining)) {
+        final bytes = await file.readAsBytes();
+        if (bytes.length > MediaService.maxImageBytes) {
+          setState(() => _errorCode = 'feed_image_too_large');
+          continue;
+        }
+        setState(() {
+          _images.add(_PickedImage(file: file, bytes: bytes));
+          _errorCode = null;
+        });
+      }
+
+      if (files.length > remaining) {
+        setState(() => _errorCode = 'feed_too_many_images');
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _errorCode = 'INTERNAL_ERROR');
+      }
+    }
   }
 
   Future<void> _submit() async {
@@ -335,7 +458,7 @@ class _CreatePostDialogState extends ConsumerState<_CreatePostDialog> {
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final content = _controller.text.trim();
-    if (content.isEmpty) {
+    if (content.isEmpty && _images.isEmpty) {
       setState(() => _errorCode = 'feed_content_required');
       return;
     }
@@ -346,9 +469,27 @@ class _CreatePostDialogState extends ConsumerState<_CreatePostDialog> {
     });
 
     try {
+      final mediaIds = <String>[];
+      if (_images.isNotEmpty) {
+        setState(() => _uploading = true);
+        mediaIds.addAll(
+          await ref.read(mediaServiceProvider).uploadAll(
+                _images.map((image) => image.file).toList(growable: false),
+                context: 'Post',
+              ),
+        );
+        if (mounted) {
+          setState(() => _uploading = false);
+        }
+      }
+
       await ref.read(apiClientProvider).post(
         '/api/posts',
-        data: {'content': content, 'visibility': _visibility},
+        data: {
+          'content': content.isEmpty ? null : content,
+          'visibility': _visibility,
+          'mediaIds': mediaIds,
+        },
       );
       ref.invalidate(feedProvider);
       if (!mounted) {
@@ -362,6 +503,7 @@ class _CreatePostDialogState extends ConsumerState<_CreatePostDialog> {
       }
       setState(() {
         _posting = false;
+        _uploading = false;
         _errorCode = error.code;
       });
     }
@@ -370,38 +512,109 @@ class _CreatePostDialogState extends ConsumerState<_CreatePostDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final errorText = _errorCode == 'feed_content_required'
-        ? l10n.t('feed_content_required')
-        : (_errorCode == null ? null : l10n.error(_errorCode));
+    final errorText = switch (_errorCode) {
+      'feed_content_required' => l10n.t('feed_content_required'),
+      'feed_too_many_images' => l10n.t('feed_too_many_images'),
+      'feed_image_too_large' => l10n.t('feed_image_too_large'),
+      null => null,
+      final code => l10n.error(code),
+    };
 
     return AlertDialog(
       title: Text(l10n.t('feed_post')),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _controller,
-            minLines: 3,
-            maxLines: 6,
-            maxLength: 5000,
-            autofocus: true,
-            decoration: InputDecoration(
-              hintText: l10n.t('feed_composer_hint'),
-              errorText: errorText,
-            ),
-          ),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            initialValue: _visibility,
-            decoration: InputDecoration(labelText: l10n.t('feed_visibility')),
-            items: [
-              DropdownMenuItem(value: 'Public', child: Text(l10n.t('feed_public'))),
-              DropdownMenuItem(value: 'Friends', child: Text(l10n.t('feed_friends'))),
-              DropdownMenuItem(value: 'OnlyMe', child: Text(l10n.t('feed_only_me'))),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _controller,
+                minLines: 3,
+                maxLines: 6,
+                maxLength: 5000,
+                autofocus: true,
+                enabled: !_posting,
+                decoration: InputDecoration(
+                  hintText: l10n.t('feed_composer_hint'),
+                  errorText: errorText,
+                ),
+              ),
+              if (_images.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (var index = 0; index < _images.length; index++)
+                      Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.memory(
+                              _images[index].bytes,
+                              width: 78,
+                              height: 78,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          Positioned(
+                            top: 2,
+                            right: 2,
+                            child: GestureDetector(
+                              onTap: _posting
+                                  ? null
+                                  : () => setState(() => _images.removeAt(index)),
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: Colors.black54,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.close, size: 14, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _posting || _uploading ? null : _pickImages,
+                    icon: const Icon(Icons.image_outlined, size: 18),
+                    label: Text(l10n.t('feed_add_image')),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${_images.length}/${MediaService.maxImagesPerPost}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                initialValue: _visibility,
+                decoration: InputDecoration(labelText: l10n.t('feed_visibility')),
+                items: [
+                  DropdownMenuItem(value: 'Public', child: Text(l10n.t('feed_public'))),
+                  DropdownMenuItem(value: 'Friends', child: Text(l10n.t('feed_friends'))),
+                  DropdownMenuItem(value: 'OnlyMe', child: Text(l10n.t('feed_only_me'))),
+                ],
+                onChanged: _posting
+                    ? null
+                    : (value) => setState(() => _visibility = value ?? 'Friends'),
+              ),
             ],
-            onChanged: _posting ? null : (value) => setState(() => _visibility = value ?? 'Friends'),
           ),
-        ],
+        ),
       ),
       actions: [
         TextButton(
@@ -411,10 +624,17 @@ class _CreatePostDialogState extends ConsumerState<_CreatePostDialog> {
         FilledButton(
           onPressed: _posting ? null : _submit,
           child: _posting
-              ? const SizedBox(
-                  height: 18,
-                  width: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(_uploading ? l10n.t('feed_uploading') : l10n.t('feed_posting')),
+                  ],
                 )
               : Text(l10n.t('feed_post')),
         ),
