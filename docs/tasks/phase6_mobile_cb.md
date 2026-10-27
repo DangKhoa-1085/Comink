@@ -3,7 +3,7 @@
 > Phân rã từ `docs/04_roadmap.md` (Giai đoạn 6) theo `AGENTS.md` mục 7.3.
 > **Mục tiêu:** đưa toàn bộ mức cơ bản của Comink sang app Flutter, dùng chung backend.
 > **Phụ thuộc:** Mốc A. *Trạng thái thực tế:* phần tự động của Mốc A đã xong (seed, OpenAPI Bearer, known issues, demo HTTP 12/12); **TURN hai mạng vẫn chờ người dùng test**. Người dùng đã chỉ định bắt đầu GĐ 6 — rủi ro còn lại được ghi ở mục 8.
-> **Trạng thái:** 🚧 **nền tảng + auth/hồ sơ/bảng tin có ảnh/bình luận/chia sẻ + bạn bè/hồ sơ công khai + chat real-time/tạo nhóm** (2026-10-27). Đã chạy thử trên Chrome (Flutter web) với backend thật; **chưa chạy trên thiết bị Android thật** vì máy chưa có `adb`/thiết bị.
+> **Trạng thái:** 🚧 **nền tảng + auth/hồ sơ/bảng tin có ảnh/bình luận/chia sẻ + bạn bè/hồ sơ công khai + chat real-time/tạo nhóm/gửi ảnh + gọi audio/video mobile** (2026-10-27). Đã chạy thử trên Chrome (Flutter web) với backend + LiveKit thật; **chưa chạy trên thiết bị Android thật** vì máy chưa có Android SDK/`adb`/thiết bị.
 > **Người phụ trách:** Dev B chính (Flutter/push/call) + Dev A hỗ trợ backend/API; xem `docs/04_roadmap.md` mục 2.
 
 ---
@@ -36,7 +36,7 @@
 | **D4** | Đa ngôn ngữ | `flutter_localizations` + lớp `AppLocalizations` dạng map (không codegen) | Ít bước build, đủ vi/en; dễ thêm chuỗi |
 | **D5** | Điều hướng | `go_router` với redirect theo trạng thái phiên; shell 4 tab | Đúng yêu cầu; deep link sau này |
 | **D6** | Push FCM | Làm sau cùng trong GĐ 6; cần backend M4 (`user_devices`, `notifications`), `IPushSender` thật, file cấu hình Firebase | Không có credentials Firebase trong repo; không chặn các mục khác |
-| **D7** | Gọi trên máy thật | Backend cấp `url` LiveKit từ cấu hình; cần thêm `LiveKit:PublicUrl`/host reachable từ điện thoại (hiện `localhost:7880` không dùng được trên máy thật) | Tránh sửa client bằng IP hard-code; làm ở bước gọi |
+| **D7** | Gọi trên máy thật | **Đã làm:** `LiveKit:PublicUrl` (fallback `Host`) trong backend; client nhận `url` từ token; máy thật/emulator đặt `ws://10.0.2.2:7880` hoặc `ws://<IP-LAN>:7880` | Tránh hard-code IP; web vẫn dùng fallback `ws://localhost:7880` |
 | **D8** | Ảnh | Client xin chữ ký → upload Cloudinary trực tiếp; dev fallback local upload | Đúng thiết kế GĐ 2; giới hạn 5 MB/ảnh |
 
 ---
@@ -74,22 +74,22 @@
 ### 3.4. Chat real-time
 
 - [x] Danh sách hội thoại (1–1 + nhóm), sắp theo tin mới, xem trước
-- [x] Khung chat: lịch sử, gửi văn bản, `clientMessageId` *(phân trang: chưa; ảnh: chưa)*
+- [x] Khung chat: lịch sử, gửi văn bản/ảnh, `clientMessageId` *(phân trang: chưa; chọn ảnh UI chưa tự động hoá)*
 - [x] SignalR: kết nối, xác thực token, nhận `MessageCreated`, tự kết nối lại *(đồng bộ `after`: chưa)*
 - [x] Tạo nhóm 3–10 người (chọn từ bạn bè, đặt tên, mở chat ngay)
 
 ### 3.5. Gọi thoại/video
 
-- [ ] Sửa backend: trả URL LiveKit phù hợp thiết bị (D7)
-- [ ] Màn hình cuộc gọi đến (chuông/từ chối/nghe), gọi 1–1 và nhóm
-- [ ] LiveKit mobile: camera/mic, tắt/bật, kết thúc, thời lượng
-- [ ] Quyền mic/camera + xử lý từ chối rõ ràng
+- [x] Backend trả URL LiveKit phù hợp thiết bị (`LiveKit:PublicUrl`, test `GetToken_UsesPublicUrl_WhenConfigured`)
+- [x] Màn hình cuộc gọi đến/đi, nghe/từ chối/kết thúc; gọi 1–1 và nhóm (dùng chung hội thoại)
+- [x] LiveKit mobile: kết nối room, mic/camera bật/tắt, kết thúc, đồng hồ thời lượng; video grid
+- [x] Quyền mic/camera (`permission_handler`) + thông báo lỗi khi từ chối; manifest Android + Info.plist iOS
 
 ### 3.6. Push, i18n, thiết bị
 
-- [ ] Backend M4: `user_devices`, `notifications`; `IPushSender` FCM
+- [ ] Backend M4: `user_devices`, `notifications`; `IPushSender` FCM *(chưa làm — cần Firebase)*
 - [ ] Đăng ký FCM token, nhận push tin/lời mời/cuộc gọi
-- [ ] Xin quyền thông báo; deep link vào chat/cuộc gọi
+- [ ] Xin quyền thông báo; deep link vào chat/cuộc gọi *(mới khai báo `POST_NOTIFICATIONS`)*
 - [x] i18n toàn bộ chuỗi hiển thị (vi/en)
 - [ ] Chạy trên thiết bị Android thật (và iOS nếu có)
 
@@ -125,7 +125,8 @@
 |---|---|
 | `flutter analyze` | **No issues found** |
 | `flutter test` | **5/5** (i18n vi/en, parse AuthResponse/AuthUser, app khởi động → login + validate form) |
-| `flutter pub get` | OK; thêm `shared_preferences 2.5.6` và `image_picker 1.2.4` (đều BSD-3) |
+| `flutter pub get` | OK; thêm `shared_preferences 2.5.6`, `image_picker 1.2.4`, `permission_handler` (BSD-3/MIT) |
+| Backend `CallServiceTests` | **14/14**, gồm test `PublicUrl` (D7) |
 
 ### 5.2. Tích hợp thật trên Chrome (Flutter web) + backend `localhost:5117` — đạt
 
@@ -141,16 +142,18 @@ Chạy: `flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=ht
 - **Bình luận:** mở sheet bình luận của bài “Ghi chú riêng”, gửi “Bình luận thử từ app” → hiện ngay, số đếm bình luận cập nhật.
 - **Hồ sơ công khai:** bấm tên Bình trong bài viết → trang hồ sơ Bình (1 bạn bè, 0 người theo dõi, 1 đang theo dõi), có nút Theo dõi/Bạn bè/Nhắn tin.
 - **Tạo nhóm:** từ tab Tin nhắn, chọn Chi + Bình, đặt tên “Nhóm kiểm thử” → tạo nhóm 3 người và mở khung chat ngay.
+- **Gọi audio (LiveKit thật):** Bình gọi An qua API → app An hiện “Cuộc gọi thoại đến”; bấm Nghe → kết nối room, hiện avatar + mic/kết thúc; kết thúc → DB `Completed`, thời lượng 16s. Gọi từ app (nút điện thoại trong chat) cũng tạo room và kết nối được.
 - **Ảnh bài viết:** upload ảnh PNG 96×96 lên Cloudinary qua chữ ký backend, đăng ký media, tạo bài “Bài có ảnh từ API” → bảng tin hiển thị đúng ảnh (`image` trong accessibility tree).
 - Giao diện Material 3, dark mode theo hệ thống; toàn bộ chuỗi qua i18n.
 
 ### 5.3. Chưa kiểm chứng / còn thiếu
 
 - **Thiết bị Android thật**: chưa có `adb`/thiết bị trong môi trường này; mới chạy Flutter web.
-- **Chọn ảnh từ UI Flutter** chưa tự động hoá được trên web (file picker của trình duyệt); luồng upload Cloudinary đã kiểm chứng bằng script HTTP, code `image_picker`/`MediaService` mới chỉ `analyze`.
-- Phân trang cuộn bảng tin/lịch sử chat, gửi ảnh trong chat (mới gửi văn bản), đồng bộ tin bị lỡ sau reconnect.
-- Gọi thoại/video bằng LiveKit mobile (cần sửa D7 + thiết bị).
-- Push FCM, quyền mic/camera/thông báo (cần M4 + Firebase).
+- **Chọn ảnh từ UI Flutter** chưa tự động hoá được trên web (file picker của trình duyệt); luồng upload Cloudinary đã kiểm chứng bằng script HTTP, code `image_picker`/`MediaService` mới chỉ `analyze`. Gửi ảnh trong chat cũng chưa thử upload từ UI.
+- **Video call** chưa kiểm chứng (Chrome test không có camera); **gọi nhóm** mới kiểm chứng tạo nhóm chat, chưa gọi nhóm thật.
+- Phân trang cuộn bảng tin/lịch sử chat, đồng bộ tin bị lỡ sau reconnect.
+- Push FCM, quyền thông báo/deep link (cần M4 + Firebase).
+- **Thiết bị Android thật**: chưa có Android SDK/`adb`/thiết bị; chỉ chạy Flutter web.
 - Widget test cho feed/lỗi bằng fake API.
 
 ---

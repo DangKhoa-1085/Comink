@@ -206,8 +206,8 @@ Mỗi giai đoạn gồm: **mục tiêu**, **phụ thuộc** và **checklist ho�
 
 > Web push (FCM trên trình duyệt) có thể làm ở giai đoạn này hoặc trong giai đoạn 7.
 
-> **Trạng thái GĐ 6 (cập nhật 2026-10-27):** 🚧 đang thực hiện — đã có **nền tảng app + đăng nhập/lưu token/refresh + hồ sơ + bảng tin (văn bản/ảnh, thích, bình luận + trả lời, chia sẻ) + bạn bè/tìm kiếm/kết bạn/theo dõi + hồ sơ công khai + chat 1–1/nhóm (lịch sử, gửi tin, SignalR real-time, tạo nhóm)**, i18n vi/en. Đã kiểm chứng tích hợp thật trên **Chrome (Flutter web)** với backend; `flutter analyze` 0 issue, `flutter test` 5/5.
-> **Còn lại:** phân trang cuộn, ảnh trong chat, đồng bộ tin sau reconnect, gọi LiveKit trên mobile (cần thêm `LiveKit:PublicUrl`), quyền mic/camera/thông báo, push FCM (M4) và **chạy trên thiết bị Android thật** (máy hiện chưa có `adb`).
+> **Trạng thái GĐ 6 (cập nhật 2026-10-27):** 🚧 đang thực hiện — đã có **nền tảng app + đăng nhập/lưu token/refresh + hồ sơ + bảng tin (văn bản/ảnh, thích, bình luận + trả lời, chia sẻ) + bạn bè/tìm kiếm/kết bạn/theo dõi + hồ sơ công khai + chat 1–1/nhóm (lịch sử, gửi văn bản/ảnh, SignalR real-time, tạo nhóm) + gọi audio/video mobile (LiveKit, quyền mic/camera, thời lượng)**, i18n vi/en. Đã kiểm chứng tích hợp thật trên **Chrome (Flutter web)** với backend + LiveKit; `flutter analyze` 0 issue, `flutter test` 5/5, backend call tests 14/14.
+> **Còn lại:** push FCM (M4 + Firebase), quyền thông báo/deep link, video/gọi nhóm trên thiết bị thật, phân trang cuộn + đồng bộ tin sau reconnect, **chạy trên thiết bị Android thật** (máy hiện chưa có Android SDK/`adb`).
 > Chi tiết: `docs/tasks/phase6_mobile_cb.md`.
 
 ### ◆ Mốc B: Web + App CB (cuối tuần 10)

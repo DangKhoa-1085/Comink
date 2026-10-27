@@ -259,9 +259,21 @@ Tài khoản demo: `an.demo` / `binh.demo` / `chi.demo` (mật khẩu do bạn �
 
 Hiện đã có: đăng nhập/đăng ký + secure storage + tự refresh token, hồ sơ (xem/sửa/đổi ngôn ngữ),
 bảng tin (văn bản/ảnh, thích, bình luận + trả lời, chia sẻ), bạn bè/tìm kiếm/kết bạn/theo dõi,
-hồ sơ công khai, chat 1–1 + nhóm (lịch sử, gửi văn bản, SignalR real-time, tạo nhóm), i18n vi/en.
-Còn lại: phân trang cuộn, ảnh trong chat, gọi mobile, quyền mic/camera/thông báo, FCM và kiểm chứng
-trên thiết bị Android thật.
+hồ sơ công khai, chat 1–1 + nhóm (lịch sử, gửi văn bản/ảnh, SignalR real-time, tạo nhóm),
+gọi audio/video 1–1 và nhóm bằng LiveKit (quyền mic/camera, tắt/bật, kết thúc, thời lượng), i18n vi/en.
+Còn lại: push FCM, quyền thông báo/deep link và kiểm chứng trên thiết bị Android thật.
+
+Khi định gọi trên **máy thật/emulator**, đặt thêm biến môi trường cho backend trước khi chạy
+(vì `localhost` trên điện thoại trỏ về chính điện thoại):
+
+```bash
+# PowerShell (emulator Android)
+$env:LiveKit__PublicUrl="ws://10.0.2.2:7880"
+# Máy thật cùng LAN
+$env:LiveKit__PublicUrl="ws://192.168.1.43:7880"
+```
+
+Sau đó chạy app với `API_BASE_URL` tương ứng. Xem `docs/tasks/phase6_mobile_cb.md`.
 
 > Trên máy này Flutter SDK nằm ở `C:\src\flutter` nhưng chưa có trong PATH — thêm
 > `C:\src\flutter\bin` vào PATH (hoặc dùng `C:\src\flutter\bin\flutter.bat`). GĐ 6 còn cần
