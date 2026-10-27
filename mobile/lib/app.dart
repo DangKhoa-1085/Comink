@@ -9,6 +9,8 @@ import 'core/i18n/locale_controller.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/auth/data/session_controller.dart';
+import 'features/calls/data/call_controller.dart';
+import 'features/calls/presentation/call_overlay.dart';
 import 'features/chats/data/chat_realtime.dart';
 import 'router/app_router.dart';
 
@@ -28,6 +30,7 @@ class CominkApp extends ConsumerWidget {
       if (next.isAuthenticated) {
         unawaited(realtime.connect());
       } else {
+        ref.read(callControllerProvider.notifier).clear();
         unawaited(realtime.disconnect());
       }
     });
@@ -42,6 +45,9 @@ class CominkApp extends ConsumerWidget {
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       routerConfig: router,
+      builder: (context, child) => CallOverlay(
+        child: child ?? const SizedBox.shrink(),
+      ),
     );
   }
 }

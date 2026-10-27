@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:signalr_netcore/signalr_client.dart';
 
@@ -5,17 +7,33 @@ import '../../../core/config/app_config.dart';
 import '../../../core/network/providers.dart';
 import 'chat_providers.dart';
 
-/// Kết nối SignalR `/hub/chat` để nhận tin nhắn mới theo thời gian thực.
+/// Tín hiệu cuộc gọi thô từ SignalR; tầng call tự parse DTO.
+class CallRealtimeSignal {
+  const CallRealtimeSignal(this.eventName, this.payload);
+
+  final String eventName;
+  final Map<String, dynamic> payload;
+}
+
+/// Kết nối SignalR `/hub/chat` để nhận tin nhắn mới và sự kiện cuộc gọi.
 ///
 /// Chỉ cần kết nối khi đã đăng nhập; `CominkApp` gọi connect/disconnect theo session.
 class ChatRealtime {
   ChatRealtime(this._ref);
 
   static const String messageCreatedEvent = 'MessageCreated';
+  static const String callIncomingEvent = 'CallIncoming';
+  static const String callUpdatedEvent = 'CallUpdated';
+  static const String callEndedEvent = 'CallEnded';
 
   final Ref _ref;
   HubConnection? _connection;
   bool _connecting = false;
+  final StreamController<CallRealtimeSignal> _callEvents =
+      StreamController<CallRealtimeSignal>.broadcast();
+
+  /// Sự kiện CallIncoming/CallUpdated/CallEnded để `CallController` xử lý.
+  Stream<CallRealtimeSignal> get callEvents => _callEvents.stream;
 
   Future<void> connect() async {
     if (_connection != null || _connecting) {
@@ -35,6 +53,9 @@ class ChatRealtime {
         .build();
 
     connection.on(messageCreatedEvent, _onMessageCreated);
+    connection.on(callIncomingEvent, (args) => _emitCall(callIncomingEvent, args));
+    connection.on(callUpdatedEvent, (args) => _emitCall(callUpdatedEvent, args));
+    connection.on(callEndedEvent, (args) => _emitCall(callEndedEvent, args));
     connection.onclose(({error}) => _connection = null);
 
     try {
@@ -69,6 +90,20 @@ class ChatRealtime {
 
   void dispose() {
     _connection = null;
+    unawaited(_callEvents.close());
+  }
+
+  void _emitCall(String eventName, List<Object?>? arguments) {
+    if (arguments == null || arguments.isEmpty || _callEvents.isClosed) {
+      return;
+    }
+    final payload = arguments.first;
+    if (payload is! Map) {
+      return;
+    }
+    _callEvents.add(
+      CallRealtimeSignal(eventName, payload.cast<String, dynamic>()),
+    );
   }
 
   void _onMessageCreated(List<Object?>? arguments) {

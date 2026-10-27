@@ -97,7 +97,9 @@ class _ConversationTile extends StatelessWidget {
         ? ''
         : (lastMessage.type == 'Image'
             ? l10n.t('chat_image')
-            : lastMessage.preview);
+            : lastMessage.type == 'Call'
+                ? l10n.t('chat_call')
+                : lastMessage.preview);
 
     return ListTile(
       onTap: onTap,

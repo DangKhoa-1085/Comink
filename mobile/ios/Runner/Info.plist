@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Comink cần camera để thực hiện cuộc gọi video.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Comink cần micro để thực hiện cuộc gọi thoại/video.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
