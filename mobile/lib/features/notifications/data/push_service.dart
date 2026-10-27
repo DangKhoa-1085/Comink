@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/i18n/app_localizations.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/providers.dart';
 import '../../../core/ui/app_keys.dart';
@@ -71,10 +72,14 @@ class PushService {
         sound: true,
       );
       if (settings.authorizationStatus == AuthorizationStatus.denied) {
+        _showPermissionMessage();
         return;
       }
       if (defaultTargetPlatform == TargetPlatform.android) {
-        await Permission.notification.request();
+        final permission = await Permission.notification.request();
+        if (!permission.isGranted) {
+          _showPermissionMessage();
+        }
       }
 
       _token = await _registerWithFirebase(messaging);
@@ -150,6 +155,16 @@ class PushService {
     } on ApiException catch (error) {
       debugPrint('Không đăng ký được thiết bị push: ${error.code}');
     }
+  }
+
+  void _showPermissionMessage() {
+    final context = scaffoldMessengerKey.currentContext;
+    if (context == null) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppLocalizations.of(context).t('notification_permission_denied'))),
+    );
   }
 
   void _onForegroundMessage(RemoteMessage message) {

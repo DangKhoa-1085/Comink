@@ -171,6 +171,8 @@ class AppLocalizations {
       'call_you': 'Bạn',
       'call_participants': 'Người tham gia',
       'call_error': 'Không thể thực hiện cuộc gọi',
+      'notification_permission_denied':
+          'Bạn đã tắt quyền thông báo. Có thể bật lại trong Cài đặt để nhận tin nhắn/cuộc gọi.',
       'error_CALL_PERMISSION_DENIED': 'Bạn cần cấp quyền micro/camera để gọi.',
       'error_CALL_MEDIA_FAILED': 'Không kết nối được phòng gọi. Kiểm tra mạng rồi thử lại.',
       'error_CALL_PROVIDER_UNAVAILABLE': 'Máy chủ gọi chưa sẵn sàng.',
@@ -368,6 +370,8 @@ class AppLocalizations {
       'call_you': 'You',
       'call_participants': 'Participants',
       'call_error': 'Could not start the call',
+      'notification_permission_denied':
+          'Notifications are disabled. You can enable them in Settings to receive messages/calls.',
       'error_CALL_PERMISSION_DENIED': 'Microphone/camera permission is required for calls.',
       'error_CALL_MEDIA_FAILED': 'Could not connect to the call room. Check your network and try again.',
       'error_CALL_PROVIDER_UNAVAILABLE': 'The call server is not ready.',
