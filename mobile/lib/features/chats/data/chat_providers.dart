@@ -25,12 +25,16 @@ final conversationDetailProvider =
 });
 
 final messagesProvider =
-    FutureProvider.autoDispose.family<List<ChatMessage>, String>((ref, conversationId) async {
+    FutureProvider.autoDispose.family<ChatHistory, String>((ref, conversationId) async {
   final data = await ref.watch(apiClientProvider).get(
         '/api/conversations/$conversationId/messages',
         query: {'limit': 50},
       );
   final page = PagedResult.fromJson(data, ChatMessage.fromJson);
   // Backend trả tin mới nhất trước; đảo lại để hiển thị theo thời gian.
-  return page.items.reversed.toList(growable: false);
+  return ChatHistory(
+    messages: page.items.reversed.toList(growable: false),
+    nextCursor: page.nextCursor,
+    hasMore: page.hasMore,
+  );
 });

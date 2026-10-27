@@ -201,3 +201,17 @@ class ChatMessage {
             DateTime.now(),
       );
 }
+
+/// Một trang lịch sử chat: tin theo thứ tự cũ → mới + con trỏ tải trang cũ hơn.
+class ChatHistory {
+  const ChatHistory({
+    required this.messages,
+    required this.nextCursor,
+    required this.hasMore,
+  });
+
+  final List<ChatMessage> messages;
+  final String? nextCursor;
+  final bool hasMore;
+}
+

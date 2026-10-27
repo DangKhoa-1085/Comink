@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -5,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/i18n/app_localizations.dart';
+import '../../../core/models/paged_result.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/providers.dart';
 import '../../../core/utils/uuid.dart';
@@ -32,10 +34,66 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   bool _sending = false;
   bool _uploading = false;
 
+  final List<ChatMessage> _olderMessages = [];
+  String? _olderCursor;
+  bool _olderHasMore = false;
+  bool _loadingOlder = false;
+  Timer? _syncTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Lưới an toàn khi SignalR mất kết nối: tải lại trang mới nhất định kỳ.
+    _syncTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (!mounted || _sending) {
+        return;
+      }
+      ref.invalidate(messagesProvider(widget.conversationId));
+      ref.invalidate(conversationsProvider);
+    });
+  }
+
   @override
   void dispose() {
+    _syncTimer?.cancel();
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadOlder(ChatHistory history) async {
+    final cursor = _olderCursor ?? history.nextCursor;
+    final canLoad = _olderMessages.isEmpty ? history.hasMore : _olderHasMore;
+    if (cursor == null || !canLoad || _loadingOlder) {
+      return;
+    }
+
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _loadingOlder = true);
+
+    try {
+      final data = await ref.read(apiClientProvider).get(
+            '/api/conversations/${widget.conversationId}/messages',
+            query: {'before': cursor, 'limit': 50},
+          );
+      final page = PagedResult.fromJson(data, ChatMessage.fromJson);
+      final older = page.items.reversed.toList(growable: false);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _olderMessages.insertAll(0, older);
+        _olderCursor = page.nextCursor;
+        _olderHasMore = page.hasMore;
+        _loadingOlder = false;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _loadingOlder = false);
+      messenger.showSnackBar(SnackBar(content: Text(l10n.error(error.code))));
+    }
   }
 
   Future<void> _pickImage() async {
@@ -164,25 +222,38 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         children: [
           Expanded(
             child: messages.when(
-              data: (items) => items.isEmpty
-                  ? EmptyState(
-                      message: l10n.t('chat_no_messages'),
-                      icon: Icons.forum_outlined,
-                    )
-                  : _MessageList(
-                      messages: items,
-                      currentUserId: currentUserId,
-                      memberNames: detail.maybeWhen(
-                        data: (value) => {
-                          for (final member in value.members) member.userId: member.displayName,
-                        },
-                        orElse: () => const <String, String>{},
-                      ),
-                      showSenderName: detail.maybeWhen(
-                        data: (value) => value.isGroup,
-                        orElse: () => false,
-                      ),
-                    ),
+              skipLoadingOnRefresh: true,
+              data: (history) {
+                final merged = <String, ChatMessage>{
+                  for (final message in [..._olderMessages, ...history.messages])
+                    message.id: message,
+                }.values.toList(growable: false)
+                  ..sort((first, second) => first.createdAt.compareTo(second.createdAt));
+                final canLoad = _olderMessages.isEmpty ? history.hasMore : _olderHasMore;
+
+                return merged.isEmpty
+                    ? EmptyState(
+                        message: l10n.t('chat_no_messages'),
+                        icon: Icons.forum_outlined,
+                      )
+                    : _MessageList(
+                        messages: merged,
+                        currentUserId: currentUserId,
+                        memberNames: detail.maybeWhen(
+                          data: (value) => {
+                            for (final member in value.members) member.userId: member.displayName,
+                          },
+                          orElse: () => const <String, String>{},
+                        ),
+                        showSenderName: detail.maybeWhen(
+                          data: (value) => value.isGroup,
+                          orElse: () => false,
+                        ),
+                        hasMore: canLoad,
+                        loadingOlder: _loadingOlder,
+                        onLoadOlder: () => _loadOlder(history),
+                      );
+              },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => ErrorState(
                 message: l10n.error(error is ApiException ? error.code : 'INTERNAL_ERROR'),
@@ -303,22 +374,48 @@ class _MessageList extends StatelessWidget {
     required this.currentUserId,
     required this.memberNames,
     required this.showSenderName,
+    required this.hasMore,
+    required this.loadingOlder,
+    required this.onLoadOlder,
   });
 
   final List<ChatMessage> messages;
   final String currentUserId;
   final Map<String, String> memberNames;
   final bool showSenderName;
+  final bool hasMore;
+  final bool loadingOlder;
+  final VoidCallback onLoadOlder;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final reversed = messages.reversed.toList(growable: false);
+    final itemCount = reversed.length + (hasMore ? 1 : 0);
 
     return ListView.builder(
       reverse: true,
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      itemCount: reversed.length,
+      itemCount: itemCount,
       itemBuilder: (context, index) {
+        if (index == reversed.length) {
+          return Center(
+            child: loadingOlder
+                ? const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : TextButton(
+                    onPressed: onLoadOlder,
+                    child: Text(l10n.t('chat_load_older')),
+                  ),
+          );
+        }
+
         final message = reversed[index];
         return _MessageBubble(
           message: message,
