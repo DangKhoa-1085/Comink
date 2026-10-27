@@ -74,8 +74,8 @@
 ### 3.4. Chat real-time
 
 - [x] Danh sách hội thoại (1–1 + nhóm), sắp theo tin mới, xem trước
-- [x] Khung chat: lịch sử, gửi văn bản/ảnh, `clientMessageId` *(phân trang: chưa; chọn ảnh UI chưa tự động hoá)*
-- [x] SignalR: kết nối, xác thực token, nhận `MessageCreated`, tự kết nối lại *(đồng bộ `after`: chưa)*
+- [x] Khung chat: lịch sử, gửi văn bản/ảnh, `clientMessageId`; nút **Tải tin cũ hơn** (before cursor) *(chọn ảnh UI chưa tự động hoá)*
+- [x] SignalR: kết nối, xác thực token, nhận `MessageCreated`, tự kết nối lại + **poll 15s khi mở chat** để bù tin bị lỡ *(chưa test mất mạng thật)*
 - [x] Tạo nhóm 3–10 người (chọn từ bạn bè, đặt tên, mở chat ngay)
 
 ### 3.5. Gọi thoại/video
@@ -125,7 +125,7 @@
 | Hạng mục | Kết quả |
 |---|---|
 | `flutter analyze` | **No issues found** |
-| `flutter test` | **5/5** (i18n vi/en, parse AuthResponse/AuthUser, app khởi động → login + validate form) |
+| `flutter test` | **7/7** (i18n vi/en, parse AuthResponse/AuthUser, AppNotification, app khởi động → login + validate form) |
 | `flutter pub get` | OK; thêm `shared_preferences 2.5.6`, `image_picker 1.2.4`, `permission_handler` (BSD-3/MIT) |
 | Backend `CallServiceTests` | **14/14**, gồm test `PublicUrl` (D7) |
 | Backend `NotificationServiceTests` | **4/4** (đăng ký thiết bị, hộp thư, mark read, push) |
@@ -157,7 +157,7 @@ Chạy: `flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=ht
 - **Thiết bị Android thật**: chưa có `adb`/thiết bị trong môi trường này; mới chạy Flutter web.
 - **Chọn ảnh từ UI Flutter** chưa tự động hoá được trên web (file picker của trình duyệt); luồng upload Cloudinary đã kiểm chứng bằng script HTTP, code `image_picker`/`MediaService` mới chỉ `analyze`. Gửi ảnh trong chat cũng chưa thử upload từ UI.
 - **Video call** chưa kiểm chứng (Chrome test không có camera); **gọi nhóm** mới kiểm chứng tạo nhóm chat, chưa gọi nhóm thật.
-- Phân trang cuộn bảng tin/lịch sử chat, đồng bộ tin bị lỡ sau reconnect.
+- Phân trang cuộn bảng tin; **phân trang lịch sử chat đã có nút tải cũ hơn nhưng chưa thử với >50 tin**; poll 15s chưa thử mất mạng thật.
 - **Push FCM chưa kiểm chứng thật**: thiếu service account Firebase/`google-services.json`; code backend + app đã sẵn sàng, thiếu cấu hình thì bỏ qua an toàn.
 - **Thiết bị Android thật**: `flutter doctor` xác nhận chưa có Android SDK/`adb`; chỉ chạy Flutter web.
 - Widget test cho feed/lỗi bằng fake API.

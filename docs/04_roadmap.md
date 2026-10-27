@@ -206,7 +206,7 @@ Mỗi giai đoạn gồm: **mục tiêu**, **phụ thuộc** và **checklist ho�
 
 > Web push (FCM trên trình duyệt) có thể làm ở giai đoạn này hoặc trong giai đoạn 7.
 
-> **Trạng thái GĐ 6 (cập nhật 2026-10-27):** 🚧 đang thực hiện — đã có **nền tảng app + đăng nhập/lưu token/refresh + hồ sơ + bảng tin (văn bản/ảnh, thích, bình luận + trả lời, chia sẻ) + bạn bè/tìm kiếm/kết bạn/theo dõi + hồ sơ công khai + chat 1–1/nhóm (lịch sử, gửi văn bản/ảnh, SignalR real-time, tạo nhóm) + gọi audio/video mobile (LiveKit, quyền mic/camera, thời lượng) + nền tảng push FCM (thiết bị, hộp thư có badge, push message/friend/call)**, i18n vi/en. Đã kiểm chứng tích hợp thật trên **Chrome (Flutter web)** + backend + LiveKit; `flutter analyze` 0 issue, `flutter test` 5/5, backend **198/198**.
+> **Trạng thái GĐ 6 (cập nhật 2026-10-27):** 🚧 đang thực hiện — đã có **nền tảng app + đăng nhập/lưu token/refresh + hồ sơ + bảng tin (văn bản/ảnh, thích, bình luận + trả lời, chia sẻ) + bạn bè/tìm kiếm/kết bạn/theo dõi + hồ sơ công khai + chat 1–1/nhóm (lịch sử có tải tin cũ hơn, gửi văn bản/ảnh, SignalR real-time, poll bù tin, tạo nhóm) + gọi audio/video mobile (LiveKit, quyền mic/camera, thời lượng) + nền tảng push FCM (thiết bị, hộp thư có badge, push message/friend/call)**, i18n vi/en. Đã kiểm chứng tích hợp thật trên **Chrome (Flutter web)** + backend + LiveKit; `flutter analyze` 0 issue, `flutter test` 5/5, backend **198/198**.
 > **Còn lại:** kiểm chứng push thật (cần service account Firebase), video/gọi nhóm trên thiết bị thật, phân trang cuộn + đồng bộ tin sau reconnect, **chạy trên thiết bị Android thật** (máy hiện chưa có Android SDK/`adb`).
 > Chi tiết: `docs/tasks/phase6_mobile_cb.md`; vấn đề môi trường: `docs/06_known_issues.md` (KI-06/KI-07).
 
