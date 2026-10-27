@@ -156,14 +156,12 @@ Chạy: `flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=ht
 
 ### 5.3. Chưa kiểm chứng / còn thiếu
 
-- **Thiết bị Android thật**: chưa có `adb`/thiết bị trong môi trường này; mới chạy Flutter web.
+- **Thiết bị Android thật**: `flutter doctor` xác nhận chưa có Android SDK/`adb`/thiết bị; mới chạy Flutter web.
 - **Chọn ảnh từ UI Flutter** chưa tự động hoá được trên web (file picker của trình duyệt); luồng upload Cloudinary đã kiểm chứng bằng script HTTP, code `image_picker`/`MediaService` mới chỉ `analyze`. Gửi ảnh trong chat cũng chưa thử upload từ UI.
 - **Video call** chưa kiểm chứng (Chrome test không có camera); **gọi nhóm** mới kiểm chứng tạo nhóm chat, chưa gọi nhóm thật.
 - Phân trang **bảng tin** đã có nút/auto tải thêm và widget test render; chưa thử với >20 bài thật.
 - **Phân trang lịch sử chat** đã có nút tải cũ hơn nhưng chưa thử với >50 tin; poll 15s chưa thử mất mạng thật.
-- **Push FCM chưa kiểm chứng thật**: thiếu service account Firebase/`google-services.json`; code backend + app đã sẵn sàng, thiếu cấu hình thì bỏ qua an toàn.
-- **Thiết bị Android thật**: `flutter doctor` xác nhận chưa có Android SDK/`adb`; chỉ chạy Flutter web.
-- Widget test cho feed/lỗi bằng fake API.
+- **Push FCM chưa kiểm chứng thật**: thiếu service account Firebase; code backend + app đã sẵn sàng, sender đã test mock, thiếu cấu hình thì bỏ qua an toàn.
 
 ---
 
@@ -174,7 +172,7 @@ Chạy: `flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=ht
 | Flutter SDK | `C:\src\flutter` (3.47.7, Dart 3.13.5) — chưa có trong PATH; dùng `C:\src\flutter\bin\flutter.bat` |
 | Android tooling | `adb` chưa có trong PATH — cần Android Studio/SDK + thiết bị thật |
 | Backend dev | `http://localhost:5117` (Windows), Android emulator dùng `http://10.0.2.2:5117` |
-| Hợp đồng API | `docs/openapi/comink.v1.json` (45 path, Bearer) |
+| Hợp đồng API | `docs/openapi/comink.v1.json` (48 path, Bearer) |
 | Tài khoản demo | `an.demo`/`binh.demo`/`chi.demo` (mật khẩu `DemoSeed:Password` của bạn) |
 
 ---
@@ -183,5 +181,26 @@ Chạy: `flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=ht
 
 - Mốc A chưa tick/TURN chưa chứng minh → app có thể phải sửa nếu API thay đổi. Đã khóa OpenAPI để giảm rủi ro.
 - Không có thiết bị Android thật/adb trong môi trường hiện tại → không thể chứng minh mục 9 cho tới khi bạn cài đặt.
-- Firebase/FCM chưa có cấu hình → push làm sau cùng.
-- LiveKit URL `localhost` không dùng được trên thiết bị thật (D7) — phải sửa backend trước khi test gọi trên máy thật.
+- Firebase/FCM chưa có credentials → chưa gửi push thật; code/sender đã test mock.
+- LiveKit URL `localhost` không dùng được trên thiết bị thật (D7) — đã có `LiveKit:PublicUrl`, cần đặt khi test máy thật.
+
+---
+
+## 8. Khi có thiết bị/Firebase (checklist cho người dùng)
+
+1. Cài **Android Studio + SDK**, thêm `adb`/`flutter` vào PATH; chấp nhận license; kiểm tra `flutter doctor` xanh phần Android.
+2. Bật backend với `LiveKit__PublicUrl`:
+   - emulator: `ws://10.0.2.2:7880`
+   - máy thật cùng LAN: `ws://<IP-máy-backend>:7880`
+3. Tạo service account Firebase, đặt backend `Firebase__ServiceAccountPath` (không commit).
+4. Chạy app với:
+   ```bash
+   flutter run \
+     --dart-define=API_BASE_URL=http://10.0.2.2:5117 \
+     --dart-define=FIREBASE_PROJECT_ID=... \
+     --dart-define=FIREBASE_APP_ID=... \
+     --dart-define=FIREBASE_API_KEY=... \
+     --dart-define=FIREBASE_MESSAGING_SENDER_ID=...
+   ```
+5. Kiểm chứng: đăng nhập → chat real-time/ảnh/tải cũ → gọi audio/video 1–1 + nhóm → từ chối quyền mic/camera → push tin/lời mời/cuộc gọi khi app nền/tắt → bấm notification mở đúng màn hình.
+6. Sau khi đạt, tick các mục GĐ 6 trong `docs/04_roadmap.md` (người dùng tick).
