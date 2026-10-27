@@ -1,8 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="comink_mobile"
+        android:label="Comink"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
+        <!-- usesCleartextTraffic: CHỈ dùng cho dev vì backend chạy HTTP (10.0.2.2/LAN).
+             Khi triển khai production (HTTPS) phải bỏ thuộc tính này. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"

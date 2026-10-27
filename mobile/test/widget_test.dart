@@ -1,30 +1,57 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:comink_mobile/main.dart';
+import 'package:comink_mobile/app.dart';
+import 'package:comink_mobile/core/network/providers.dart';
+import 'package:comink_mobile/core/storage/preferences.dart';
+import 'package:comink_mobile/core/storage/token_storage.dart';
+import 'package:comink_mobile/features/auth/domain/auth_models.dart';
+import 'package:comink_mobile/features/auth/presentation/login_page.dart';
+
+/// Token storage giả để widget test không gọi plugin secure storage.
+class _FakeTokenStorage extends TokenStorage {
+  @override
+  Future<String?> readRefreshToken() async => null;
+
+  @override
+  Future<AuthUser?> readUser() async => null;
+
+  @override
+  Future<void> saveSession(AuthResponse auth) async {}
+
+  @override
+  Future<void> saveUser(AuthUser user) async {}
+
+  @override
+  Future<void> clear() async {}
+}
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('app khởi động chưa đăng nhập → chuyển tới trang đăng nhập', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(preferences),
+          tokenStorageProvider.overrideWithValue(_FakeTokenStorage()),
+        ],
+        child: const CominkApp(),
+      ),
+    );
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoginPage), findsOneWidget);
+    expect(find.text('Đăng nhập'), findsWidgets);
+
+    // Bấm đăng nhập khi để trống → form báo lỗi bắt buộc.
+    await tester.tap(find.widgetWithText(FilledButton, 'Đăng nhập'));
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Vui lòng nhập thông tin'), findsNWidgets(2));
   });
 }
