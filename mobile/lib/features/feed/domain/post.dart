@@ -108,3 +108,17 @@ class Post {
   static int _intValue(dynamic value) =>
       value is int ? value : int.tryParse(value?.toString() ?? '') ?? 0;
 }
+
+/// Một trang bảng tin: bài mới nhất trước + con trỏ trang cũ hơn.
+class FeedHistory {
+  const FeedHistory({
+    required this.posts,
+    required this.nextCursor,
+    required this.hasMore,
+  });
+
+  final List<Post> posts;
+  final String? nextCursor;
+  final bool hasMore;
+}
+

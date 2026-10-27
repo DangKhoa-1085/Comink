@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/i18n/app_localizations.dart';
+import '../../../core/models/paged_result.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/providers.dart';
 import '../../../core/theme/theme_controller.dart';
@@ -18,11 +19,66 @@ import '../domain/post.dart';
 import 'comments_sheet.dart';
 
 /// Tab Bảng tin: bài của bạn bè/người theo dõi, đăng bài, thích.
-class FeedPage extends ConsumerWidget {
+class FeedPage extends ConsumerStatefulWidget {
   const FeedPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FeedPage> createState() => _FeedPageState();
+}
+
+class _FeedPageState extends ConsumerState<FeedPage> {
+  final List<Post> _morePosts = [];
+  String? _nextCursor;
+  bool _hasMore = false;
+  bool _loadingMore = false;
+
+  Future<void> _loadMore(FeedHistory history) async {
+    final cursor = _nextCursor ?? history.nextCursor;
+    final canLoad = _morePosts.isEmpty ? history.hasMore : _hasMore;
+    if (cursor == null || !canLoad || _loadingMore) {
+      return;
+    }
+
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _loadingMore = true);
+
+    try {
+      final data = await ref.read(apiClientProvider).get(
+            '/api/feed',
+            query: {'cursor': cursor, 'limit': 20},
+          );
+      final page = PagedResult.fromJson(data, Post.fromJson);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _morePosts.addAll(page.items);
+        _nextCursor = page.nextCursor;
+        _hasMore = page.hasMore;
+        _loadingMore = false;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _loadingMore = false);
+      messenger.showSnackBar(SnackBar(content: Text(l10n.error(error.code))));
+    }
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _morePosts.clear();
+      _nextCursor = null;
+      _hasMore = false;
+    });
+    ref.invalidate(feedProvider);
+    await ref.read(feedProvider.future);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final feed = ref.watch(feedProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -50,29 +106,64 @@ class FeedPage extends ConsumerWidget {
         label: Text(l10n.t('feed_post')),
       ),
       body: feed.when(
-        data: (posts) => RefreshIndicator(
-          onRefresh: () async {
-            ref.invalidate(feedProvider);
-            await ref.read(feedProvider.future);
-          },
-          child: posts.isEmpty
-              ? ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: [
-                    SizedBox(height: MediaQuery.sizeOf(context).height * 0.2),
-                    EmptyState(
-                      message: l10n.t('feed_empty'),
-                      icon: Icons.dynamic_feed_outlined,
+        skipLoadingOnRefresh: true,
+        data: (history) {
+          final merged = <String, Post>{
+            for (final post in [...history.posts, ..._morePosts]) post.id: post,
+          }.values.toList(growable: false);
+          final canLoad = _morePosts.isEmpty ? history.hasMore : _hasMore;
+
+          return RefreshIndicator(
+            onRefresh: _refresh,
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                if (canLoad &&
+                    !_loadingMore &&
+                    notification.metrics.extentAfter < 300 &&
+                    notification.metrics.axis == Axis.vertical) {
+                  _loadMore(history);
+                }
+                return false;
+              },
+              child: merged.isEmpty
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        SizedBox(height: MediaQuery.sizeOf(context).height * 0.2),
+                        EmptyState(
+                          message: l10n.t('feed_empty'),
+                          icon: Icons.dynamic_feed_outlined,
+                        ),
+                      ],
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
+                      itemCount: merged.length + (canLoad ? 1 : 0),
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        if (index == merged.length) {
+                          return Center(
+                            child: _loadingMore
+                                ? const Padding(
+                                    padding: EdgeInsets.all(8),
+                                    child: SizedBox(
+                                      height: 18,
+                                      width: 18,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    ),
+                                  )
+                                : TextButton(
+                                    onPressed: () => _loadMore(history),
+                                    child: Text(l10n.t('feed_load_more')),
+                                  ),
+                          );
+                        }
+                        return _PostCard(post: merged[index]);
+                      },
                     ),
-                  ],
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
-                  itemCount: posts.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (context, index) => _PostCard(post: posts[index]),
-                ),
-        ),
+            ),
+          );
+        },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => ErrorState(
           message: l10n.error(error is ApiException ? error.code : 'INTERNAL_ERROR'),
