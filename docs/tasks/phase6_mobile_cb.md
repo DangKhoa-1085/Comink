@@ -1,0 +1,170 @@
+# Giai đoạn 6 — App Flutter CB
+
+> Phân rã từ `docs/04_roadmap.md` (Giai đoạn 6) theo `AGENTS.md` mục 7.3.
+> **Mục tiêu:** đưa toàn bộ mức cơ bản của Comink sang app Flutter, dùng chung backend.
+> **Phụ thuộc:** Mốc A. *Trạng thái thực tế:* phần tự động của Mốc A đã xong (seed, OpenAPI Bearer, known issues, demo HTTP 12/12); **TURN hai mạng vẫn chờ người dùng test**. Người dùng đã chỉ định bắt đầu GĐ 6 — rủi ro còn lại được ghi ở mục 8.
+> **Trạng thái:** 🚧 **nền tảng + auth/hồ sơ/bảng tin/bạn bè/chat cơ bản** (2026-10-27). Đã chạy thử trên Chrome (Flutter web) với backend thật; **chưa chạy trên thiết bị Android thật** vì máy chưa có `adb`/thiết bị.
+> **Người phụ trách:** Dev B chính (Flutter/push/call) + Dev A hỗ trợ backend/API; xem `docs/04_roadmap.md` mục 2.
+
+---
+
+## 1. Phạm vi (9 mục roadmap)
+
+| # | Yêu cầu | Ghi chú |
+|---|---|---|
+| 1 | Đăng ký, đăng nhập, lưu token an toàn, tự làm mới | `flutter_secure_storage` + interceptor 401 |
+| 2 | Hồ sơ, bạn bè, theo dõi, tìm kiếm người dùng | API GĐ 1–2 |
+| 3 | Bảng tin, đăng bài kèm ảnh, thích, bình luận, chia sẻ | Cloudinary sign → upload trực tiếp |
+| 4 | Chat riêng real-time, xem lịch sử, gửi ảnh | SignalR + `after`/`before` cursor |
+| 5 | Gọi thoại/video 1–1 và gọi nhóm | LiveKit mobile + token backend |
+| 6 | Quyền mic/camera/thông báo; xử lý khi bị từ chối | `permission_handler` + thông báo rõ |
+| 7 | Push notification FCM (tin mới, lời mời kết bạn, cuộc gọi đến) | Cần backend M4 + Firebase |
+| 8 | Đa ngôn ngữ Việt/Anh | `flutter_localizations` + `intl` |
+| 9 | Chạy ổn trên thiết bị Android thật | Emulator không đủ |
+
+**Ngoài phạm vi GĐ 6:** các tính năng NC của GĐ 7 (trạng thái online, đã đọc, reaction, ghim, tìm kiếm tin…), trừ chat nhóm/gọi nhóm đã có ở CB.
+
+---
+
+## 2. Quyết định kỹ thuật
+
+| Mã | Vấn đề | Phương án | Lý do |
+|---|---|---|---|
+| **D1** | Kiến trúc app | Riverpod 3 + `dio` + `go_router`; chia `core/` và `features/` | Đúng `AGENTS.md` mục 8.4; không thêm state library khác |
+| **D2** | Địa chỉ API | `--dart-define=API_BASE_URL=…`; mặc định `http://10.0.2.2:5117` (Android emulator) | Máy thật dùng IP LAN; không hard-code localhost |
+| **D3** | Lưu token | Refresh token + user trong secure storage; **access token chỉ trong bộ nhớ**; interceptor tự refresh khi 401 một lần | Giảm rủi ro lưu access token; khôi phục phiên bằng `/api/users/me` |
+| **D4** | Đa ngôn ngữ | `flutter_localizations` + lớp `AppLocalizations` dạng map (không codegen) | Ít bước build, đủ vi/en; dễ thêm chuỗi |
+| **D5** | Điều hướng | `go_router` với redirect theo trạng thái phiên; shell 4 tab | Đúng yêu cầu; deep link sau này |
+| **D6** | Push FCM | Làm sau cùng trong GĐ 6; cần backend M4 (`user_devices`, `notifications`), `IPushSender` thật, file cấu hình Firebase | Không có credentials Firebase trong repo; không chặn các mục khác |
+| **D7** | Gọi trên máy thật | Backend cấp `url` LiveKit từ cấu hình; cần thêm `LiveKit:PublicUrl`/host reachable từ điện thoại (hiện `localhost:7880` không dùng được trên máy thật) | Tránh sửa client bằng IP hard-code; làm ở bước gọi |
+| **D8** | Ảnh | Client xin chữ ký → upload Cloudinary trực tiếp; dev fallback local upload | Đúng thiết kế GĐ 2; giới hạn 5 MB/ảnh |
+
+---
+
+## 3. Công việc
+
+### 3.1. Nền tảng (đang làm)
+
+- [x] Cấu trúc `lib/core` + `lib/features`; xóa màn hình counter mẫu
+- [x] `AppConfig` (`API_BASE_URL` bằng `--dart-define`)
+- [x] `ApiClient` (dio): base URL, gắn Bearer, tự refresh 401 một lần, phát sự kiện phiên hết hạn
+- [x] `ApiException` + map mã lỗi sang i18n
+- [x] `TokenStorage` (secure storage) + `SessionController` (Riverpod)
+- [x] `AppLocalizations` vi/en + `LocaleController`
+- [x] Theme Material 3 sáng/tối + lưu lựa chọn
+- [x] `go_router`: `/splash`, `/login`, `/register`, shell `/` (Feed/Bạn bè/Tin nhắn/Hồ sơ)
+- [x] Android: thêm `INTERNET`, cấu hình cleartext cho dev, tên app "Comink"
+
+### 3.2. Xác thực và hồ sơ
+
+- [x] Màn hình đăng nhập/đăng ký (validate, lỗi từ `code`, loading)
+- [x] Khôi phục phiên/đăng xuất; chặn back về màn hình auth
+- [x] Hồ sơ cá nhân: xem, sửa displayName/bio/location; đổi ngôn ngữ (PATCH settings)
+- [ ] Đổi mật khẩu? *(ngoài CB — GĐ 7)*
+
+### 3.3. Mạng xã hội và bảng tin
+
+- [x] Bảng tin: danh sách, loading/empty/error, pull-to-refresh *(phân trang cuộn: chưa)*
+- [x] Đăng bài văn bản + chọn visibility; *(đính kèm ảnh: chưa)*
+- [x] Thích/bỏ thích; *(bình luận/chia sẻ: chưa)*
+- [x] Tìm người dùng (không dấu), kết bạn/theo dõi *(trang hồ sơ công khai: chưa)*
+- [x] Danh sách bạn bè, lời mời nhận/gửi, chấp nhận/từ chối/hủy kết bạn
+- [ ] Trang cá nhân + bài viết
+
+### 3.4. Chat real-time
+
+- [x] Danh sách hội thoại (1–1 + nhóm), sắp theo tin mới, xem trước
+- [x] Khung chat: lịch sử, gửi văn bản, `clientMessageId` *(phân trang: chưa; ảnh: chưa)*
+- [x] SignalR: kết nối, xác thực token, nhận `MessageCreated`, tự kết nối lại *(đồng bộ `after`: chưa)*
+- [ ] Tạo nhóm 3–10 người (bạn bè)
+
+### 3.5. Gọi thoại/video
+
+- [ ] Sửa backend: trả URL LiveKit phù hợp thiết bị (D7)
+- [ ] Màn hình cuộc gọi đến (chuông/từ chối/nghe), gọi 1–1 và nhóm
+- [ ] LiveKit mobile: camera/mic, tắt/bật, kết thúc, thời lượng
+- [ ] Quyền mic/camera + xử lý từ chối rõ ràng
+
+### 3.6. Push, i18n, thiết bị
+
+- [ ] Backend M4: `user_devices`, `notifications`; `IPushSender` FCM
+- [ ] Đăng ký FCM token, nhận push tin/lời mời/cuộc gọi
+- [ ] Xin quyền thông báo; deep link vào chat/cuộc gọi
+- [x] i18n toàn bộ chuỗi hiển thị (vi/en)
+- [ ] Chạy trên thiết bị Android thật (và iOS nếu có)
+
+### 3.7. Test và tài liệu
+
+- [x] Unit test: parser DTO, i18n, lỗi API; widget test khởi động + validate login
+- [ ] Widget test cho shell/feed rỗng/lỗi với fake API
+- [x] `flutter analyze` 0 issue; `flutter test` xanh
+- [ ] README: chạy app, `--dart-define`, quyền, thiết bị thật *(đã có mục cơ bản)*
+- [ ] Cập nhật `docs/04_roadmap.md` khi xong (người dùng tick)
+
+---
+
+## 4. Tiêu chí hoàn thành
+
+- [ ] Đăng nhập/đăng ký/lưu token/refresh hoạt động trên máy thật
+- [ ] Bảng tin + đăng bài + ảnh + thích/bình luận/chia sẻ
+- [ ] Chat 1–1 real-time, lịch sử, ảnh
+- [ ] Gọi 1–1 và nhóm trên điện thoại
+- [ ] Quyền mic/camera/thông báo xử lý đúng khi bị từ chối
+- [ ] Push FCM cho tin/lời mời/cuộc gọi
+- [ ] i18n vi/en đầy đủ
+- [ ] `flutter analyze` sạch, `flutter test` xanh
+- [ ] Chạy trên ít nhất một thiết bị Android thật
+
+---
+
+## 5. Kiểm chứng
+
+### 5.1. Tự động (2026-10-27)
+
+| Hạng mục | Kết quả |
+|---|---|
+| `flutter analyze` | **No issues found** |
+| `flutter test` | **5/5** (i18n vi/en, parse AuthResponse/AuthUser, app khởi động → login + validate form) |
+| `flutter pub get` | OK; thêm `shared_preferences 2.5.6` (BSD-3) |
+
+### 5.2. Tích hợp thật trên Chrome (Flutter web) + backend `localhost:5117` — đạt
+
+Chạy: `flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=http://localhost:5117`, sau đó thao tác qua Chrome:
+
+- Đăng nhập `an.demo` / mật khẩu demo → vào thẳng Bảng tin; token lưu/khôi phục qua secure storage web.
+- Bảng tin hiển thị 5 bài mẫu (An/Chi/Bình), visibility `Chỉ mình tôi` chỉ hiện với chính An; nút thích gọi API được.
+- Tab Hồ sơ: hiện đúng số bạn bè/người theo dõi, email, vai trò; đổi ngôn ngữ Việt → Anh qua `PATCH /api/users/me/settings`, UI đổi ngay; đổi lại tiếng Việt được.
+- Tab Bạn bè: danh sách 2 bạn; tìm `chi` ra đúng người, hiện trạng thái “Bạn bè” + nút theo dõi.
+- Tab Tin nhắn: 2 hội thoại (nhóm “Nhóm học tập” + 1–1 với Bình); mở chat thấy đúng lịch sử 3 tin.
+- Gửi tin “Xin chào từ app Flutter” → xuất hiện ngay.
+- **SignalR:** dùng API đăng nhập `binh.demo` gửi tin “Tin từ Bình qua SignalR” → khung chat của An cập nhật ngay, không cần refresh.
+- Giao diện Material 3, dark mode theo hệ thống; toàn bộ chuỗi qua i18n.
+
+### 5.3. Chưa kiểm chứng / còn thiếu
+
+- **Thiết bị Android thật**: chưa có `adb`/thiết bị trong môi trường này; mới chạy Flutter web.
+- Ảnh trong bài viết/tin nhắn, bình luận/chia sẻ, phân trang cuộn, tạo nhóm.
+- Gọi thoại/video bằng LiveKit mobile (cần sửa D7 + thiết bị).
+- Push FCM, quyền mic/camera/thông báo (cần M4 + Firebase).
+- Widget test cho feed/lỗi bằng fake API.
+
+---
+
+## 6. Môi trường
+
+| Hạng mục | Giá trị |
+|---|---|
+| Flutter SDK | `C:\src\flutter` (3.47.7, Dart 3.13.5) — chưa có trong PATH; dùng `C:\src\flutter\bin\flutter.bat` |
+| Android tooling | `adb` chưa có trong PATH — cần Android Studio/SDK + thiết bị thật |
+| Backend dev | `http://localhost:5117` (Windows), Android emulator dùng `http://10.0.2.2:5117` |
+| Hợp đồng API | `docs/openapi/comink.v1.json` (45 path, Bearer) |
+| Tài khoản demo | `an.demo`/`binh.demo`/`chi.demo` (mật khẩu `DemoSeed:Password` của bạn) |
+
+---
+
+## 7. Rủi ro
+
+- Mốc A chưa tick/TURN chưa chứng minh → app có thể phải sửa nếu API thay đổi. Đã khóa OpenAPI để giảm rủi ro.
+- Không có thiết bị Android thật/adb trong môi trường hiện tại → không thể chứng minh mục 9 cho tới khi bạn cài đặt.
+- Firebase/FCM chưa có cấu hình → push làm sau cùng.
+- LiveKit URL `localhost` không dùng được trên thiết bị thật (D7) — phải sửa backend trước khi test gọi trên máy thật.

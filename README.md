@@ -239,17 +239,33 @@ netsh interface portproxy reset        # xoá hết khi test xong
 - Giới hạn: `image/jpeg`, `image/png`, `image/webp`, ≤ 5 MB/ảnh, ≤ 10 ảnh/bài (kiểm tra ở cả client và server).
 - Thư mục `infra/uploads` là dữ liệu dev — không commit (xem `.gitignore`).
 
-### 7. Chạy app Flutter (tuỳ chọn)
+### 7. Chạy app Flutter (GĐ 6 — đang phát triển)
 
 ```bash
 cd mobile
 flutter pub get
+
+# Android emulator (mặc định backend 10.0.2.2:5117)
 flutter run
+
+# Thiết bị thật cùng LAN — thay IP máy chạy backend
+flutter run --dart-define=API_BASE_URL=http://192.168.1.43:5117
+
+# Kiểm tra nhanh trên Chrome (không cần thiết bị)
+flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=http://localhost:5117
 ```
+
+Tài khoản demo: `an.demo` / `binh.demo` / `chi.demo` (mật khẩu do bạn đặt ở `DemoSeed:Password`).
+
+Hiện đã có: đăng nhập/đăng ký + secure storage + tự refresh token, hồ sơ (xem/sửa/đổi ngôn ngữ),
+bảng tin (văn bản, thích, phân trang cơ bản), bạn bè/tìm kiếm/kết bạn/theo dõi, chat 1–1 + nhóm
+(lịch sử, gửi văn bản, SignalR real-time), i18n vi/en. Còn lại: ảnh, bình luận/chia sẻ, gọi mobile,
+quyền mic/camera/thông báo, FCM và kiểm chứng trên thiết bị Android thật.
 
 > Trên máy này Flutter SDK nằm ở `C:\src\flutter` nhưng chưa có trong PATH — thêm
 > `C:\src\flutter\bin` vào PATH (hoặc dùng `C:\src\flutter\bin\flutter.bat`). GĐ 6 còn cần
-> Android Studio/SDK, thiết bị thật và cấu hình FCM; xem `docs/06_known_issues.md` (KI-06, KI-07).
+> Android Studio/SDK, thiết bị thật và cấu hình FCM; xem `docs/06_known_issues.md` (KI-06, KI-07)
+> và `docs/tasks/phase6_mobile_cb.md`.
 
 ---
 
