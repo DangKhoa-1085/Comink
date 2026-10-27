@@ -91,12 +91,19 @@ public class CallServiceTests : IntegrationTestBase
     private static CallService NewService(
         ApplicationDbContext db,
         FakeCallProvider provider,
-        RecordingCallNotifier notifier) =>
+        RecordingCallNotifier notifier,
+        string? publicUrl = null) =>
         new(
             db,
             provider,
             notifier,
-            Options.Create(new LiveKitOptions { Host = "http://localhost:7880", ApiKey = "devkey", ApiSecret = new string('s', 32) }),
+            Options.Create(new LiveKitOptions
+            {
+                Host = "http://localhost:7880",
+                PublicUrl = publicUrl ?? string.Empty,
+                ApiKey = "devkey",
+                ApiSecret = new string('s', 32),
+            }),
             NullLogger<CallService>.Instance);
 
     /// <summary>Hai người là bạn bè + một hội thoại 1–1 sẵn có.</summary>
@@ -248,6 +255,23 @@ public class CallServiceTests : IntegrationTestBase
         Assert.StartsWith("ws://", token.Value!.Url);
         Assert.Equal(call.Value.RoomName, token.Value.RoomName);
         Assert.True(token.Value.ExpiresAt > DateTimeOffset.UtcNow);
+    }
+
+    [Fact]
+    public async Task GetToken_UsesPublicUrl_WhenConfigured()
+    {
+        var (db, alice, bob, conversation) = await CreateDirectPairAsync();
+        var service = NewService(
+            db,
+            new FakeCallProvider(),
+            new RecordingCallNotifier(),
+            publicUrl: "ws://10.0.2.2:7880");
+        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, "Video"));
+
+        var token = await service.GetTokenAsync(bob.Id, call.Value!.Id);
+
+        Assert.True(token.Succeeded);
+        Assert.Equal("ws://10.0.2.2:7880", token.Value!.Url);
     }
 
     [Fact]

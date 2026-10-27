@@ -153,11 +153,8 @@ public class CallService : ICallService
                 canPublish: true,
                 cancellationToken);
 
-            // Client cần URL WebSocket; LiveKit JS chấp nhận ws:// / wss://.
-            var url = _liveKit.Host
-                .Replace("https://", "wss://", StringComparison.OrdinalIgnoreCase)
-                .Replace("http://", "ws://", StringComparison.OrdinalIgnoreCase)
-                .TrimEnd('/');
+            // Client cần URL WebSocket; ưu tiên LiveKit:PublicUrl cho thiết bị/emulator (D7).
+            var url = _liveKit.ClientUrl;
 
             return OperationResult<CallTokenDto>.Success(new CallTokenDto(
                 url,

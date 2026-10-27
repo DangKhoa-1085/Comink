@@ -619,6 +619,7 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 
 `POST /api/calls/{id}/token` → `200 { url, token, roomName, expiresAt }`
 
+- `url` là WebSocket; lấy từ `LiveKit:PublicUrl` nếu được cấu hình, ngược lại chuyển `LiveKit:Host` sang `ws://`/`wss://`. Thiết bị thật/emulator **phải** đặt `LiveKit__PublicUrl` (ví dụ `ws://10.0.2.2:7880` hoặc `ws://192.168.1.43:7880`) vì `localhost` trên điện thoại trỏ về chính điện thoại (D7).
 - Chỉ thành viên; cuộc gọi đã kết thúc → `409 CALL_ALREADY_ENDED`; LiveKit không chạy → `503 CALL_PROVIDER_UNAVAILABLE`.
 
 ### 9.4. Chấp nhận / từ chối / kết thúc
