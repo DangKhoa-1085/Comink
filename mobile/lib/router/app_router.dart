@@ -10,6 +10,7 @@ import '../features/chats/presentation/chat_page.dart';
 import '../features/chats/presentation/chats_page.dart';
 import '../features/feed/presentation/feed_page.dart';
 import '../features/friends/presentation/friends_page.dart';
+import '../features/notifications/presentation/notifications_page.dart';
 import '../features/profile/presentation/profile_page.dart';
 import '../features/profile/presentation/public_user_page.dart';
 import '../features/shell/home_shell.dart';
@@ -90,6 +91,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => PublicUserPage(
           userId: state.pathParameters['id'] ?? '',
         ),
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsPage(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

@@ -15,6 +15,7 @@ import '../../../core/ui/app_keys.dart';
 import '../../calls/data/call_controller.dart';
 import '../../chats/data/chat_providers.dart';
 import '../../../router/app_router.dart';
+import 'notification_providers.dart';
 
 /// Xử lý FCM ở background (không dùng ref/router).
 @pragma('vm:entry-point')
@@ -186,6 +187,7 @@ class PushService {
       _ref.invalidate(conversationsProvider);
       _ref.invalidate(messagesProvider(data['conversationId']!));
     }
+    _ref.invalidate(notificationsProvider);
   }
 
   void _onMessageOpened(RemoteMessage message) {

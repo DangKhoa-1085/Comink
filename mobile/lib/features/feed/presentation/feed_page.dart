@@ -12,6 +12,7 @@ import '../../../core/theme/theme_controller.dart';
 import '../../../core/widgets/app_avatar.dart';
 import '../../../core/widgets/states.dart';
 import '../../media/data/media_service.dart';
+import '../../notifications/presentation/notification_bell.dart';
 import '../data/feed_providers.dart';
 import '../domain/post.dart';
 import 'comments_sheet.dart';
@@ -30,6 +31,7 @@ class FeedPage extends ConsumerWidget {
       appBar: AppBar(
         title: Text(l10n.t('feed_title')),
         actions: [
+          const NotificationBell(),
           IconButton(
             tooltip: l10n.t('profile_theme'),
             onPressed: () => ref
