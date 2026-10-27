@@ -9,6 +9,8 @@ using Comink.Application.Identity.Validators;
 using Comink.Infrastructure;
 using Comink.Infrastructure.Media;
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.OpenApi;
 using Serilog;
 
 // --- Cấu hình Serilog sớm để bắt lỗi khởi động ---
@@ -80,7 +82,44 @@ try
     builder.Services.AddHostedService<Comink.Api.Realtime.CallRingTimeoutService>();
 
     // --- OpenAPI / Swagger ---
-    builder.Services.AddOpenApi();
+    // Mốc A: hợp đồng phải đủ ổn định để app Flutter sinh client từ đó.
+    // - Khai báo security scheme Bearer JWT (Swagger UI hiện nút Authorize).
+    // - Chỉ gắn yêu cầu bảo mật cho endpoint cần đăng nhập (bỏ login/register/refresh/health/webhook).
+    builder.Services.AddOpenApi(options =>
+    {
+        options.AddDocumentTransformer((document, _, _) =>
+        {
+            document.Components ??= new OpenApiComponents();
+            document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+            document.Components.SecuritySchemes["Bearer"] = new OpenApiSecurityScheme
+            {
+                Type = SecuritySchemeType.Http,
+                Scheme = "bearer",
+                BearerFormat = "JWT",
+                Description = "Access token JWT lấy từ /api/auth/login (không kèm tiền tố Bearer)."
+            };
+
+            return Task.CompletedTask;
+        });
+
+        options.AddOperationTransformer((operation, context, _) =>
+        {
+            var metadata = context.Description.ActionDescriptor.EndpointMetadata;
+            var requiresAuth = metadata.OfType<IAuthorizeData>().Any();
+            var allowsAnonymous = metadata.OfType<IAllowAnonymous>().Any();
+
+            if (requiresAuth && !allowsAnonymous)
+            {
+                operation.Security ??= [];
+                operation.Security.Add(new OpenApiSecurityRequirement
+                {
+                    [new OpenApiSecuritySchemeReference("Bearer", context.Document)] = []
+                });
+            }
+
+            return Task.CompletedTask;
+        });
+    });
 
     // --- SignalR ---
     builder.Services.AddSignalR();
