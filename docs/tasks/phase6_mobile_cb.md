@@ -89,6 +89,7 @@
 
 - [x] Backend M4: `user_devices`, `notifications`; `IPushSender` FCM (HTTP v1, fallback bỏ qua nếu thiếu service account)
 - [x] Đăng ký FCM token, nhận push tin/lời mời/cuộc gọi (code; **chưa kiểm chứng do thiếu credentials Firebase**)
+- [x] Hộp thư thông báo trong app: badge số chưa đọc, danh sách, đánh dấu đã đọc khi mở
 - [x] Xin quyền thông báo; deep link vào chat/cuộc gọi
 - [x] i18n toàn bộ chuỗi hiển thị (vi/en)
 - [ ] Chạy trên thiết bị Android thật (và iOS nếu có)
@@ -148,6 +149,7 @@ Chạy: `flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=ht
 - **Gọi audio (LiveKit thật):** Bình gọi An qua API → app An hiện “Cuộc gọi thoại đến”; bấm Nghe → kết nối room, hiện avatar + mic/kết thúc; kết thúc → DB `Completed`, thời lượng 16s. Gọi từ app (nút điện thoại trong chat) cũng tạo room và kết nối được.
 - **Ảnh bài viết:** upload ảnh PNG 96×96 lên Cloudinary qua chữ ký backend, đăng ký media, tạo bài “Bài có ảnh từ API” → bảng tin hiển thị đúng ảnh (`image` trong accessibility tree).
 - **FCM:** đã đăng ký endpoint thiết bị/hộp thư và nối push vào message/friend/call; **chưa gửi push thật** vì môi trường không có service account Firebase.
+- **Hộp thư:** sau khi tạo lời mời kết bạn từ tài khoản mới, chuông Bảng tin có badge; mở trang Thông báo thấy “Lời mời kết bạn”; bấm vào → đánh dấu đã đọc và chuyển tab Bạn bè, lời mời hiện để Chấp nhận/Từ chối.
 - Giao diện Material 3, dark mode theo hệ thống; toàn bộ chuỗi qua i18n.
 
 ### 5.3. Chưa kiểm chứng / còn thiếu
