@@ -92,7 +92,8 @@ public class CallServiceTests : IntegrationTestBase
         ApplicationDbContext db,
         FakeCallProvider provider,
         RecordingCallNotifier notifier,
-        string? publicUrl = null) =>
+        string? publicUrl = null,
+        FakeNotificationService? notifications = null) =>
         new(
             db,
             provider,
@@ -104,7 +105,8 @@ public class CallServiceTests : IntegrationTestBase
                 ApiKey = "devkey",
                 ApiSecret = new string('s', 32),
             }),
-            NullLogger<CallService>.Instance);
+            NullLogger<CallService>.Instance,
+            notifications);
 
     /// <summary>Hai người là bạn bè + một hội thoại 1–1 sẵn có.</summary>
     private async Task<(ApplicationDbContext Db, ApplicationUser First, ApplicationUser Second, Conversation Conversation)>
@@ -157,6 +159,27 @@ public class CallServiceTests : IntegrationTestBase
         var incoming = Assert.Single(notifier.Incoming);
         Assert.Contains(bob.Id, incoming.Users);
         Assert.DoesNotContain(alice.Id, incoming.Users);
+    }
+
+    [Fact]
+    public async Task Start_DirectCall_PushesInviteeWithCallData()
+    {
+        var (db, alice, bob, conversation) = await CreateDirectPairAsync();
+        var push = new FakeNotificationService();
+        var service = NewService(db, new FakeCallProvider(), new RecordingCallNotifier(), notifications: push);
+
+        var result = await service.StartAsync(
+            alice.Id,
+            new StartCallRequest(conversation.Id, "Video"));
+
+        Assert.True(result.Succeeded);
+        var pushed = Assert.Single(push.Pushes);
+        Assert.Contains(bob.Id, pushed.UserIds);
+        Assert.DoesNotContain(alice.Id, pushed.UserIds);
+        Assert.True(pushed.HighPriority);
+        Assert.Equal("CallIncoming", pushed.Data!["type"]);
+        Assert.Equal(result.Value!.Id.ToString(), pushed.Data["callId"]);
+        Assert.Equal("Video", pushed.Data["callType"]);
     }
 
     [Fact]

@@ -318,6 +318,26 @@ public class MessagingServiceTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Send_PushesOnlyToOtherMembers()
+    {
+        var (db, alice, bob) = await CreatePairAsync();
+        var conversationId = (await Conversations(db).OpenDirectAsync(alice.Id, bob.Id)).Value!.Conversation.Id;
+        var push = new FakeNotificationService();
+        var service = new MessageService(db, new NullChatNotifier(), push);
+
+        await service.SendAsync(
+            alice.Id, conversationId, new SendMessageRequest(Guid.CreateVersion7(), "push nhé", null));
+
+        var pushed = Assert.Single(push.Pushes);
+        Assert.DoesNotContain(alice.Id, pushed.UserIds);
+        Assert.Contains(bob.Id, pushed.UserIds);
+        Assert.Equal("Tin nhắn mới", pushed.Title);
+        Assert.Contains("push nhé", pushed.Body);
+        Assert.True(pushed.HighPriority);
+        Assert.Equal(conversationId.ToString(), pushed.Data!["conversationId"]);
+    }
+
+    [Fact]
     public async Task GetActiveConversationIds_OnlyReturnsMemberships()
     {
         var (db, alice, bob) = await CreatePairAsync();

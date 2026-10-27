@@ -77,6 +77,23 @@ public class SocialServiceTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task SendRequest_CreatesFriendRequestNotification()
+    {
+        var (db, first, second) = await CreateTwoUsersAsync();
+        var push = new FakeNotificationService();
+        var service = new FriendshipService(db, push);
+
+        var result = await service.SendRequestAsync(first.Id, second.Id);
+
+        Assert.True(result.Succeeded);
+        var created = Assert.Single(push.Creates);
+        Assert.Equal(second.Id, created.RecipientId);
+        Assert.Equal(first.Id, created.ActorId);
+        Assert.Equal(Comink.Domain.Enums.NotificationType.FriendRequestReceived, created.Type);
+        Assert.Equal("Friendship", created.EntityType);
+    }
+
+    [Fact]
     public async Task SendRequest_ThenAccept_MakesFriendsAndUpdatesCounts()
     {
         var (db, first, second) = await CreateTwoUsersAsync();
