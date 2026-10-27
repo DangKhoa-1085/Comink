@@ -64,7 +64,7 @@
 
 ### 3.3. Mạng xã hội và bảng tin
 
-- [x] Bảng tin: danh sách, loading/empty/error, pull-to-refresh *(phân trang cuộn: chưa)*
+- [x] Bảng tin: danh sách, loading/empty/error, pull-to-refresh, cuộn/tải thêm theo cursor (20 bài/trang)
 - [x] Đăng bài văn bản/ảnh + chọn visibility (upload Cloudinary/local; tối đa 10 ảnh, 5 MB/ảnh)
 - [x] Thích/bỏ thích, bình luận + trả lời, chia sẻ bài viết
 - [x] Tìm người dùng (không dấu), kết bạn/theo dõi, trang hồ sơ công khai + bài viết
@@ -97,7 +97,7 @@
 ### 3.7. Test và tài liệu
 
 - [x] Unit test: parser DTO, i18n, lỗi API; widget test khởi động + validate login
-- [ ] Widget test cho shell/feed rỗng/lỗi với fake API
+- [x] Widget test: bảng tin rỗng/có bài + nút tải thêm, hộp thư rỗng/có thông báo (dùng override provider)
 - [x] `flutter analyze` 0 issue; `flutter test` xanh
 - [ ] README: chạy app, `--dart-define`, quyền, thiết bị thật *(đã có mục cơ bản)*
 - [ ] Cập nhật `docs/04_roadmap.md` khi xong (người dùng tick)
@@ -125,7 +125,7 @@
 | Hạng mục | Kết quả |
 |---|---|
 | `flutter analyze` | **No issues found** |
-| `flutter test` | **7/7** (i18n vi/en, parse AuthResponse/AuthUser, AppNotification, app khởi động → login + validate form) |
+| `flutter test` | **11/11** (i18n, AuthResponse/AuthUser, AppNotification, feed rỗng/có bài + nút tải thêm, hộp thư rỗng/có thông báo, app khởi động + validate login) |
 | `flutter pub get` | OK; thêm `shared_preferences 2.5.6`, `image_picker 1.2.4`, `permission_handler` (BSD-3/MIT) |
 | Backend `CallServiceTests` | **14/14**, gồm test `PublicUrl` (D7) |
 | Backend `NotificationServiceTests` | **4/4** (đăng ký thiết bị, hộp thư, mark read, push) |
@@ -157,7 +157,8 @@ Chạy: `flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=ht
 - **Thiết bị Android thật**: chưa có `adb`/thiết bị trong môi trường này; mới chạy Flutter web.
 - **Chọn ảnh từ UI Flutter** chưa tự động hoá được trên web (file picker của trình duyệt); luồng upload Cloudinary đã kiểm chứng bằng script HTTP, code `image_picker`/`MediaService` mới chỉ `analyze`. Gửi ảnh trong chat cũng chưa thử upload từ UI.
 - **Video call** chưa kiểm chứng (Chrome test không có camera); **gọi nhóm** mới kiểm chứng tạo nhóm chat, chưa gọi nhóm thật.
-- Phân trang cuộn bảng tin; **phân trang lịch sử chat đã có nút tải cũ hơn nhưng chưa thử với >50 tin**; poll 15s chưa thử mất mạng thật.
+- Phân trang **bảng tin** đã có nút/auto tải thêm và widget test render; chưa thử với >20 bài thật.
+- **Phân trang lịch sử chat** đã có nút tải cũ hơn nhưng chưa thử với >50 tin; poll 15s chưa thử mất mạng thật.
 - **Push FCM chưa kiểm chứng thật**: thiếu service account Firebase/`google-services.json`; code backend + app đã sẵn sàng, thiếu cấu hình thì bỏ qua an toàn.
 - **Thiết bị Android thật**: `flutter doctor` xác nhận chưa có Android SDK/`adb`; chỉ chạy Flutter web.
 - Widget test cho feed/lỗi bằng fake API.

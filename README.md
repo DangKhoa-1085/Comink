@@ -258,7 +258,7 @@ flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=http://loca
 Tài khoản demo: `an.demo` / `binh.demo` / `chi.demo` (mật khẩu do bạn đặt ở `DemoSeed:Password`).
 
 Hiện đã có: đăng nhập/đăng ký + secure storage + tự refresh token, hồ sơ (xem/sửa/đổi ngôn ngữ),
-bảng tin (văn bản/ảnh, thích, bình luận + trả lời, chia sẻ), bạn bè/tìm kiếm/kết bạn/theo dõi,
+bảng tin (văn bản/ảnh, thích, bình luận + trả lời, chia sẻ, tải thêm theo cursor), bạn bè/tìm kiếm/kết bạn/theo dõi,
 hồ sơ công khai, chat 1–1 + nhóm (lịch sử có tải tin cũ hơn, gửi văn bản/ảnh, SignalR real-time, poll bù tin, tạo nhóm),
 gọi audio/video 1–1 và nhóm bằng LiveKit (quyền mic/camera, tắt/bật, kết thúc, thời lượng),
 đăng ký thiết bị + push FCM (tin nhắn/lời mời/cuộc gọi; bỏ qua an toàn nếu chưa cấu hình Firebase),
