@@ -1,5 +1,5 @@
-// Gửi push FCM HTTP v1 bằng service account (không phụ thuộc SDK).
-// Nếu chưa cấu hình Firebase, sender chỉ ghi log và bỏ qua — app vẫn chạy bình thường.
+﻿// Gá»­i push FCM HTTP v1 báº±ng service account (khÃ´ng phá»¥ thuá»™c SDK).
+// Náº¿u chÆ°a cáº¥u hÃ¬nh Firebase, sender chá»‰ ghi log vÃ  bá» qua â€” app váº«n cháº¡y bÃ¬nh thÆ°á»ng.
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
@@ -14,21 +14,28 @@ public class FirebasePushOptions
 {
     public const string SectionName = "Firebase";
 
-    /// <summary>Toàn bộ JSON service account (đặt trong .env/user-secrets, không commit).</summary>
+    /// <summary>ToÃ n bá»™ JSON service account (Ä‘áº·t trong .env/user-secrets, khÃ´ng commit).</summary>
     public string ServiceAccountJson { get; set; } = string.Empty;
 
-    /// <summary>Đường dẫn tới file JSON service account (cách khác thay cho chuỗi JSON).</summary>
+    /// <summary>ÄÆ°á»ng dáº«n tá»›i file JSON service account (cÃ¡ch khÃ¡c thay cho chuá»—i JSON).</summary>
     public string ServiceAccountPath { get; set; } = string.Empty;
+
+    /// <summary>Cho phÃ©p test trá» OAuth endpoint sang server giáº£.</summary>
+    public string OAuthUrl { get; set; } = "https://oauth2.googleapis.com/token";
+
+    /// <summary>Cho phÃ©p test trá» FCM base URL sang server giáº£.</summary>
+    public string FcmBaseUrl { get; set; } = "https://fcm.googleapis.com";
 
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(ServiceAccountJson) ||
         !string.IsNullOrWhiteSpace(ServiceAccountPath);
 }
 
-/// <summary>Gửi notification qua FCM HTTP v1; tự lấy access token OAuth2 và cache đến khi hết hạn.</summary>
+/// <summary>Gá»­i notification qua FCM HTTP v1; tá»± láº¥y access token OAuth2 vÃ  cache Ä‘áº¿n khi háº¿t háº¡n.</summary>
 public class FcmPushSender : IPushSender, IDisposable
 {
-    private static readonly HttpClient Http = new();
+    private readonly HttpClient _http;
+    private readonly bool _ownsHttpClient;
     private readonly FirebasePushOptions _options;
     private readonly ILogger<FcmPushSender> _logger;
     private readonly SemaphoreSlim _tokenLock = new(1, 1);
@@ -36,10 +43,15 @@ public class FcmPushSender : IPushSender, IDisposable
     private DateTimeOffset _accessTokenExpiresAt;
     private ServiceAccount? _account;
 
-    public FcmPushSender(IOptions<FirebasePushOptions> options, ILogger<FcmPushSender> logger)
+    public FcmPushSender(
+        IOptions<FirebasePushOptions> options,
+        ILogger<FcmPushSender> logger,
+        HttpClient? httpClient = null)
     {
         _options = options.Value;
         _logger = logger;
+        _http = httpClient ?? new HttpClient();
+        _ownsHttpClient = httpClient is null;
     }
 
     public async Task SendToDeviceAsync(
@@ -56,7 +68,7 @@ public class FcmPushSender : IPushSender, IDisposable
         if (!_options.IsConfigured)
         {
             _logger.LogDebug(
-                "Bỏ qua push '{Title}': chưa cấu hình Firebase service account",
+                "Bá» qua push '{Title}': chÆ°a cáº¥u hÃ¬nh Firebase service account",
                 notification.Title);
             return;
         }
@@ -129,7 +141,7 @@ public class FcmPushSender : IPushSender, IDisposable
 
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
-            $"https://fcm.googleapis.com/v1/projects/{projectId}/messages:send");
+            $"{_options.FcmBaseUrl.TrimEnd('/')}/v1/projects/{projectId}/messages:send");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         request.Content = new StringContent(
             JsonSerializer.Serialize(message),
@@ -138,19 +150,19 @@ public class FcmPushSender : IPushSender, IDisposable
 
         try
         {
-            using var response = await Http.SendAsync(request, cancellationToken);
+            using var response = await _http.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 var body = await response.Content.ReadAsStringAsync(cancellationToken);
                 _logger.LogWarning(
-                    "FCM trả {Status} khi gửi push: {Body}",
+                    "FCM tráº£ {Status} khi gá»­i push: {Body}",
                     (int)response.StatusCode,
                     body.Length > 500 ? body[..500] : body);
             }
         }
         catch (Exception exception)
         {
-            _logger.LogWarning(exception, "Không gửi được push FCM tới một thiết bị");
+            _logger.LogWarning(exception, "KhÃ´ng gá»­i Ä‘Æ°á»£c push FCM tá»›i má»™t thiáº¿t bá»‹");
         }
     }
 
@@ -178,7 +190,7 @@ public class FcmPushSender : IPushSender, IDisposable
                 string.IsNullOrWhiteSpace(clientEmail) ||
                 string.IsNullOrWhiteSpace(privateKey))
             {
-                _logger.LogWarning("Firebase service account thiếu project_id/client_email/private_key");
+                _logger.LogWarning("Firebase service account thiáº¿u project_id/client_email/private_key");
                 return null;
             }
 
@@ -187,7 +199,7 @@ public class FcmPushSender : IPushSender, IDisposable
         }
         catch (Exception exception)
         {
-            _logger.LogWarning(exception, "Không đọc được Firebase service account");
+            _logger.LogWarning(exception, "KhÃ´ng Ä‘á»c Ä‘Æ°á»£c Firebase service account");
             return null;
         }
     }
@@ -212,17 +224,17 @@ public class FcmPushSender : IPushSender, IDisposable
             var assertion = CreateAssertion(account);
             using var request = new HttpRequestMessage(
                 HttpMethod.Post,
-                "https://oauth2.googleapis.com/token");
+                _options.OAuthUrl);
             request.Content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
                 ["grant_type"] = "urn:ietf:params:oauth:grant-type:jwt-bearer",
                 ["assertion"] = assertion,
             });
 
-            using var response = await Http.SendAsync(request, cancellationToken);
+            using var response = await _http.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("Không lấy được FCM access token: HTTP {Status}", (int)response.StatusCode);
+                _logger.LogWarning("KhÃ´ng láº¥y Ä‘Æ°á»£c FCM access token: HTTP {Status}", (int)response.StatusCode);
                 return null;
             }
 
@@ -238,7 +250,7 @@ public class FcmPushSender : IPushSender, IDisposable
         }
         catch (Exception exception)
         {
-            _logger.LogWarning(exception, "Không lấy được FCM access token");
+            _logger.LogWarning(exception, "KhÃ´ng láº¥y Ä‘Æ°á»£c FCM access token");
             return null;
         }
         finally
@@ -277,7 +289,14 @@ public class FcmPushSender : IPushSender, IDisposable
     private static string Base64Url(byte[] bytes) =>
         Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
-    public void Dispose() => _tokenLock.Dispose();
+    public void Dispose()
+    {
+        _tokenLock.Dispose();
+        if (_ownsHttpClient)
+        {
+            _http.Dispose();
+        }
+    }
 
     private sealed record ServiceAccount(string ProjectId, string ClientEmail, string PrivateKey);
 }
