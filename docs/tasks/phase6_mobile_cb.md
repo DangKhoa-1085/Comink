@@ -130,7 +130,8 @@
 | Backend `CallServiceTests` | **14/14**, gồm test `PublicUrl` (D7) |
 | Backend `NotificationServiceTests` | **4/4** (đăng ký thiết bị, hộp thư, mark read, push) |
 | Backend `FcmPushSenderTests` | **3/3** (OAuth + FCM HTTP v1, nhiều token, thiếu cấu hình không gọi mạng) |
-| Backend toàn bộ | **201/201** (Domain 68, Application 25, Integration 108) |
+| Backend push trigger | message → chỉ người nhận, friend request → tạo thông báo, call → `CallIncoming` dữ liệu |
+| Backend toàn bộ | **204/204** (Domain 68, Application 25, Integration 111) |
 | OpenAPI | tái sinh **48 path**, có `/api/devices`, `/api/notifications` |
 
 ### 5.2. Tích hợp thật trên Chrome (Flutter web) + backend `localhost:5117` — đạt
