@@ -31,6 +31,19 @@ Kiểm tra môi trường:
 flutter doctor
 ```
 
+### 2.1. Android trên máy dev hiện tại
+
+| Hạng mục | Giá trị |
+|---|---|
+| Android Studio | 2026.2.2 — `C:\Program Files\Android\Android Studio` |
+| Android SDK | `C:\Users\HP\AppData\Local\Android\Sdk` — Platforms 34/35/36/37.0, Build-Tools 36.0.0, NDK 28.2.13676358, Platform-Tools 37.0.1 |
+| JDK | JDK kèm Android Studio (JBR 25) — `flutter doctor` tự dùng, không cần cài JDK riêng |
+| Emulator / AVD | Pixel_7 (Android 16, google_apis) và Medium_Phone_API_37.0 |
+| PATH | `C:\src\flutter\bin`, `…\Android\Sdk\platform-tools`, `…\Android\Sdk\emulator`, `…\cmdline-tools\latest\bin` |
+| License | đã chấp nhận — mục "Android toolchain" của `flutter doctor` phải xanh |
+
+Kiểm tra nhanh: `flutter doctor -v` (mục Android toolchain `[√]`) và `adb devices`.
+
 ---
 
 ## 3. Lệnh thường dùng
@@ -42,6 +55,48 @@ flutter test              # chạy test
 flutter run               # chạy app trên thiết bị/giả lập đang kết nối
 dart format lib test      # định dạng mã
 ```
+
+### 3.1. Build và chạy trên Android
+
+**Build APK debug (không cần thiết bị cắm vào):**
+
+```bash
+flutter build apk --debug
+# → build/app/outputs/flutter-apk/app-debug.apk
+```
+
+**Chạy trên emulator** (backend chạy trên máy host):
+
+```bash
+flutter emulators --launch Pixel_7
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5117
+```
+
+**Chạy trên điện thoại thật** (backend phải vào được qua LAN):
+
+1. Trên điện thoại: `Cài đặt → Giới thiệu điện thoại → Nhấn "Số bản dựng" 7 lần` → bật **Tùy chọn nhà phát triển** → bật **Gỡ lỗi USB (USB debugging)**.
+2. Cắm cáp USB, trên điện thoại chọn chế độ **Truyền tệp** và bấm **Cho phép** ở hộp thoại "Cho phép gỡ lỗi USB".
+3. Kiểm tra: `adb devices` phải hiện `<serial>  device` (nếu là `unauthorized` thì bấm lại "Cho phép" trên điện thoại).
+4. Lấy IP LAN của máy tính (`ipconfig`), rồi chạy:
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://<ip-lan-máy-tính>:5117
+```
+
+Lưu ý cho máy thật:
+
+- Điện thoại và máy tính phải cùng mạng LAN; tường lửa Windows phải cho phép cổng **5117** (backend) và **7880** (LiveKit).
+- Backend phải lắng nghe trên `0.0.0.0`, không chỉ `localhost` (xem `backend/src/Comink.Api/Properties/launchSettings.json` hoặc biến `ASPNETCORE_URLS`).
+- Gọi thoại/video cần `LiveKit__PublicUrl=ws://<ip-lan-máy-tính>:7880` khi khởi động backend, nếu không app sẽ nhận `ws://localhost:7880` và không kết nối được.
+- Quyền mic/camera/thông báo do app xin lúc dùng; nếu người dùng từ chối, app hiện thông báo lỗi thay vì im lặng.
+- App bật `usesCleartextTraffic` để gọi HTTP khi dev — **phải bỏ** khi chuyển sang HTTPS production.
+
+**Lỗi build đã biết (đã xử lý trong repo):**
+
+| Lỗi | Nguyên nhân | Cách xử lý trong repo |
+|---|---|---|
+| `permission_handler_android requires ... Android SDK version 37` | `permission_handler` 13 yêu cầu `compileSdk 37`, Flutter 3.47 mặc định 36 | `android/app/build.gradle.kts`: `compileSdk = 37` |
+| `Could not close incremental caches ... is already registered` | Kotlin 2.4 + AGP 9.1 + Gradle 9.3 trên Windows lỗi cache biên dịch tăng dần của các module plugin | `android/gradle.properties`: `kotlin.incremental=false` (build chậm hơn một chút) |
 
 ---
 
