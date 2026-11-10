@@ -173,6 +173,48 @@ try
         }
     }
 
+    // --- Trạng thái push FCM (Giai đoạn 6) ---
+    // Thiếu cấu hình Firebase thì backend vẫn chạy và push bị bỏ qua (KI-06). Log rõ ở đây để
+    // biết push đang BẬT hay TẮT, và cảnh báo khi đặt đường dẫn service account mà file không có
+    // (trường hợp hay gặp nhất khi cấu hình FCM lần đầu).
+    using (var pushScope = app.Services.CreateScope())
+    {
+        var pushOptions = pushScope.ServiceProvider
+            .GetRequiredService<Microsoft.Extensions.Options.IOptions<
+                Comink.Infrastructure.Notifications.FirebasePushOptions>>()
+            .Value;
+        var pushLogger = pushScope.ServiceProvider
+            .GetRequiredService<ILoggerFactory>()
+            .CreateLogger("Push.Fcm");
+
+        if (!string.IsNullOrWhiteSpace(pushOptions.ServiceAccountJson))
+        {
+            pushLogger.LogInformation("Push FCM: BẬT (service account JSON lấy từ cấu hình)");
+        }
+        else if (!string.IsNullOrWhiteSpace(pushOptions.ServiceAccountPath))
+        {
+            if (File.Exists(pushOptions.ServiceAccountPath))
+            {
+                pushLogger.LogInformation(
+                    "Push FCM: BẬT (service account: {Path})",
+                    pushOptions.ServiceAccountPath);
+            }
+            else
+            {
+                pushLogger.LogWarning(
+                    "Push FCM: TẮT — không tìm thấy file service account tại {Path}. "
+                    + "Kiểm tra Firebase__ServiceAccountPath (hướng dẫn: mobile/README.md mục 3.2)",
+                    pushOptions.ServiceAccountPath);
+            }
+        }
+        else
+        {
+            pushLogger.LogInformation(
+                "Push FCM: TẮT — thiếu Firebase__ServiceAccountPath/Firebase__ServiceAccountJson; "
+                + "app vẫn chạy nhưng không có thông báo đẩy (hướng dẫn: mobile/README.md mục 3.2)");
+        }
+    }
+
     if (app.Environment.IsDevelopment())
     {
         app.MapOpenApi();

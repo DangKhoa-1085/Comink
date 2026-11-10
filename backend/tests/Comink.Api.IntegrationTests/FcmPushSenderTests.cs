@@ -132,4 +132,30 @@ public class FcmPushSenderTests
 
         Assert.Empty(handler.Requests);
     }
+
+    [Fact]
+    public async Task MissingServiceAccountFile_DoesNotThrowAndSkipsHttp()
+    {
+        // Cấu hình Firebase__ServiceAccountPath trỏ tới file không tồn tại là lỗi hay gặp khi
+        // cấu hình FCM lần đầu: sender phải bỏ qua an toàn (chỉ log), không làm hỏng request
+        // đang gửi push và không gọi mạng.
+        var handler = new RecordingHandler();
+        var options = new FirebasePushOptions
+        {
+            ServiceAccountPath = Path.Combine(
+                Path.GetTempPath(),
+                $"comink-missing-service-account-{Guid.NewGuid():N}.json"),
+            OAuthUrl = "https://oauth.test/token",
+            FcmBaseUrl = "https://fcm.test",
+        };
+
+        using var sender = new FcmPushSender(
+            Options.Create(options),
+            NullLogger<FcmPushSender>.Instance,
+            new HttpClient(handler));
+
+        await sender.SendToDeviceAsync("device-token-1", new PushNotification("A", "B"));
+
+        Assert.Empty(handler.Requests);
+    }
 }
