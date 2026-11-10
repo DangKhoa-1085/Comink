@@ -3,7 +3,7 @@
 > Phân rã từ `docs/04_roadmap.md` (Giai đoạn 6) theo `AGENTS.md` mục 7.3.
 > **Mục tiêu:** đưa toàn bộ mức cơ bản của Comink sang app Flutter, dùng chung backend.
 > **Phụ thuộc:** Mốc A. *Trạng thái thực tế:* phần tự động của Mốc A đã xong (seed, OpenAPI Bearer, known issues, demo HTTP 12/12); **TURN hai mạng vẫn chờ người dùng test**. Người dùng đã chỉ định bắt đầu GĐ 6 — rủi ro còn lại được ghi ở mục 8.
-> **Trạng thái:** 🚧 **nền tảng + auth/hồ sơ/bảng tin có ảnh/bình luận/chia sẻ + bạn bè/hồ sơ công khai + chat real-time/tạo nhóm/gửi ảnh + gọi audio/video mobile + FCM/hộp thư thông báo** (2026-10-27). Đã chạy thử trên Chrome (Flutter web) với backend + LiveKit thật; **chưa chạy trên thiết bị Android thật** vì máy chưa có Android SDK/`adb`/thiết bị.
+> **Trạng thái:** 🚧 **nền tảng + auth/hồ sơ/bảng tin có ảnh/bình luận/chia sẻ + bạn bè/hồ sơ công khai + chat real-time/tạo nhóm/gửi ảnh + gọi audio/video mobile + FCM/hộp thư thông báo** (2026-10-27). Đã chạy thử trên Chrome (Flutter web) với backend + LiveKit thật; **chưa chạy trên thiết bị Android thật** — 2026-11-03: Android Studio + SDK đã cài xong, `flutter doctor` mục Android xanh và `flutter build apk --debug` thành công, nhưng vẫn chưa có điện thoại cắm vào (`adb devices` trống).
 > **Người phụ trách:** Dev B chính (Flutter/push/call) + Dev A hỗ trợ backend/API; xem `docs/04_roadmap.md` mục 2.
 
 ---
@@ -99,7 +99,7 @@
 - [x] Unit test: parser DTO, i18n, lỗi API; widget test khởi động + validate login
 - [x] Widget test: bảng tin rỗng/có bài + nút tải thêm, hộp thư rỗng/có thông báo (dùng override provider)
 - [x] `flutter analyze` 0 issue; `flutter test` xanh
-- [ ] README: chạy app, `--dart-define`, quyền, thiết bị thật *(đã có mục cơ bản)*
+- [x] README: chạy app, `--dart-define`, quyền, thiết bị thật *(mục 2.1 + 3.1: build APK, emulator, 4 bước bật USB debugging, LAN/firewall, LiveKit `PublicUrl`, bảng lỗi build)*
 - [ ] Cập nhật `docs/04_roadmap.md` khi xong (người dùng tick)
 
 ---
@@ -113,7 +113,7 @@
 - [ ] Quyền mic/camera/thông báo xử lý đúng khi bị từ chối
 - [ ] Push FCM cho tin/lời mời/cuộc gọi
 - [ ] i18n vi/en đầy đủ
-- [ ] `flutter analyze` sạch, `flutter test` xanh
+- [x] `flutter analyze` sạch, `flutter test` xanh *(2026-11-04: analyze 0 issue; test 11/11)*
 - [ ] Chạy trên ít nhất một thiết bị Android thật
 
 ---
@@ -156,7 +156,8 @@ Chạy: `flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=ht
 
 ### 5.3. Chưa kiểm chứng / còn thiếu
 
-- **Thiết bị Android thật**: `flutter doctor` xác nhận chưa có Android SDK/`adb`/thiết bị; mới chạy Flutter web.
+- **Thiết bị Android thật**: Android toolchain đã xanh và APK debug build được từ đầu (`flutter clean` → `flutter build apk --debug`, 2026-11-03); **còn thiếu điện thoại** — `adb devices` trống nên chưa kiểm chứng runtime trên Android. Hướng dẫn kết nối ở `mobile/README.md` mục 3.1.
+  - Đã sửa 2 lỗi chặn build Android: `compileSdk = 37` (vì `permission_handler_android` 13 yêu cầu) và `kotlin.incremental=false` (lỗi cache Kotlin 2.4 + AGP 9.1 + Gradle 9.3 trên Windows).
 - **Chọn ảnh từ UI Flutter** chưa tự động hoá được trên web (file picker của trình duyệt); luồng upload Cloudinary đã kiểm chứng bằng script HTTP, code `image_picker`/`MediaService` mới chỉ `analyze`. Gửi ảnh trong chat cũng chưa thử upload từ UI.
 - **Video call** chưa kiểm chứng (Chrome test không có camera); **gọi nhóm** mới kiểm chứng tạo nhóm chat, chưa gọi nhóm thật.
 - Phân trang **bảng tin** đã có nút/auto tải thêm và widget test render; chưa thử với >20 bài thật.
@@ -169,8 +170,9 @@ Chạy: `flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=ht
 
 | Hạng mục | Giá trị |
 |---|---|
-| Flutter SDK | `C:\src\flutter` (3.47.7, Dart 3.13.5) — chưa có trong PATH; dùng `C:\src\flutter\bin\flutter.bat` |
-| Android tooling | `adb` chưa có trong PATH — cần Android Studio/SDK + thiết bị thật |
+| Flutter SDK | `C:\src\flutter` (3.47.7, Dart 3.13.5) — đã có trong PATH; dùng `C:\src\flutter\bin\flutter.bat` |
+| Android tooling | Android Studio 2026.2.2 + Android SDK ở `C:\Users\HP\AppData\Local\Android\Sdk` (Platform 34/35/36/37.0, Build-Tools 36.0.0, NDK 28.2, Platform-Tools 37.0.1); `adb`, `emulator`, `cmdline-tools`, `flutter` đã có trong PATH; license đã chấp nhận; AVD `Pixel_7` + `Medium_Phone_API_37.0`; JDK = JBR 25 của Android Studio |
+| Build Android | `flutter build apk --debug` → OK (2026-11-03, `app-debug.apk`, compileSdk 37 / targetSdk 36 / minSdk 24) |
 | Backend dev | `http://localhost:5117` (Windows), Android emulator dùng `http://10.0.2.2:5117` |
 | Hợp đồng API | `docs/openapi/comink.v1.json` (48 path, Bearer) |
 | Tài khoản demo | `an.demo`/`binh.demo`/`chi.demo` (mật khẩu `DemoSeed:Password` của bạn) |
@@ -180,7 +182,7 @@ Chạy: `flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=ht
 ## 7. Rủi ro
 
 - Mốc A chưa tick/TURN chưa chứng minh → app có thể phải sửa nếu API thay đổi. Đã khóa OpenAPI để giảm rủi ro.
-- Không có thiết bị Android thật/adb trong môi trường hiện tại → không thể chứng minh mục 9 cho tới khi bạn cài đặt.
+- Không có điện thoại Android trong môi trường hiện tại (SDK/tooling đã sẵn sàng) → chưa chứng minh được mục 9 cho tới khi cắm thiết bị thật.
 - Firebase/FCM chưa có credentials → chưa gửi push thật; code/sender đã test mock.
 - LiveKit URL `localhost` không dùng được trên thiết bị thật (D7) — đã có `LiveKit:PublicUrl`, cần đặt khi test máy thật.
 
