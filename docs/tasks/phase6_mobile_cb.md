@@ -91,6 +91,7 @@
 - [x] Đăng ký FCM token, nhận push tin/lời mời/cuộc gọi (code; **chưa kiểm chứng do thiếu credentials Firebase**)
   - 2026-11-11: thêm log trạng thái lúc khởi động backend — `Push FCM: BẬT (service account: …)` / `Push FCM: TẮT — …` (kèm cảnh báo khi `Firebase__ServiceAccountPath` trỏ tới file không tồn tại) để phân biệt "push tắt" với "push lỗi"; thêm test `MissingServiceAccountFile_DoesNotThrowAndSkipsHttp`.
   - Hướng dẫn cấu hình đầy đủ (tạo Firebase project, bật Cloud Messaging API, service account, chạy app, kiểm chứng 2 tài khoản, lỗi thường gặp): `mobile/README.md` mục 3.2.
+  - ⚠️ **Lệch quyết định đã chốt:** `docs/02_tech_stack_decisions.md` mục 2.3 chốt push = `firebase_messaging` + `flutter_local_notifications`, nhưng app hiện chỉ dùng `firebase_messaging`: khi app ở **foreground** thông báo hiện bằng SnackBar + tự cập nhật hộp thư (`_onForegroundMessage`), **không** có thông báo trên khay hệ thống. Khi app ở **nền/tắt**, khay hệ thống vẫn hoạt động bình thường. Chờ người dùng chọn: thêm `flutter_local_notifications` hay cập nhật lại quyết định.
 - [x] Hộp thư thông báo trong app: badge số chưa đọc, danh sách, đánh dấu đã đọc khi mở
 - [x] Xin quyền thông báo; deep link vào chat/cuộc gọi
 - [x] i18n toàn bộ chuỗi hiển thị (vi/en)

@@ -162,7 +162,8 @@ flutter run \
 
 1. Tài khoản A đăng nhập trên điện thoại, tài khoản B nhắn tin cho A.
 2. Đưa app A xuống nền → phải có thông báo; **tắt hẳn app** → vẫn phải có thông báo.
-3. Lặp lại với lời mời kết bạn và cuộc gọi đến; bấm thông báo phải mở đúng chat / hộp thư / màn hình cuộc gọi.
+3. Khi app A đang mở (foreground), FCM hiện **SnackBar** trong app và tự cập nhật hộp thư — hiện **chưa** có thông báo trên khay hệ thống khi đang mở (xem `docs/tasks/phase6_mobile_cb.md` mục 3.6).
+4. Lặp lại với lời mời kết bạn và cuộc gọi đến; bấm thông báo phải mở đúng chat / hộp thư / màn hình cuộc gọi.
 
 **Lỗi thường gặp**
 
