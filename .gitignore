@@ -18,6 +18,8 @@ appsettings.Local.json
 *.pfx
 *serviceAccount*.json
 *service-account*.json
+# Thư mục chứa service account Firebase khi dev: bỏ qua MỌI tên file trong đó
+backend/secrets/
 
 # Tệp media lưu cục bộ khi dev (Giai đoạn 2, phương án B) — dữ liệu sinh ra, không commit
 infra/uploads/
