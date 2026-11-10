@@ -6,7 +6,10 @@ plugins {
 
 android {
     namespace = "com.comink.comink_mobile"
-    compileSdk = flutter.compileSdkVersion
+    // Flutter 3.47 mặc định compileSdk 36, nhưng permission_handler_android (v13) yêu cầu
+    // compileSdk >= 37 nên buộc phải ghi đè tường minh để build được APK Android.
+    // compileSdk chỉ ảnh hưởng lúc biên dịch; targetSdk/minSdk vẫn theo Flutter.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
