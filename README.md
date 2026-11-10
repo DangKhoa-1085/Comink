@@ -278,15 +278,15 @@ $env:LiveKit__PublicUrl="ws://192.168.1.43:7880"
 
 Sau đó chạy app với `API_BASE_URL` tương ứng. Xem `docs/tasks/phase6_mobile_cb.md`.
 
-**Push FCM (tuỳ chọn, GĐ 6):** backend cần service account Firebase (không commit):
+**Push FCM (tuỳ chọn, GĐ 6):** cần service account Firebase cho backend (không commit) và 4 giá
+trị công khai cho app. Hướng dẫn từng bước — tạo project, bật Cloud Messaging API, kiểm tra log
+`Push FCM: BẬT`, chạy app, kiểm chứng với 2 tài khoản: `mobile/README.md` mục 3.2.
 
 ```bash
-$env:Firebase__ServiceAccountPath="D:\secrets\comink-firebase.json"
-```
+# Backend: đặt file service account trong backend/secrets/ (đã git-ignore) rồi khai báo trong .env
+Firebase__ServiceAccountPath=D:\DACN\Comink\backend\secrets\fcm-service-account.json
 
-và app nhận cấu hình công khai qua `--dart-define` (các giá trị này không phải secret):
-
-```bash
+# App: 4 giá trị công khai lấy từ Firebase Console (Project settings → General)
 flutter run --dart-define=FIREBASE_PROJECT_ID=... \
   --dart-define=FIREBASE_APP_ID=... \
   --dart-define=FIREBASE_API_KEY=... \
@@ -295,9 +295,9 @@ flutter run --dart-define=FIREBASE_PROJECT_ID=... \
 
 Nếu thiếu cấu hình, app vẫn chạy bình thường; backend bỏ qua push và ghi log.
 
-> Trên máy này Flutter SDK nằm ở `C:\src\flutter` nhưng chưa có trong PATH — thêm
-> `C:\src\flutter\bin` vào PATH (hoặc dùng `C:\src\flutter\bin\flutter.bat`). GĐ 6 còn cần
-> Android Studio/SDK, thiết bị thật và cấu hình FCM; xem `docs/06_known_issues.md` (KI-06, KI-07)
+> Trên máy này Flutter SDK ở `C:\src\flutter` và đã có trong PATH; Android Studio 2026.2.2 +
+> Android SDK (Platform 37.0) đã cài, `flutter build apk --debug` chạy được. GĐ 6 còn thiếu
+> **điện thoại thật** và credentials FCM; xem `docs/06_known_issues.md` (KI-06, KI-07)
 > và `docs/tasks/phase6_mobile_cb.md`.
 
 ---

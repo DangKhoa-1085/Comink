@@ -89,6 +89,8 @@
 
 - [x] Backend M4: `user_devices`, `notifications`; `IPushSender` FCM (HTTP v1, fallback bỏ qua nếu thiếu service account)
 - [x] Đăng ký FCM token, nhận push tin/lời mời/cuộc gọi (code; **chưa kiểm chứng do thiếu credentials Firebase**)
+  - 2026-11-11: thêm log trạng thái lúc khởi động backend — `Push FCM: BẬT (service account: …)` / `Push FCM: TẮT — …` (kèm cảnh báo khi `Firebase__ServiceAccountPath` trỏ tới file không tồn tại) để phân biệt "push tắt" với "push lỗi"; thêm test `MissingServiceAccountFile_DoesNotThrowAndSkipsHttp`.
+  - Hướng dẫn cấu hình đầy đủ (tạo Firebase project, bật Cloud Messaging API, service account, chạy app, kiểm chứng 2 tài khoản, lỗi thường gặp): `mobile/README.md` mục 3.2.
 - [x] Hộp thư thông báo trong app: badge số chưa đọc, danh sách, đánh dấu đã đọc khi mở
 - [x] Xin quyền thông báo; deep link vào chat/cuộc gọi
 - [x] i18n toàn bộ chuỗi hiển thị (vi/en)
@@ -129,9 +131,9 @@
 | `flutter pub get` | OK; thêm `shared_preferences 2.5.6`, `image_picker 1.2.4`, `permission_handler` (BSD-3/MIT) |
 | Backend `CallServiceTests` | **14/14**, gồm test `PublicUrl` (D7) |
 | Backend `NotificationServiceTests` | **4/4** (đăng ký thiết bị, hộp thư, mark read, push) |
-| Backend `FcmPushSenderTests` | **3/3** (OAuth + FCM HTTP v1, nhiều token, thiếu cấu hình không gọi mạng) |
+| Backend `FcmPushSenderTests` | **4/4** (OAuth + FCM HTTP v1, nhiều token, thiếu cấu hình không gọi mạng, `ServiceAccountPath` trỏ file không tồn tại → bỏ qua an toàn) |
 | Backend push trigger | message → chỉ người nhận, friend request → tạo thông báo, call → `CallIncoming` dữ liệu |
-| Backend toàn bộ | **204/204** (Domain 68, Application 25, Integration 111) |
+| Backend toàn bộ | **205/205** (Domain 68, Application 25, Integration 112) — 2026-11-11 |
 | OpenAPI | tái sinh **48 path**, có `/api/devices`, `/api/notifications` |
 
 ### 5.2. Tích hợp thật trên Chrome (Flutter web) + backend `localhost:5117` — đạt
