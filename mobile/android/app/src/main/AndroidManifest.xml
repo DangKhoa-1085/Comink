@@ -12,6 +12,12 @@
         android:usesCleartextTraffic="true">
         <!-- usesCleartextTraffic: CHỈ dùng cho dev vì backend chạy HTTP (10.0.2.2/LAN).
              Khi triển khai production (HTTPS) phải bỏ thuộc tính này. -->
+        <!-- firebase_messaging 17 chỉ tạo token FCM khi Firebase Installations ID được bật.
+             Thiếu dòng này, FirebaseMessaging ném IllegalStateException "API disabled"
+             → app không xin quyền thông báo, không đăng ký token, không nhận push (GĐ 6). -->
+        <meta-data
+            android:name="firebase_messaging_installation_id_enabled"
+            android:value="true" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

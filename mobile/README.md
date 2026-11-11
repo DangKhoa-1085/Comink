@@ -173,6 +173,7 @@ flutter run \
 | `FCM trả 404` kèm `UNREGISTERED` | Token cũ/bị thu hồi — mở lại app để đăng ký token mới |
 | Không có log push nào | Thiếu `Firebase__ServiceAccountPath` trong `.env` (xem bước 4) |
 | Có thông báo nhưng bấm không mở đúng màn hình | Payload `data` thiếu `type`/`conversationId` — đối chiếu `docs/05_api_contract.md` mục 10 |
+| Không hiện hộp thoại xin quyền thông báo **và** không có token trong `user_devices` | `firebase_messaging` 17 ném `IllegalStateException: API disabled ... firebase_messaging_installation_id_enabled` (thiếu meta-data Firebase Installations ID) → app bỏ qua toàn bộ push. Log thấy dòng `flutter : Không khởi tạo được FCM: …`. **Đã sửa** bằng meta-data trong `android/app/src/main/AndroidManifest.xml`; nhớ **build lại và cài lại** app (hot reload không cập nhật manifest) |
 | iOS không nhận | Cần APNs key trong Firebase + quyền thông báo; ngoài phạm vi GĐ 6 |
 
 ---
