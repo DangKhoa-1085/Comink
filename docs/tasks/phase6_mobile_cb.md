@@ -110,15 +110,15 @@
 
 ## 4. Tiêu chí hoàn thành
 
-- [ ] Đăng nhập/đăng ký/lưu token/refresh hoạt động trên máy thật
+- [x] Đăng nhập/đăng ký/lưu token/refresh hoạt động trên máy thật *(2026-11-12: đăng ký `test2.demo` trên Samsung A50, mở lại app vẫn giữ phiên)*
 - [ ] Bảng tin + đăng bài + ảnh + thích/bình luận/chia sẻ
-- [ ] Chat 1–1 real-time, lịch sử, ảnh
-- [ ] Gọi 1–1 và nhóm trên điện thoại
+- [ ] Chat 1–1 real-time, lịch sử, ảnh *(đã thử chat văn bản trên máy thật; ảnh trong chat chưa thử)*
+- [ ] Gọi 1–1 và nhóm trên điện thoại *(đã thử gọi 1–1 app ↔ web; gọi nhóm chưa thử)*
 - [ ] Quyền mic/camera/thông báo xử lý đúng khi bị từ chối
-- [ ] Push FCM cho tin/lời mời/cuộc gọi
-- [ ] i18n vi/en đầy đủ
+- [ ] Push FCM cho tin/lời mời/cuộc gọi *(đã nhận push tin nhắn thật; lời mời/cuộc gọi chưa ghi nhận)*
+- [x] i18n vi/en đầy đủ *(toàn bộ chuỗi qua i18n; đã đổi vi/en trên web)*
 - [x] `flutter analyze` sạch, `flutter test` xanh *(2026-11-04: analyze 0 issue; test 11/11)*
-- [ ] Chạy trên ít nhất một thiết bị Android thật
+- [x] Chạy trên ít nhất một thiết bị Android thật *(2026-11-12: Samsung SM-A505F, Android 11 — xem mục 5.4)*
 
 ---
 
@@ -160,13 +160,32 @@ Chạy: `flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=ht
 
 ### 5.3. Chưa kiểm chứng / còn thiếu
 
-- **Thiết bị Android thật**: Android toolchain đã xanh và APK debug build được từ đầu (`flutter clean` → `flutter build apk --debug`, 2026-11-03); **còn thiếu điện thoại** — `adb devices` trống nên chưa kiểm chứng runtime trên Android. Hướng dẫn kết nối ở `mobile/README.md` mục 3.1.
-  - Đã sửa 2 lỗi chặn build Android: `compileSdk = 37` (vì `permission_handler_android` 13 yêu cầu) và `kotlin.incremental=false` (lỗi cache Kotlin 2.4 + AGP 9.1 + Gradle 9.3 trên Windows).
+- **Thiết bị Android thật**: đã chạy được trên Samsung SM-A505F (Android 11) ngày 2026-11-12 — xem mục 5.4; còn thiếu các kịch bản như app tắt hẳn, push lời mời/cuộc gọi, gọi nhóm, video call.
+  - Đã sửa 3 lỗi chặn trên máy thật: `compileSdk = 37`, `kotlin.incremental=false` (lỗi cache Kotlin 2.4 + AGP 9.1 + Gradle 9.3 trên Windows), và thiếu meta-data `firebase_messaging_installation_id_enabled` (FCM không khởi tạo → không xin quyền, không có token).
 - **Chọn ảnh từ UI Flutter** chưa tự động hoá được trên web (file picker của trình duyệt); luồng upload Cloudinary đã kiểm chứng bằng script HTTP, code `image_picker`/`MediaService` mới chỉ `analyze`. Gửi ảnh trong chat cũng chưa thử upload từ UI.
 - **Video call** chưa kiểm chứng (Chrome test không có camera); **gọi nhóm** mới kiểm chứng tạo nhóm chat, chưa gọi nhóm thật.
 - Phân trang **bảng tin** đã có nút/auto tải thêm và widget test render; chưa thử với >20 bài thật.
 - **Phân trang lịch sử chat** đã có nút tải cũ hơn nhưng chưa thử với >50 tin; poll 15s chưa thử mất mạng thật.
-- **Push FCM chưa kiểm chứng thật**: thiếu service account Firebase; code backend + app đã sẵn sàng, sender đã test mock, thiếu cấu hình thì bỏ qua an toàn.
+- **Push FCM**: đã nhận **push tin nhắn thật** trên Samsung A50 (2026-11-12, xem 5.4); còn kiểm chứng push **lời mời kết bạn**, **cuộc gọi đến**, và trường hợp **app tắt hẳn**. Không còn thiếu credentials — service account đặt ở `backend/secrets/` (git-ignore), log backend báo `Push FCM: BẬT`.
+
+### 5.4. Máy thật Android — Samsung SM-A505F (2026-11-12)
+
+| Hạng mục | Giá trị |
+|---|---|
+| Thiết bị | Samsung **SM-A505F** (Galaxy A50), **Android 11** (API 30), debug build cài qua `flutter run` |
+| Mạng | Điện thoại + máy tính cùng Wi-Fi; backend `http://192.168.1.4:5117` (`0.0.0.0`), LiveKit `ws://192.168.1.4:7880` |
+| Tài khoản | `test2.demo` trên app (Android), `test1.demo` trên web — đã kết bạn |
+| Token FCM | `user_devices` có `test2.demo` với `platform=Android`, `device_name=android`, `is_active=t` (2026-11-11 17:31 UTC) |
+| Kết quả | ✅ **Nhận thông báo push tin nhắn từ web lên app**; đăng nhập/giữ phiên, chat văn bản, gọi 1–1 app ↔ web hoạt động |
+
+**Lỗi đã gặp và sửa trong đợt này** (quan trọng cho lần sau):
+
+1. `flutter build apk` lỗi `permission_handler_android requires compileSdk 37` → đặt `compileSdk = 37` ([build.gradle.kts](../../mobile/android/app/build.gradle.kts)).
+2. Build lỗi `Could not close incremental caches … is already registered` (Kotlin 2.4 + AGP 9.1 trên Windows) → `kotlin.incremental=false` ([gradle.properties](../../mobile/android/gradle.properties)).
+3. **Không có token, không hiện hộp thoại quyền, không có push** → log: `IllegalStateException: API disabled … firebase_messaging_installation_id_enabled`. Sửa bằng meta-data trong `AndroidManifest.xml` ([AndroidManifest.xml](../../mobile/android/app/src/main/AndroidManifest.xml)) — phải build lại + cài lại, hot reload không đủ.
+4. Android 11 **không có hộp thoại quyền thông báo** (POST_NOTIFICATIONS chỉ có từ Android 13) — nên "không thấy hỏi quyền" trên máy này là bình thường, không phải lỗi.
+
+**Chưa thử trên máy thật**: push khi app tắt hẳn, push lời mời kết bạn/cuộc gọi, gọi nhóm, video call, chọn/gửi ảnh, đăng bài từ app.
 
 ---
 
@@ -177,7 +196,8 @@ Chạy: `flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=ht
 | Flutter SDK | `C:\src\flutter` (3.47.7, Dart 3.13.5) — đã có trong PATH; dùng `C:\src\flutter\bin\flutter.bat` |
 | Android tooling | Android Studio 2026.2.2 + Android SDK ở `C:\Users\HP\AppData\Local\Android\Sdk` (Platform 34/35/36/37.0, Build-Tools 36.0.0, NDK 28.2, Platform-Tools 37.0.1); `adb`, `emulator`, `cmdline-tools`, `flutter` đã có trong PATH; license đã chấp nhận; AVD `Pixel_7` + `Medium_Phone_API_37.0`; JDK = JBR 25 của Android Studio |
 | Build Android | `flutter build apk --debug` → OK (2026-11-03, `app-debug.apk`, compileSdk 37 / targetSdk 36 / minSdk 24) |
-| Backend dev | `http://localhost:5117` (Windows), Android emulator dùng `http://10.0.2.2:5117` |
+| Backend dev | `http://localhost:5117` (Windows); máy thật cùng LAN: `http://<IP-LAN>:5117` với backend chạy `ASPNETCORE_URLS=http://0.0.0.0:5117`; emulator dùng `http://10.0.2.2:5117` |
+| Thiết bị kiểm chứng | Samsung **SM-A505F** (Galaxy A50), Android 11 (API 30), serial `R58M45SH22R` — app debug cài qua `flutter run` |
 | Hợp đồng API | `docs/openapi/comink.v1.json` (48 path, Bearer) |
 | Tài khoản demo | `an.demo`/`binh.demo`/`chi.demo` (mật khẩu `DemoSeed:Password` của bạn) |
 
@@ -186,8 +206,8 @@ Chạy: `flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=ht
 ## 7. Rủi ro
 
 - Mốc A chưa tick/TURN chưa chứng minh → app có thể phải sửa nếu API thay đổi. Đã khóa OpenAPI để giảm rủi ro.
-- Không có điện thoại Android trong môi trường hiện tại (SDK/tooling đã sẵn sàng) → chưa chứng minh được mục 9 cho tới khi cắm thiết bị thật.
-- Firebase/FCM chưa có credentials → chưa gửi push thật; code/sender đã test mock.
+- Điện thoại thật đã có (Samsung A50, Android 11) và app chạy được; rủi ro còn lại là các kịch bản chưa thử (app tắt hẳn, push lời mời/cuộc gọi, gọi nhóm, ảnh) và máy chỉ có Android 11 nên chưa kiểm chứng hành vi riêng của Android 13+ (hộp thoại quyền thông báo).
+- FCM đã chạy thật cho tin nhắn; service account chỉ đặt cục bộ ở `backend/secrets/` (git-ignore) nên máy dev khác cần tự tạo lại theo `mobile/README.md` mục 3.2.
 - LiveKit URL `localhost` không dùng được trên thiết bị thật (D7) — đã có `LiveKit:PublicUrl`, cần đặt khi test máy thật.
 
 ---

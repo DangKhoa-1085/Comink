@@ -263,8 +263,9 @@ hồ sơ công khai, chat 1–1 + nhóm (lịch sử có tải tin cũ hơn, g�
 gọi audio/video 1–1 và nhóm bằng LiveKit (quyền mic/camera, tắt/bật, kết thúc, thời lượng),
 đăng ký thiết bị + push FCM (tin nhắn/lời mời/cuộc gọi; bỏ qua an toàn nếu chưa cấu hình Firebase),
 hộp thư thông báo trong app (badge, đánh dấu đã đọc), i18n vi/en.
-Còn lại: kiểm chứng push thật, video/gọi nhóm trên thiết bị thật, phân trang cuộn và kiểm chứng
-trên thiết bị Android thật.
+Còn lại: kiểm chứng push **lời mời kết bạn / cuộc gọi đến** và khi **app tắt hẳn**, gọi nhóm/video
+trên máy thật, gửi ảnh từ UI, phân trang với dữ liệu lớn. (Đã chạy thật trên Samsung A50 Android 11:
+đăng nhập, chat, gọi 1–1 và nhận push tin nhắn — xem `docs/tasks/phase6_mobile_cb.md` mục 5.4.)
 
 Khi định gọi trên **máy thật/emulator**, đặt thêm biến môi trường cho backend trước khi chạy
 (vì `localhost` trên điện thoại trỏ về chính điện thoại):
