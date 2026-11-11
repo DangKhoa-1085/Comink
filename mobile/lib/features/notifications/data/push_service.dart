@@ -15,6 +15,7 @@ import '../../../core/ui/app_keys.dart';
 import '../../calls/data/call_controller.dart';
 import '../../chats/data/chat_providers.dart';
 import '../../../router/app_router.dart';
+import 'local_notifications.dart';
 import 'notification_providers.dart';
 
 /// Xử lý FCM ở background (không dùng ref/router).
@@ -38,9 +39,11 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 /// Đăng ký token FCM, xin quyền thông báo và điều hướng khi bấm notification.
 class PushService {
-  PushService(this._ref);
+  PushService(this._ref, {LocalNotifications? localNotifications})
+    : _localNotifications = localNotifications ?? LocalNotifications();
 
   final Ref _ref;
+  final LocalNotifications _localNotifications;
   StreamSubscription<String>? _tokenSubscription;
   StreamSubscription<RemoteMessage>? _messageSubscription;
   StreamSubscription<RemoteMessage>? _openedSubscription;
@@ -88,13 +91,19 @@ class PushService {
         await _register(_token!);
       }
 
+      // Bật thông báo hệ thống cho tin nhắn/lời mời khi app đang mở (foreground).
+      await _localNotifications.initialize(onTap: _onLocalNotificationTap);
+
       _tokenSubscription = messaging.onRegistered.listen((token) async {
         _token = token;
         await _register(token);
       });
-      _messageSubscription = FirebaseMessaging.onMessage.listen(_onForegroundMessage);
-      _openedSubscription =
-          FirebaseMessaging.onMessageOpenedApp.listen(_onMessageOpened);
+      _messageSubscription = FirebaseMessaging.onMessage.listen(
+        _onForegroundMessage,
+      );
+      _openedSubscription = FirebaseMessaging.onMessageOpenedApp.listen(
+        _onMessageOpened,
+      );
 
       final initial = await messaging.getInitialMessage();
       if (initial != null) {
@@ -122,9 +131,9 @@ class PushService {
     final token = _token;
     if (token != null) {
       try {
-        await _ref.read(apiClientProvider).delete(
-              '/api/devices?token=${Uri.encodeQueryComponent(token)}',
-            );
+        await _ref
+            .read(apiClientProvider)
+            .delete('/api/devices?token=${Uri.encodeQueryComponent(token)}');
       } on ApiException {
         // Bỏ qua — đăng xuất phía client vẫn phải thành công.
       }
@@ -144,15 +153,18 @@ class PushService {
     return token.isEmpty ? null : token;
   }
 
-  Future<void> _register(String token) async {    try {
-      await _ref.read(apiClientProvider).post(
-        '/api/devices',
-        data: {
-          'pushToken': token,
-          'platform': _platform,
-          'deviceName': _deviceName,
-        },
-      );
+  Future<void> _register(String token) async {
+    try {
+      await _ref
+          .read(apiClientProvider)
+          .post(
+            '/api/devices',
+            data: {
+              'pushToken': token,
+              'platform': _platform,
+              'deviceName': _deviceName,
+            },
+          );
     } on ApiException catch (error) {
       debugPrint('Không đăng ký được thiết bị push: ${error.code}');
     }
@@ -164,8 +176,16 @@ class PushService {
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(AppLocalizations.of(context).t('notification_permission_denied'))),
+      SnackBar(
+        content: Text(
+          AppLocalizations.of(context).t('notification_permission_denied'),
+        ),
+      ),
     );
+  }
+
+  void _onLocalNotificationTap(NotificationPayload payload) {
+    _onOpenData(payload.toData());
   }
 
   void _onForegroundMessage(RemoteMessage message) {
@@ -183,6 +203,18 @@ class PushService {
       );
     }
 
+    // Android không tự hiện thông báo FCM khi app đang mở → hiện qua local notifications.
+    final payload = NotificationPayload.fromData(data);
+    if (shouldShowTrayNotification(payload)) {
+      unawaited(
+        _localNotifications.show(
+          payload: payload,
+          title: title,
+          body: body ?? '',
+        ),
+      );
+    }
+
     if (data['type'] == 'Message' && data['conversationId'] != null) {
       _ref.invalidate(conversationsProvider);
       _ref.invalidate(messagesProvider(data['conversationId']!));
@@ -191,7 +223,10 @@ class PushService {
   }
 
   void _onMessageOpened(RemoteMessage message) {
-    final data = message.data;
+    _onOpenData(message.data);
+  }
+
+  void _onOpenData(Map<String, dynamic> data) {
     _handleCallPush(data);
 
     switch (data['type']) {
@@ -206,7 +241,9 @@ class PushService {
       case 'CallIncoming':
         final callId = data['callId'];
         if (callId != null) {
-          unawaited(_ref.read(callControllerProvider.notifier).openFromPush(callId));
+          unawaited(
+            _ref.read(callControllerProvider.notifier).openFromPush(callId),
+          );
         }
     }
   }
@@ -217,7 +254,9 @@ class PushService {
     }
     final callId = data['callId'];
     if (callId != null) {
-      unawaited(_ref.read(callControllerProvider.notifier).openFromPush(callId));
+      unawaited(
+        _ref.read(callControllerProvider.notifier).openFromPush(callId),
+      );
     }
   }
 
