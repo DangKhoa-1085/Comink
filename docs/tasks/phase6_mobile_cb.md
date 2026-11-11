@@ -92,7 +92,7 @@
   - 2026-11-11: thêm log trạng thái lúc khởi động backend — `Push FCM: BẬT (service account: …)` / `Push FCM: TẮT — …` (kèm cảnh báo khi `Firebase__ServiceAccountPath` trỏ tới file không tồn tại) để phân biệt "push tắt" với "push lỗi"; thêm test `MissingServiceAccountFile_DoesNotThrowAndSkipsHttp`.
   - 2026-11-12: **phát hiện + sửa lỗi chặn push trên máy thật** — `firebase_messaging` 17 ném `IllegalStateException: API disabled … firebase_messaging_installation_id_enabled` khi thiếu Firebase Installations ID, làm app **không xin quyền thông báo, không đăng ký token** (hộp thư vẫn báo vì là SignalR). Đã thêm meta-data `firebase_messaging_installation_id_enabled=true` vào `android/app/src/main/AndroidManifest.xml`; phải **build lại + cài lại** app (hot reload không cập nhật manifest).
   - Hướng dẫn cấu hình đầy đủ (tạo Firebase project, bật Cloud Messaging API, service account, chạy app, kiểm chứng 2 tài khoản, lỗi thường gặp): `mobile/README.md` mục 3.2.
-  - ⚠️ **Lệch quyết định đã chốt:** `docs/02_tech_stack_decisions.md` mục 2.3 chốt push = `firebase_messaging` + `flutter_local_notifications`, nhưng app hiện chỉ dùng `firebase_messaging`: khi app ở **foreground** thông báo hiện bằng SnackBar + tự cập nhật hộp thư (`_onForegroundMessage`), **không** có thông báo trên khay hệ thống. Khi app ở **nền/tắt**, khay hệ thống vẫn hoạt động bình thường. Chờ người dùng chọn: thêm `flutter_local_notifications` hay cập nhật lại quyết định.
+  - ✅ **Đã chốt phương án (A) — 2026-11-12:** thêm `flutter_local_notifications` 23.0.1 (BSD-3), bật core library desugaring trong `android/app/build.gradle.kts`; khi app **foreground**, tin nhắn/lời mời hiện **cả SnackBar lẫn thông báo khay** (`lib/features/notifications/data/local_notifications.dart`), bấm thông báo điều hướng như push; `CallIncoming` bỏ qua khay vì đã mở màn hình cuộc gọi. Khi app **nền/tắt** vẫn do hệ thống hiện như trước. Có 8 unit test cho payload/ID/quyết định hiện khay.
 - [x] Hộp thư thông báo trong app: badge số chưa đọc, danh sách, đánh dấu đã đọc khi mở
 - [x] Xin quyền thông báo; deep link vào chat/cuộc gọi
 - [x] i18n toàn bộ chuỗi hiển thị (vi/en)
@@ -129,8 +129,8 @@
 | Hạng mục | Kết quả |
 |---|---|
 | `flutter analyze` | **No issues found** |
-| `flutter test` | **11/11** (i18n, AuthResponse/AuthUser, AppNotification, feed rỗng/có bài + nút tải thêm, hộp thư rỗng/có thông báo, app khởi động + validate login) |
-| `flutter pub get` | OK; thêm `shared_preferences 2.5.6`, `image_picker 1.2.4`, `permission_handler` (BSD-3/MIT) |
+| `flutter test` | **19/19** (11 test cũ + 8 test payload/ID/quyết định hiện khay của `local_notifications_test.dart`) — 2026-11-12 |
+| `flutter pub get` | OK; thêm `shared_preferences 2.5.6`, `image_picker 1.2.4`, `permission_handler` (BSD-3/MIT), `flutter_local_notifications 23.0.1` (BSD-3) |
 | Backend `CallServiceTests` | **14/14**, gồm test `PublicUrl` (D7) |
 | Backend `NotificationServiceTests` | **4/4** (đăng ký thiết bị, hộp thư, mark read, push) |
 | Backend `FcmPushSenderTests` | **4/4** (OAuth + FCM HTTP v1, nhiều token, thiếu cấu hình không gọi mạng, `ServiceAccountPath` trỏ file không tồn tại → bỏ qua an toàn) |
@@ -176,7 +176,7 @@ Chạy: `flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=ht
 | Mạng | Điện thoại + máy tính cùng Wi-Fi; backend `http://192.168.1.4:5117` (`0.0.0.0`), LiveKit `ws://192.168.1.4:7880` |
 | Tài khoản | `test2.demo` trên app (Android), `test1.demo` trên web — đã kết bạn |
 | Token FCM | `user_devices` có `test2.demo` với `platform=Android`, `device_name=android`, `is_active=t` (2026-11-11 17:31 UTC) |
-| Kết quả | ✅ **Nhận thông báo push tin nhắn từ web lên app**; đăng nhập/giữ phiên, chat văn bản, gọi 1–1 app ↔ web hoạt động |
+| Kết quả | ✅ **Nhận thông báo push tin nhắn từ web lên app**; đăng nhập/giữ phiên, chat văn bản, gọi 1–1 app ↔ web hoạt động; push vẫn đến sau khi **rút cáp USB** (không cần debugger) |
 
 **Lỗi đã gặp và sửa trong đợt này** (quan trọng cho lần sau):
 
@@ -185,7 +185,7 @@ Chạy: `flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=ht
 3. **Không có token, không hiện hộp thoại quyền, không có push** → log: `IllegalStateException: API disabled … firebase_messaging_installation_id_enabled`. Sửa bằng meta-data trong `AndroidManifest.xml` ([AndroidManifest.xml](../../mobile/android/app/src/main/AndroidManifest.xml)) — phải build lại + cài lại, hot reload không đủ.
 4. Android 11 **không có hộp thoại quyền thông báo** (POST_NOTIFICATIONS chỉ có từ Android 13) — nên "không thấy hỏi quyền" trên máy này là bình thường, không phải lỗi.
 
-**Chưa thử trên máy thật**: push khi app tắt hẳn, push lời mời kết bạn/cuộc gọi, gọi nhóm, video call, chọn/gửi ảnh, đăng bài từ app.
+**Chưa thử trên máy thật**: push khi app tắt hẳn, push lời mời kết bạn/cuộc gọi, gọi nhóm, video call, chọn/gửi ảnh, đăng bài từ app. Thông báo khay khi app **đang mở** (phương án A, `flutter_local_notifications`) đã code + build được nhưng **chưa kiểm chứng lại trên máy** — cần chạy lại `flutter run` với các `--dart-define` FCM rồi nhắn tin từ web lúc app đang mở.
 
 ---
 

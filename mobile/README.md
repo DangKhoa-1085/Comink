@@ -162,7 +162,7 @@ flutter run \
 
 1. Tài khoản A đăng nhập trên điện thoại, tài khoản B nhắn tin cho A.
 2. Đưa app A xuống nền → phải có thông báo; **tắt hẳn app** → vẫn phải có thông báo.
-3. Khi app A đang mở (foreground), FCM hiện **SnackBar** trong app và tự cập nhật hộp thư — hiện **chưa** có thông báo trên khay hệ thống khi đang mở (xem `docs/tasks/phase6_mobile_cb.md` mục 3.6).
+3. Khi app A đang mở (foreground), tin nhắn vừa hiện **SnackBar** trong app vừa có **thông báo trên khay** (qua `flutter_local_notifications`); cuộc gọi đến thì mở thẳng màn hình cuộc gọi, không thêm thông báo khay.
 4. Lặp lại với lời mời kết bạn và cuộc gọi đến; bấm thông báo phải mở đúng chat / hộp thư / màn hình cuộc gọi.
 
 **Lỗi thường gặp**
@@ -189,7 +189,7 @@ flutter run \
 | Real-time | `signalr_netcore` |
 | Gọi thoại/video | `livekit_client` |
 | Đa ngôn ngữ | `flutter_localizations` + `intl` (vi, en) |
-| Push | `firebase_messaging` + `flutter_local_notifications` (thêm ở Giai đoạn 6) |
+| Push | `firebase_messaging` (FCM) + `flutter_local_notifications` (hiện thông báo khay khi app đang mở) |
 
 Quy ước: **không hard-code chuỗi hiển thị**; mọi văn bản đi qua hệ thống đa ngôn ngữ (xem `AGENTS.md` mục 8.4).
 

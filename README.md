@@ -261,7 +261,8 @@ Hiện đã có: đăng nhập/đăng ký + secure storage + tự refresh token,
 bảng tin (văn bản/ảnh, thích, bình luận + trả lời, chia sẻ, tải thêm theo cursor), bạn bè/tìm kiếm/kết bạn/theo dõi,
 hồ sơ công khai, chat 1–1 + nhóm (lịch sử có tải tin cũ hơn, gửi văn bản/ảnh, SignalR real-time, poll bù tin, tạo nhóm),
 gọi audio/video 1–1 và nhóm bằng LiveKit (quyền mic/camera, tắt/bật, kết thúc, thời lượng),
-đăng ký thiết bị + push FCM (tin nhắn/lời mời/cuộc gọi; bỏ qua an toàn nếu chưa cấu hình Firebase),
+đăng ký thiết bị + push FCM (tin nhắn/lời mời/cuộc gọi; bỏ qua an toàn nếu chưa cấu hình Firebase;
+hiện thêm thông báo khay khi app đang mở bằng `flutter_local_notifications`),
 hộp thư thông báo trong app (badge, đánh dấu đã đọc), i18n vi/en.
 Còn lại: kiểm chứng push **lời mời kết bạn / cuộc gọi đến** và khi **app tắt hẳn**, gọi nhóm/video
 trên máy thật, gửi ảnh từ UI, phân trang với dữ liệu lớn. (Đã chạy thật trên Samsung A50 Android 11:
