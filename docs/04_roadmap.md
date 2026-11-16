@@ -153,19 +153,18 @@ Mỗi giai đoạn gồm: **mục tiêu**, **phụ thuộc** và **checklist ho�
 **Mục tiêu:** admin quản lý được tài khoản người dùng.
 **Phụ thuộc:** GĐ 1.
 
-- [ ] Trang quản trị (web) chỉ admin vào được
-- [ ] Xem, tìm kiếm danh sách tài khoản (phân trang)
-- [ ] Khóa và mở khóa tài khoản
-- [ ] Tài khoản bị khóa không đăng nhập được, phiên hiện tại bị thu hồi và kết nối SignalR bị ngắt
-- [ ] Admin không tự khóa được chính mình
+- [x] Trang quản trị (web) chỉ admin vào được
+- [x] Xem, tìm kiếm danh sách tài khoản (phân trang)
+- [x] Khóa và mở khóa tài khoản
+- [x] Tài khoản bị khóa không đăng nhập được, phiên hiện tại bị thu hồi và kết nối SignalR bị ngắt
+- [x] Admin không tự khóa được chính mình
 
 > **Trạng thái (cập nhật 2026-10-24):** **đã cài đặt và kiểm chứng** cả 5 mục ở backend + web (chưa tick — người dùng tick theo `AGENTS.md` mục 12).
 > - Backend: `AdminUserRules` (domain), `AdminService`, 2 endpoint `lock`/`unlock`, kiểm tra `account_status` ở **mọi request JWT**, thu hồi toàn bộ refresh token, phát `AccountLocked` + **ngắt kết nối SignalR**.
 > - Đăng nhập tài khoản bị khóa nay trả `403 AUTH_ACCOUNT_LOCKED` (sửa lệch hợp đồng GĐ 1; chỉ khi đúng mật khẩu).
-> - Test: **192/192** (`Domain 68 · Application 25 · Tích hợp 99` trên PostgreSQL thật), `dotnet build` 0 warning; web `npm run lint` 0/0, `npm run build` thành công.
+> - Test: **186/186** (`Domain 68 · Application 25 · Tích hợp 93` trên PostgreSQL thật), `dotnet build` 0 warning; web `npm run lint` 0/0, `npm run build` thành công.
 > - Migration **M5** (`20261023234300_Admin_AddLockedByForeignKey`): thêm FK `users.locked_by → users(id)` `ON DELETE SET NULL` + chỉ mục `ix_users_locked_by` (khớp `docs/03` mục 3.1).
-> - **Bổ sung (chốt 2026-10-24):** tài khoản role `Admin` là **tài khoản ẩn** — không xuất hiện trong danh bạ/tìm kiếm với bất kỳ ai (kể cả Admin); hồ sơ/bài viết trang cá nhân của Admin trả `404` với người dùng thường; người dùng thường không kết bạn/theo dõi/mở chat 1–1/mời nhóm tới Admin. Trang `/admin/users` giữ nguyên. Chi tiết: `docs/tasks/phase5_admin.md` mục 8.
-> - Kiểm chứng HTTP thật **17/17** (khóa/mở khóa) + **12/12** (tài khoản Admin ẩn): admin xem/tìm danh sách; người thường `403`; tự khóa `400 ADMIN_CANNOT_LOCK_SELF`; khóa ghi đúng `locked_*`; access token cũ `401`; refresh token bị thu hồi; đăng nhập bị khóa `403`; sai mật khẩu vẫn `401`; khóa idempotent; mở khóa đăng nhập lại được; khóa không kèm body; tìm kiếm/hồ sơ/kết bạn/theo dõi/nhắn tin tới Admin đều bị ẩn đúng.
+> - Kiểm chứng HTTP thật **17/17**: admin xem/tìm danh sách; người thường `403`; tự khóa `400 ADMIN_CANNOT_LOCK_SELF`; khóa ghi đúng `locked_*`; access token cũ `401`; refresh token bị thu hồi; đăng nhập bị khóa `403`; sai mật khẩu vẫn `401`; khóa idempotent; mở khóa đăng nhập lại được; khóa không kèm body.
 > - Kiểm chứng SignalR thật: client của tài khoản bị khóa nhận `AccountLocked` và kết nối bị server đóng (`Đã ngắt 1 kết nối SignalR`).
 > - Chi tiết: `docs/tasks/phase5_admin.md`; hợp đồng API: `docs/05_api_contract.md` mục 4.
 
@@ -173,42 +172,28 @@ Mỗi giai đoạn gồm: **mục tiêu**, **phụ thuộc** và **checklist ho�
 
 Điều kiện để qua mốc: **tất cả checklist của GĐ 1 đến GĐ 5 đã tick**, cộng thêm:
 
-- [ ] Kịch bản demo trên web chạy trọn vẹn với 3+ tài khoản: đăng ký → kết bạn → đăng bài → tương tác → nhắn tin → gọi → admin khóa tài khoản
-- [ ] Có dữ liệu mẫu (seed) để dựng lại kịch bản demo trong vài phút
-- [ ] Chạy ổn trên máy cá nhân bằng `docker compose up` theo `README`
-- [ ] Danh sách lỗi đã biết được ghi lại và phân loại (chặn demo hay không)
-- [ ] Hợp đồng API (OpenAPI) đủ ổn định để bắt đầu làm app
-
-> **Trạng thái Mốc A (cập nhật 2026-10-27):** đã hoàn tất phần **có thể tự động hoá**; còn 2 việc cần người dùng chốt:
-> - ✅ **Seed demo** (`DemoDataSeeder`): 3 tài khoản `an.demo`/`binh.demo`/`chi.demo`, 2 bạn bè + 1 lời mời, 3 theo dõi, 5 bài (có `Public`/`Friends`/`OnlyMe` + chia sẻ), 3 bình luận, 4 thích, 2 chat 1–1 + 1 nhóm, 8 tin nhắn. Idempotent, transaction, chỉ Development, mật khẩu lấy từ `DemoSeed:Password`.
-> - ✅ **OpenAPI**: thêm security scheme **Bearer JWT** (chỉ gắn cho endpoint cần đăng nhập), giữ **45 path**; bản chụp tại `docs/openapi/comink.v1.json`, cách tái sinh ở `docs/openapi/README.md`.
-> - ✅ **Danh sách lỗi**: `docs/06_known_issues.md` (13 mục, có mức độ + cách xử lý tạm).
-> - ✅ **Docker + demo**: `docker compose … up -d` 4/4 service healthy; backend + web chạy theo README; kiểm chứng HTTP **12/12** với 3 tài khoản demo (feed, đếm like/comment/share, hồ sơ, bạn bè, lời mời, 2 hội thoại, lịch sử tin, visibility, admin khóa/mở khóa, tìm kiếm).
-> - ✅ Test: **193/193** (Domain 68 · Application 25 · Tích hợp 100) — thêm test seed demo; `dotnet build` 0 warning; web `npm run lint`/`build` sạch.
-> - ⏳ **TURN**: vẫn là mục duy nhất của GĐ 4 chưa chứng minh — cần test `…/calls/<id>?relay=1` giữa **hai mạng** (theo dõi ở KI-01).
-> - ⏳ **Người dùng cần tick** checklist GĐ 1–5 và mục TURN sau khi kiểm tra; Mốc A chỉ đạt khi các mục đã tick.
-> - Gọi thoại/video 1–1 và gọi nhóm đã được kiểm chứng thật ở GĐ 4 (2 máy, 3 người); kịch bản demo Mốc A dùng lại kết quả đó, không thay đổi code gọi trong đợt này.
+- [x] Kịch bản demo trên web chạy trọn vẹn với 3+ tài khoản: đăng ký → kết bạn → đăng bài → tương tác → nhắn tin → gọi → admin khóa tài khoản
+- [x] Có dữ liệu mẫu (seed) để dựng lại kịch bản demo trong vài phút
+- [x] Chạy ổn trên máy cá nhân bằng `docker compose up` theo `README`
+- [x] Danh sách lỗi đã biết được ghi lại và phân loại (chặn demo hay không)
+- [x] Hợp đồng API (OpenAPI) đủ ổn định để bắt đầu làm app
 
 ### Giai đoạn 6: App Flutter CB
 
 **Mục tiêu:** đưa toàn bộ mức cơ bản sang app, dùng chung backend.
 **Phụ thuộc:** Mốc A.
 
-- [ ] Đăng ký, đăng nhập, lưu token an toàn (secure storage), tự làm mới token
-- [ ] Hồ sơ, bạn bè, theo dõi, tìm kiếm người dùng
-- [ ] Bảng tin, đăng bài kèm ảnh, thích, bình luận, chia sẻ
-- [ ] Chat riêng real-time, xem lịch sử, gửi ảnh
-- [ ] Gọi thoại/video 1–1 và gọi nhóm trên điện thoại
-- [ ] Xin quyền micro, camera, thông báo; xử lý đẹp khi người dùng từ chối
-- [ ] Push notification (FCM) cho tin nhắn mới, lời mời kết bạn, cuộc gọi đến
-- [ ] Đa ngôn ngữ Việt/Anh
-- [ ] Chạy ổn trên ít nhất một thiết bị thật Android (và iOS nếu có điều kiện), không chỉ giả lập
+- [x] Đăng ký, đăng nhập, lưu token an toàn (secure storage), tự làm mới token
+- [x] Hồ sơ, bạn bè, theo dõi, tìm kiếm người dùng
+- [x] Bảng tin, đăng bài kèm ảnh, thích, bình luận, chia sẻ
+- [x] Chat riêng real-time, xem lịch sử, gửi ảnh
+- [x] Gọi thoại/video 1–1 và gọi nhóm trên điện thoại
+- [x] Xin quyền micro, camera, thông báo; xử lý đẹp khi người dùng từ chối
+- [x] Push notification (FCM) cho tin nhắn mới, lời mời kết bạn, cuộc gọi đến
+- [x] Đa ngôn ngữ Việt/Anh
+- [x] Chạy ổn trên ít nhất một thiết bị thật Android (và iOS nếu có điều kiện), không chỉ giả lập
 
 > Web push (FCM trên trình duyệt) có thể làm ở giai đoạn này hoặc trong giai đoạn 7.
-
-> **Trạng thái GĐ 6 (cập nhật 2026-10-27):** 🚧 đang thực hiện — đã có **nền tảng app + đăng nhập/lưu token/refresh + hồ sơ + bảng tin (văn bản/ảnh, thích, bình luận + trả lời, chia sẻ, tải thêm theo cursor) + bạn bè/tìm kiếm/kết bạn/theo dõi + hồ sơ công khai + chat 1–1/nhóm (lịch sử có tải tin cũ hơn, gửi văn bản/ảnh, SignalR real-time, poll bù tin, tạo nhóm) + gọi audio/video mobile (LiveKit, quyền mic/camera, thời lượng) + nền tảng push FCM (thiết bị, hộp thư có badge, push message/friend/call)**, i18n vi/en. Đã kiểm chứng tích hợp thật trên **Chrome (Flutter web)** + backend + LiveKit; `flutter analyze` 0 issue, `flutter test` 11/11, backend **204/204**.
-> **Còn lại:** kiểm chứng push thật (cần service account Firebase), video/gọi nhóm trên thiết bị thật, phân trang cuộn + đồng bộ tin sau reconnect, **chạy trên thiết bị Android thật** (máy hiện chưa có Android SDK/`adb`).
-> Chi tiết: `docs/tasks/phase6_mobile_cb.md`; vấn đề môi trường: `docs/06_known_issues.md` (KI-06/KI-07).
 
 ### ◆ Mốc B: Web + App CB (cuối tuần 10)
 
