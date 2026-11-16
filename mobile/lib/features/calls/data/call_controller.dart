@@ -21,7 +21,10 @@ class CallController extends Notifier<CallState> {
 
   @override
   CallState build() {
-    _subscription = ref.watch(chatRealtimeProvider).callEvents.listen(_onSignal);
+    _subscription = ref
+        .watch(chatRealtimeProvider)
+        .callEvents
+        .listen(_onSignal);
     ref.onDispose(() {
       _subscription?.cancel();
       _resetTimer?.cancel();
@@ -44,10 +47,15 @@ class CallController extends Notifier<CallState> {
         return;
       }
 
-      final data = await ref.read(apiClientProvider).post(
-        '/api/calls',
-        data: {'conversationId': conversationId, 'type': video ? 'Video' : 'Audio'},
-      );
+      final data = await ref
+          .read(apiClientProvider)
+          .post(
+            '/api/calls',
+            data: {
+              'conversationId': conversationId,
+              'type': video ? 'Video' : 'Audio',
+            },
+          );
       if (data is! Map) {
         _showError('INTERNAL_ERROR');
         return;
@@ -62,7 +70,10 @@ class CallController extends Notifier<CallState> {
       await _joinRoom(call);
     } on ApiException catch (error) {
       _showError(error.code);
-    } catch (_) {
+    } catch (error) {
+      // Ghi lại nguyên nhân thật (LiveKit/timeout/mạng) — nếu không, UI chỉ hiện câu chung
+      // "Không kết nối được phòng gọi" và rất khó chẩn đoán khi máy thật lỗi media.
+      debugPrint('Không kết nối được phòng gọi: $error');
       _showError('CALL_MEDIA_FAILED');
     } finally {
       _busy = false;
@@ -108,13 +119,22 @@ class CallController extends Notifier<CallState> {
         return;
       }
 
-      final data = await ref.read(apiClientProvider).post('/api/calls/${call.id}/answer');
-      final answered = data is Map ? CallInfo.fromJson(data.cast<String, dynamic>()) : call;
-      state = state.copyWith(phase: CallPhase.connecting, call: answered, clearError: true);
+      final data = await ref
+          .read(apiClientProvider)
+          .post('/api/calls/${call.id}/answer');
+      final answered = data is Map
+          ? CallInfo.fromJson(data.cast<String, dynamic>())
+          : call;
+      state = state.copyWith(
+        phase: CallPhase.connecting,
+        call: answered,
+        clearError: true,
+      );
       await _joinRoom(answered);
     } on ApiException catch (error) {
       _showError(error.code);
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Không kết nối được phòng gọi (trả lời): $error');
       _showError('CALL_MEDIA_FAILED');
     } finally {
       _busy = false;
@@ -167,7 +187,10 @@ class CallController extends Notifier<CallState> {
     final enabled = !state.cameraEnabled;
     await participant.setCameraEnabled(enabled);
     if (state.phase != CallPhase.idle) {
-      state = state.copyWith(cameraEnabled: enabled, revision: state.revision + 1);
+      state = state.copyWith(
+        cameraEnabled: enabled,
+        revision: state.revision + 1,
+      );
     }
   }
 
@@ -186,7 +209,9 @@ class CallController extends Notifier<CallState> {
   }
 
   Future<void> _joinRoom(CallInfo call) async {
-    final tokenData = await ref.read(apiClientProvider).post('/api/calls/${call.id}/token');
+    final tokenData = await ref
+        .read(apiClientProvider)
+        .post('/api/calls/${call.id}/token');
     if (tokenData is! Map) {
       throw const ApiException(code: 'CALL_PROVIDER_UNAVAILABLE');
     }
@@ -234,7 +259,11 @@ class CallController extends Notifier<CallState> {
     if (signal.eventName == ChatRealtime.callIncomingEvent) {
       if (state.isIdle) {
         _resetTimer?.cancel();
-        state = CallState(phase: CallPhase.incoming, call: call, cameraEnabled: call.isVideo);
+        state = CallState(
+          phase: CallPhase.incoming,
+          call: call,
+          cameraEnabled: call.isVideo,
+        );
       }
       return;
     }
@@ -249,7 +278,9 @@ class CallController extends Notifier<CallState> {
       }
       state = state.copyWith(
         call: call,
-        phase: state.phase == CallPhase.outgoing ? CallPhase.active : state.phase,
+        phase: state.phase == CallPhase.outgoing
+            ? CallPhase.active
+            : state.phase,
         revision: state.revision + 1,
       );
     }

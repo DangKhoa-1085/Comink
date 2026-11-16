@@ -88,6 +88,9 @@ Lưu ý cho máy thật:
 - Điện thoại và máy tính phải cùng mạng LAN; tường lửa Windows phải cho phép cổng **5117** (backend) và **7880** (LiveKit).
 - Backend phải lắng nghe trên `0.0.0.0`, không chỉ `localhost` (xem `backend/src/Comink.Api/Properties/launchSettings.json` hoặc biến `ASPNETCORE_URLS`).
 - Gọi thoại/video cần `LiveKit__PublicUrl=ws://<ip-lan-máy-tính>:7880` khi khởi động backend, nếu không app sẽ nhận `ws://localhost:7880` và không kết nối được.
+- Nếu gọi báo **"Không kết nối được phòng gọi"** (nhất là sau khi đổi Wi-Fi hoặc router cấp IP mới): chạy lại
+  `powershell -ExecutionPolicy Bypass -File infra/set-lan-ip.ps1` (cập nhật `rtc.node_ip` + `turn.domain` rồi restart LiveKit),
+  sau đó khởi động lại backend với `LiveKit__PublicUrl=ws://<ip-mới>:7880` và chạy lại app với `API_BASE_URL` mới — xem KI-03.
 - Quyền mic/camera/thông báo do app xin lúc dùng; nếu người dùng từ chối, app hiện thông báo lỗi thay vì im lặng.
 - App bật `usesCleartextTraffic` để gọi HTTP khi dev — **phải bỏ** khi chuyển sang HTTPS production.
 
