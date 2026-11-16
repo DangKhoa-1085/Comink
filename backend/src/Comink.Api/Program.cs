@@ -78,6 +78,9 @@ try
     builder.Services.AddSingleton<IUserConnectionRegistry, UserConnectionRegistry>();
     builder.Services.AddScoped<IAccountNotifier, SignalRAccountNotifier>();
 
+    // --- Nhắn tin NC (Giai đoạn 7): chặn spam tín hiệu "đang nhập" phía server ---
+    builder.Services.AddSingleton<ITypingThrottle, TypingThrottle>();
+
     // --- Dọn cuộc gọi đổ chuông quá hạn (30s) — bắt buộc phía server, client có thể đóng tab ---
     builder.Services.AddHostedService<Comink.Api.Realtime.CallRingTimeoutService>();
 

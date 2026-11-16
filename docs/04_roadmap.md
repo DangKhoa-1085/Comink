@@ -225,6 +225,8 @@ Mỗi tính năng NC khi làm xong cần: chạy đúng trên web, có kiểm tr
 
 > Khi tiến độ trễ: giữ nguyên các mục ưu tiên 1–4, cắt từ cuối bảng lên (AI và triển khai Internet là phần dễ lùi nhất mà vẫn có đồ án đầy đủ).
 
+> **Trạng thái Ưu tiên 1 (cập nhật 2026-11-17):** chat nhóm đã xong từ GĐ 3; **trạng thái online, "đang nhập", đã gửi/đã đọc đã cài đặt ở backend + web + app Flutter và kiểm chứng phần backend/realtime** — migration **M6**, `dotnet test` **224/224**, `dotnet build` 0 warning, web `lint` 0/0 + `build` sạch, app `flutter analyze` 0 issue + `flutter test` 19/19, kiểm chứng **28/28** bằng HTTP + 2 client SignalR thật (presence, typing, đọc 1–1 và nhóm, chặn người ngoài). Còn lại: bấm thử bằng mắt trên trình duyệt và trên máy thật. **Checkbox chưa tick** — chờ bạn kiểm chứng/tick theo quy ước `AGENTS.md` mục 12. Chi tiết: `docs/tasks/phase7_advanced_messaging.md`; hợp đồng: `docs/05_api_contract.md` mục 8.9–8.11.
+
 ### Giai đoạn 8: Hoàn thiện và Bảo vệ
 
 **Mục tiêu:** sản phẩm ổn định, tài liệu đầy đủ, sẵn sàng demo.

@@ -88,6 +88,14 @@ public class ConversationMemberConfiguration : IEntityTypeConfiguration<Conversa
         // Chỉ mục "hội thoại của người dùng" có điều kiện tạo bằng SQL trong migration:
         //   CREATE INDEX ix_conversation_members_user_active ON conversation_members (user_id) WHERE left_at IS NULL;
         builder.HasIndex(m => m.UserId);
+
+        // Mốc đã đọc trỏ tới tin nhắn; xoá tin thì chỉ mất mốc, không xoá thành viên.
+        // Phải khai báo TƯỜNG MINH: bảng messages có nhiều quan hệ tới conversation_members
+        // (chỉ mốc đọc) nên EF không tự suy ra được.
+        builder.HasOne(m => m.LastReadMessage)
+            .WithMany()
+            .HasForeignKey(m => m.LastReadMessageId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
 

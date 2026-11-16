@@ -15,6 +15,7 @@ import '../../auth/data/session_controller.dart';
 import '../../calls/data/call_controller.dart';
 import '../../media/data/media_service.dart';
 import '../data/chat_providers.dart';
+import '../data/chat_realtime.dart';
 import '../domain/chat_models.dart';
 
 /// Khung chat: lịch sử tin nhắn + gửi tin văn bản (real-time sẽ bổ sung sau).
@@ -40,6 +41,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   bool _loadingOlder = false;
   Timer? _syncTimer;
 
+  // NC GĐ 7: "đang nhập" và mốc đã đọc.
+  StreamSubscription<void>? _typingSub;
+  Timer? _typingStopTimer;
+  DateTime _lastTypingSentAt = DateTime.fromMillisecondsSinceEpoch(0);
+  bool _typingSent = false;
+  String? _lastMarkedMessageId;
+
   @override
   void initState() {
     super.initState();
@@ -51,13 +59,67 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       ref.invalidate(messagesProvider(widget.conversationId));
       ref.invalidate(conversationsProvider);
     });
+
+    // Danh sách người đang gõ thay đổi → vẽ lại phần tiêu đề.
+    _typingSub = ref
+        .read(chatRealtimeProvider)
+        .typingChanges
+        .listen((_) => _onTypingChanged());
   }
 
   @override
   void dispose() {
     _syncTimer?.cancel();
+    _typingStopTimer?.cancel();
+    unawaited(_typingSub?.cancel());
+    // Rời khung chat khi vẫn đang gõ → báo ngừng để người kia không thấy "đang nhập" treo.
+    if (_typingSent) {
+      unawaited(ref
+          .read(chatRealtimeProvider)
+          .sendTyping(widget.conversationId, false));
+    }
     _controller.dispose();
     super.dispose();
+  }
+
+  void _onTypingChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  /// Gõ → báo "đang nhập" (throttle 3 giây); ngừng 5 giây thì tự báo ngừng.
+  void _notifyTyping() {
+    final realtime = ref.read(chatRealtimeProvider);
+    final now = DateTime.now();
+    if (now.difference(_lastTypingSentAt) > const Duration(seconds: 3)) {
+      _lastTypingSentAt = now;
+      _typingSent = true;
+      unawaited(realtime.sendTyping(widget.conversationId, true));
+    }
+
+    _typingStopTimer?.cancel();
+    _typingStopTimer = Timer(const Duration(seconds: 5), _stopTyping);
+  }
+
+  void _stopTyping() {
+    _typingStopTimer?.cancel();
+    _typingStopTimer = null;
+    _lastTypingSentAt = DateTime.fromMillisecondsSinceEpoch(0);
+    if (!_typingSent) {
+      return;
+    }
+    _typingSent = false;
+    unawaited(ref.read(chatRealtimeProvider).sendTyping(widget.conversationId, false));
+  }
+
+  /// Đánh dấu đã đọc tới tin mới nhất đang thấy (server chỉ tiến mốc).
+  void _markRead(String messageId) {
+    if (_lastMarkedMessageId == messageId) {
+      return;
+    }
+    _lastMarkedMessageId = messageId;
+    unawaited(ref.read(chatRealtimeProvider).markRead(widget.conversationId, messageId));
   }
 
   Future<void> _loadOlder(ChatHistory history) async {
@@ -171,6 +233,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       }
       ref.invalidate(messagesProvider(widget.conversationId));
       ref.invalidate(conversationsProvider);
+      _stopTyping();
     } on ApiException catch (error) {
       messenger.showSnackBar(
         SnackBar(content: Text('${l10n.t('chat_error')}: ${l10n.error(error.code)}')),
@@ -185,6 +248,108 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
   }
 
+  /// Dòng trạng thái dưới tên hội thoại: "đang nhập…" → "Đang hoạt động" → "Truy cập lần cuối…".
+  String? _statusText(
+    BuildContext context,
+    AppLocalizations l10n,
+    ConversationDetail? detail,
+    String currentUserId,
+  ) {
+    if (detail == null) {
+      return null;
+    }
+
+    final typingIds = ref
+        .read(chatRealtimeProvider)
+        .typingUserIds(widget.conversationId)
+      ..remove(currentUserId);
+
+    if (detail.isGroup) {
+      if (typingIds.isNotEmpty) {
+        final names = detail.members
+            .where((member) => typingIds.contains(member.userId))
+            .map((member) => member.displayName)
+            .where((name) => name.isNotEmpty)
+            .toList(growable: false);
+        if (names.isNotEmpty) {
+          return '${names.join(', ')} ${l10n.t('chat_typing_many')}';
+        }
+      }
+
+      final online = detail.members.where((member) => member.isOnline).length;
+      return '${detail.members.length} ${l10n.t('chat_members')} · '
+          '$online ${l10n.t('chat_online_suffix')}';
+    }
+
+    ConversationPeer? peer;
+    for (final member in detail.members) {
+      if (member.userId != currentUserId) {
+        peer = member;
+        break;
+      }
+    }
+    if (peer == null) {
+      return null;
+    }
+
+    if (typingIds.contains(peer.userId)) {
+      return l10n.t('chat_typing');
+    }
+    if (peer.isOnline) {
+      return l10n.t('chat_online');
+    }
+    if (peer.lastSeenAt != null) {
+      return '${l10n.t('chat_last_seen')} ${_formatMoment(context, peer.lastSeenAt!)}';
+    }
+    return l10n.t('chat_offline');
+  }
+
+  String _formatMoment(BuildContext context, DateTime time) {
+    final material = MaterialLocalizations.of(context);
+    final now = DateTime.now();
+    final sameDay = now.year == time.year && now.month == time.month && now.day == time.day;
+    if (sameDay) {
+      return material.formatTimeOfDay(
+        TimeOfDay.fromDateTime(time),
+        alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+      );
+    }
+    return material.formatShortDate(time);
+  }
+
+  /// Nhãn "Đã gửi"/"Đã đọc"/"Đã xem bởi N" cho tin CUỐI của chính mình (NC GĐ 7).
+  String? _readLabel(
+    AppLocalizations l10n,
+    ConversationDetail? detail,
+    String currentUserId,
+    ChatMessage? lastOwnMessage,
+  ) {
+    if (detail == null || lastOwnMessage == null) {
+      return null;
+    }
+
+    if (detail.isGroup) {
+      final seen = detail.members
+          .where((member) =>
+              member.userId != currentUserId &&
+              member.lastReadAt != null &&
+              !member.lastReadAt!.isBefore(lastOwnMessage.createdAt))
+          .length;
+      return seen > 0 ? '${l10n.t('chat_seen_by')} $seen' : l10n.t('chat_sent');
+    }
+
+    ConversationPeer? peer;
+    for (final member in detail.members) {
+      if (member.userId != currentUserId) {
+        peer = member;
+        break;
+      }
+    }
+    final lastReadAt = peer?.lastReadAt;
+    final read = lastReadAt != null && !lastReadAt.isBefore(lastOwnMessage.createdAt);
+    return read ? l10n.t('chat_read') : l10n.t('chat_sent');
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -193,14 +358,37 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final detail = ref.watch(conversationDetailProvider(widget.conversationId));
     final messages = ref.watch(messagesProvider(widget.conversationId));
 
-    final title = detail.maybeWhen(
-      data: (value) => value.displayTitle(currentUserId),
-      orElse: () => l10n.t('chats_title'),
-    );
+    final detailValue = detail.asData?.value;
+
+    // Tin mới (hoặc mở khung chat) → đánh dấu đã đọc; server chỉ tiến mốc nên gọi lại vô hại.
+    ref.listen(messagesProvider(widget.conversationId), (previous, next) {
+      final history = next.asData?.value;
+      if (history != null && history.messages.isNotEmpty) {
+        _markRead(history.messages.last.id);
+      }
+    });
+
+    final title = detailValue?.displayTitle(currentUserId) ?? l10n.t('chats_title');
+    final statusText = _statusText(context, l10n, detailValue, currentUserId);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(title),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(title),
+            if (statusText != null)
+              Text(
+                statusText,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+          ],
+        ),
         actions: [
           IconButton(
             tooltip: l10n.t('call_audio'),
@@ -231,6 +419,20 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   ..sort((first, second) => first.createdAt.compareTo(second.createdAt));
                 final canLoad = _olderMessages.isEmpty ? history.hasMore : _olderHasMore;
 
+                ChatMessage? lastOwnCandidate;
+                for (final message in merged) {
+                  if (message.senderId == currentUserId) {
+                    lastOwnCandidate = message;
+                  }
+                }
+                final lastOwnMessage = lastOwnCandidate;
+                final readLabel = _readLabel(
+                  l10n,
+                  detailValue,
+                  currentUserId,
+                  lastOwnMessage,
+                );
+
                 return merged.isEmpty
                     ? EmptyState(
                         message: l10n.t('chat_no_messages'),
@@ -239,16 +441,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     : _MessageList(
                         messages: merged,
                         currentUserId: currentUserId,
-                        memberNames: detail.maybeWhen(
-                          data: (value) => {
-                            for (final member in value.members) member.userId: member.displayName,
-                          },
-                          orElse: () => const <String, String>{},
-                        ),
-                        showSenderName: detail.maybeWhen(
-                          data: (value) => value.isGroup,
-                          orElse: () => false,
-                        ),
+                        memberNames: detailValue == null
+                            ? const <String, String>{}
+                            : {
+                                for (final member in detailValue.members)
+                                  member.userId: member.displayName,
+                              },
+                        showSenderName: detailValue?.isGroup ?? false,
+                        lastOwnMessageId: lastOwnMessage?.id,
+                        readLabel: readLabel,
                         hasMore: canLoad,
                         loadingOlder: _loadingOlder,
                         onLoadOlder: () => _loadOlder(history),
@@ -336,6 +537,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                           minLines: 1,
                           maxLines: 4,
                           textInputAction: TextInputAction.send,
+                          onChanged: (_) => _notifyTyping(),
                           onSubmitted: (_) => _send(),
                           decoration: InputDecoration(
                             hintText: l10n.t('chat_placeholder'),
@@ -377,6 +579,8 @@ class _MessageList extends StatelessWidget {
     required this.hasMore,
     required this.loadingOlder,
     required this.onLoadOlder,
+    this.lastOwnMessageId,
+    this.readLabel,
   });
 
   final List<ChatMessage> messages;
@@ -386,6 +590,8 @@ class _MessageList extends StatelessWidget {
   final bool hasMore;
   final bool loadingOlder;
   final VoidCallback onLoadOlder;
+  final String? lastOwnMessageId;
+  final String? readLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -421,6 +627,7 @@ class _MessageList extends StatelessWidget {
           message: message,
           isMine: message.senderId == currentUserId,
           senderName: showSenderName ? memberNames[message.senderId] ?? '' : '',
+          statusLabel: message.id == lastOwnMessageId ? readLabel : null,
         );
       },
     );
@@ -432,11 +639,13 @@ class _MessageBubble extends StatelessWidget {
     required this.message,
     required this.isMine,
     required this.senderName,
+    this.statusLabel,
   });
 
   final ChatMessage message;
   final bool isMine;
   final String senderName;
+  final String? statusLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -510,6 +719,14 @@ class _MessageBubble extends StatelessWidget {
                 color: textColor.withValues(alpha: 0.7),
               ),
             ),
+            if (statusLabel != null)
+              Text(
+                statusLabel!,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: textColor.withValues(alpha: 0.8),
+                ),
+              ),
           ],
         ),
       ),

@@ -83,4 +83,57 @@ public class MessagingRulesTests
 
     [Fact]
     public void MaxAttachments_IsTen() => Assert.Equal(10, MessageRules.MaxAttachments);
+
+    // --- Mốc đã đọc (NC Giai đoạn 7) ---
+
+    [Fact]
+    public void CanAdvanceReadMarker_FirstReadAlwaysAdvances()
+    {
+        Assert.True(ConversationRules.CanAdvanceReadMarker(
+            null,
+            null,
+            DateTimeOffset.UtcNow,
+            Guid.CreateVersion7()));
+    }
+
+    [Fact]
+    public void CanAdvanceReadMarker_NewerMessageAdvances()
+    {
+        var oldId = Guid.CreateVersion7();
+        var currentAt = DateTimeOffset.UtcNow;
+        var newerAt = currentAt.AddSeconds(1);
+
+        Assert.True(ConversationRules.CanAdvanceReadMarker(
+            currentAt,
+            oldId,
+            newerAt,
+            Guid.CreateVersion7()));
+    }
+
+    [Fact]
+    public void CanAdvanceReadMarker_OlderMessageDoesNotMoveBack()
+    {
+        var currentAt = DateTimeOffset.UtcNow;
+        var olderAt = currentAt.AddSeconds(-5);
+
+        Assert.False(ConversationRules.CanAdvanceReadMarker(
+            currentAt,
+            Guid.CreateVersion7(),
+            olderAt,
+            Guid.CreateVersion7()));
+    }
+
+    [Fact]
+    public void CanAdvanceReadMarker_SameTimestampComparesIds()
+    {
+        var at = DateTimeOffset.UtcNow;
+        var first = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var second = Guid.Parse("00000000-0000-0000-0000-000000000002");
+
+        // Cùng thời điểm: id lớn hơn (UUIDv7 mới hơn) thì tiến.
+        Assert.True(ConversationRules.CanAdvanceReadMarker(at, first, at, second));
+        // Cùng id (lặp lại request) hoặc id nhỏ hơn thì không tiến.
+        Assert.False(ConversationRules.CanAdvanceReadMarker(at, second, at, first));
+        Assert.False(ConversationRules.CanAdvanceReadMarker(at, second, at, second));
+    }
 }

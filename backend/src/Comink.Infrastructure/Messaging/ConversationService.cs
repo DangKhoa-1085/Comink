@@ -19,10 +19,17 @@ namespace Comink.Infrastructure.Messaging;
 public class ConversationService : IConversationService
 {
     private readonly ApplicationDbContext _db;
+    private readonly IPresenceService _presence;
+    private readonly IChatNotifier _notifier;
 
-    public ConversationService(ApplicationDbContext db)
+    public ConversationService(
+        ApplicationDbContext db,
+        IPresenceService presence,
+        IChatNotifier notifier)
     {
         _db = db;
+        _presence = presence;
+        _notifier = notifier;
     }
 
     /// <inheritdoc />
@@ -279,6 +286,32 @@ public class ConversationService : IConversationService
             .Select(m => new { m.Id, m.SenderId, m.Content, m.Type, m.CreatedAt })
             .ToListAsync(cancellationToken);
 
+        // Trạng thái online của "người còn lại" trong chat 1–1 (một lượt hỏi Redis).
+        var presenceByUser = await _presence.GetStatusesAsync(
+            peers.Select(p => p.UserId).Distinct().ToList(),
+            cancellationToken);
+
+        // Số tin chưa đọc thật: tin của NGƯỜI KHÁC có (created_at, id) lớn hơn mốc đọc của tôi
+        // (docs/03_database_design.md mục 3.3). Một truy vấn join cho cả trang, không N+1.
+        var unreadRows = await (
+                from message in _db.Messages.AsNoTracking()
+                join member in _db.ConversationMembers.AsNoTracking()
+                    on message.ConversationId equals member.ConversationId
+                where member.UserId == currentUserId
+                      && conversationIds.Contains(message.ConversationId)
+                      && message.SenderId != currentUserId
+                      && (member.LastReadAt == null
+                          || message.CreatedAt > member.LastReadAt
+                          || (message.CreatedAt == member.LastReadAt
+                              && member.LastReadMessageId != null
+                              && message.Id.CompareTo(member.LastReadMessageId.Value) > 0))
+                group message by message.ConversationId
+                into grouped
+                select new { ConversationId = grouped.Key, Count = grouped.Count() })
+            .ToListAsync(cancellationToken);
+
+        var unreadByConversation = unreadRows.ToDictionary(row => row.ConversationId, row => row.Count);
+
         var items = pageRows.Select(row =>
         {
             // Chỉ hội thoại 1–1 mới có "peer"; nhóm hiển thị theo Title + số thành viên.
@@ -287,6 +320,7 @@ public class ConversationService : IConversationService
                 : null;
             var last = lastMessages.FirstOrDefault(m => m.Id == row.LastMessageId);
             var memberCount = memberCounts.FirstOrDefault(x => x.ConversationId == row.Id)?.Count ?? 0;
+            var peerPresence = peer is null ? null : presenceByUser.GetValueOrDefault(peer.UserId);
 
             return new ConversationSummaryDto(
                 row.Id,
@@ -299,7 +333,9 @@ public class ConversationService : IConversationService
                         peer.UserId,
                         peer.UserName ?? string.Empty,
                         peer.DisplayName ?? string.Empty,
-                        peer.AvatarUrl),
+                        peer.AvatarUrl,
+                        peerPresence?.IsOnline ?? false,
+                        peerPresence?.LastSeenAt),
                 last is null
                     ? null
                     : new ConversationLastMessageDto(
@@ -308,8 +344,7 @@ public class ConversationService : IConversationService
                         MessagingMapping.Preview(last.Content),
                         last.Type.ToString(),
                         last.CreatedAt),
-                // Số tin chưa đọc là [NC] ở GĐ 3 — luôn 0.
-                0,
+                unreadByConversation.GetValueOrDefault(row.Id),
                 memberCount);
         }).ToList();
 
@@ -346,13 +381,27 @@ public class ConversationService : IConversationService
             return OperationResult<ConversationDto>.Failure(ErrorCodes.ConversationNotFound);
         }
 
+        // Trạng thái online của các thành viên (một lượt hỏi Redis) + mốc đọc của từng người
+        // để client hiển thị "Đã đọc"/"Đã xem bởi N" (NC Giai đoạn 7).
+        var presenceByUser = await _presence.GetStatusesAsync(
+            conversation.Members.Where(m => m.LeftAt is null).Select(m => m.UserId).ToList(),
+            cancellationToken);
+
         var members = conversation.Members
             .OrderBy(m => m.JoinedAt)
-            .Select(m => new ConversationMemberDto(
-                m.UserId,
-                m.User.UserName ?? string.Empty,
-                m.User.Profile?.DisplayName ?? m.User.UserName ?? string.Empty,
-                m.User.Profile?.AvatarUrl))
+            .Select(m =>
+            {
+                var presence = presenceByUser.GetValueOrDefault(m.UserId);
+                return new ConversationMemberDto(
+                    m.UserId,
+                    m.User.UserName ?? string.Empty,
+                    m.User.Profile?.DisplayName ?? m.User.UserName ?? string.Empty,
+                    m.User.Profile?.AvatarUrl,
+                    presence?.IsOnline ?? false,
+                    presence?.LastSeenAt,
+                    m.LastReadMessageId,
+                    m.LastReadAt);
+            })
             .ToList();
 
         return OperationResult<ConversationDto>.Success(new ConversationDto(
@@ -376,6 +425,129 @@ public class ConversationService : IConversationService
             .Select(m => m.ConversationId)
             .Distinct()
             .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public Task<bool> IsMemberAsync(
+        Guid currentUserId,
+        Guid conversationId,
+        CancellationToken cancellationToken = default) =>
+        _db.ConversationMembers
+            .AsNoTracking()
+            .AnyAsync(
+                m => m.ConversationId == conversationId && m.UserId == currentUserId && m.LeftAt == null,
+                cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Guid>> GetCoMemberUserIdsAsync(
+        Guid currentUserId,
+        CancellationToken cancellationToken = default) =>
+        await _db.ConversationMembers
+            .AsNoTracking()
+            .Where(m => m.UserId != currentUserId &&
+                        m.LeftAt == null &&
+                        _db.ConversationMembers.Any(mine =>
+                            mine.ConversationId == m.ConversationId &&
+                            mine.UserId == currentUserId &&
+                            mine.LeftAt == null))
+            .Select(m => m.UserId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<OperationResult<ReadReceiptDto>> MarkReadAsync(
+        Guid currentUserId,
+        Guid conversationId,
+        Guid messageId,
+        CancellationToken cancellationToken = default)
+    {
+        var member = await _db.ConversationMembers
+            .FirstOrDefaultAsync(
+                m => m.ConversationId == conversationId && m.UserId == currentUserId && m.LeftAt == null,
+                cancellationToken);
+
+        if (member is null)
+        {
+            return OperationResult<ReadReceiptDto>.Failure(ErrorCodes.ConversationNotFound);
+        }
+
+        // Tin phải thuộc ĐÚNG hội thoại này — không tin id client gửi (AGENTS.md mục 9.2).
+        var message = await _db.Messages
+            .AsNoTracking()
+            .Where(m => m.Id == messageId && m.ConversationId == conversationId)
+            .Select(m => new { m.Id, m.CreatedAt })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (message is null)
+        {
+            return OperationResult<ReadReceiptDto>.Failure(ErrorCodes.MessageNotFound);
+        }
+
+        var now = DateTimeOffset.UtcNow;
+
+        // Mốc chỉ tiến: mở lại khung chat hoặc tab cũ gửi mốc cũ không phát lại sự kiện.
+        if (!ConversationRules.CanAdvanceReadMarker(
+                member.LastReadAt,
+                member.LastReadMessageId,
+                message.CreatedAt,
+                message.Id))
+        {
+            return OperationResult<ReadReceiptDto>.Success(
+                new ReadReceiptDto(
+                    conversationId,
+                    currentUserId,
+                    member.LastReadMessageId ?? message.Id,
+                    member.LastReadAt ?? now));
+        }
+
+        // Ghi mốc bằng MỘT câu lệnh có điều kiện tiến — hai tab gửi đồng thời cũng không làm
+        // mốc bị lùi (điều kiện so sánh nằm ngay trong WHERE).
+        var updated = await _db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             UPDATE conversation_members
+             SET last_read_message_id = {message.Id}, last_read_at = {now}
+             WHERE conversation_id = {conversationId}
+               AND user_id = {currentUserId}
+               AND (last_read_at IS NULL
+                    OR last_read_at < {message.CreatedAt}
+                    OR (last_read_at = {message.CreatedAt} AND last_read_message_id < {message.Id}))
+             """,
+            cancellationToken);
+
+        if (updated == 0)
+        {
+            // Tab khác đã ghi mốc mới hơn trong lúc này → trả lại mốc hiện tại, không phát trùng.
+            var current = await _db.ConversationMembers
+                .AsNoTracking()
+                .FirstAsync(
+                    m => m.ConversationId == conversationId && m.UserId == currentUserId,
+                    cancellationToken);
+
+            return OperationResult<ReadReceiptDto>.Success(
+                new ReadReceiptDto(
+                    conversationId,
+                    currentUserId,
+                    current.LastReadMessageId ?? message.Id,
+                    current.LastReadAt ?? now));
+        }
+
+        var receipt = new ReadReceiptDto(conversationId, currentUserId, message.Id, now);
+
+        // Câu lệnh trên cập nhật thẳng DB (không qua EF) → nạp lại entity đang bị track để
+        // trong cùng request các chỗ đọc sau đó thấy đúng mốc mới.
+        await _db.Entry(member).ReloadAsync(cancellationToken);
+
+        // Phát cho MỌI thành viên còn hiệu lực để người gửi thấy "Đã đọc" ngay, kể cả khi
+        // hội thoại được tạo sau lúc client kết nối (bài học GĐ 3: phát qua user:{id}).
+        var memberUserIds = await _db.ConversationMembers
+            .AsNoTracking()
+            .Where(m => m.ConversationId == conversationId && m.LeftAt == null)
+            .Select(m => m.UserId)
+            .ToListAsync(cancellationToken);
+
+        await _notifier.MessageReadAsync(conversationId, memberUserIds, receipt, cancellationToken);
+
+        return OperationResult<ReadReceiptDto>.Success(receipt);
+    }
 
     /// <summary>Lỗi vi phạm ràng buộc duy nhất của PostgreSQL (SqlState 23505).</summary>
     private static bool IsUniqueViolation(DbUpdateException exception) =>

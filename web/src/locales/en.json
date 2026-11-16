@@ -178,6 +178,7 @@
     "group_name": "Group name",
     "group_members_hint": "{{count}}/{{max}} members selected — a group needs at least {{min}} people (including you).",
     "member_count": "{{count}} members",
+    "online_count": "{{count}} online",
     "no_friends": "Add some friends before creating a group.",
     "create": "Create",
     "cancel": "Cancel",
@@ -194,7 +195,16 @@
     "remove_image": "Remove image",
     "back": "Conversations",
     "not_found": "Conversation not found",
-    "open": "Message"
+    "open": "Message",
+    "online": "Online",
+    "offline": "Offline",
+    "last_seen": "Last seen {{time}}",
+    "typing": "typing…",
+    "typing_many": "{{names}} are typing…",
+    "seen_by": "Seen by {{count}}",
+    "sent": "Sent",
+    "read": "Read",
+    "unread_count": "{{count}} unread messages"
   },
   "social": {
     "feed": "Feed",

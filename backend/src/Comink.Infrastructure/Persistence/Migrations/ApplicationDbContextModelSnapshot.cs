@@ -563,6 +563,14 @@ namespace Comink.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("joined_at");
 
+                    b.Property<DateTimeOffset?>("LastReadAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_read_at");
+
+                    b.Property<Guid?>("LastReadMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("last_read_message_id");
+
                     b.Property<DateTimeOffset?>("LeftAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("left_at");
@@ -577,6 +585,9 @@ namespace Comink.Infrastructure.Persistence.Migrations
 
                     b.HasKey("ConversationId", "UserId")
                         .HasName("pk_conversation_members");
+
+                    b.HasIndex("LastReadMessageId")
+                        .HasDatabaseName("ix_conversation_members_last_read_message_id");
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_conversation_members_user_id");
@@ -1473,6 +1484,12 @@ namespace Comink.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_conversation_members_conversations_conversation_id");
 
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.Message", "LastReadMessage")
+                        .WithMany()
+                        .HasForeignKey("LastReadMessageId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_conversation_members_messages_last_read_message_id");
+
                     b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
@@ -1481,6 +1498,8 @@ namespace Comink.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_conversation_members_users_user_id");
 
                     b.Navigation("Conversation");
+
+                    b.Navigation("LastReadMessage");
 
                     b.Navigation("User");
                 });

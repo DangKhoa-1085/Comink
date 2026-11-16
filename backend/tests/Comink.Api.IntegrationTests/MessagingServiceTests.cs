@@ -18,32 +18,6 @@ public class MessagingServiceTests : IntegrationTestBase
     {
     }
 
-    /// <summary>Không phát sóng gì — test nghiệp vụ không cần SignalR.</summary>
-    private sealed class NullChatNotifier : IChatNotifier
-    {
-        public Task MessageCreatedAsync(
-            Guid conversationId,
-            IReadOnlyList<Guid> memberUserIds,
-            MessageDto message,
-            CancellationToken cancellationToken = default) => Task.CompletedTask;
-    }
-
-    /// <summary>Ghi lại lần phát sự kiện để khẳng định danh sách người nhận.</summary>
-    private sealed class RecordingChatNotifier : IChatNotifier
-    {
-        public List<(Guid ConversationId, IReadOnlyList<Guid> Members, Guid MessageId)> Calls { get; } = [];
-
-        public Task MessageCreatedAsync(
-            Guid conversationId,
-            IReadOnlyList<Guid> memberUserIds,
-            MessageDto message,
-            CancellationToken cancellationToken = default)
-        {
-            Calls.Add((conversationId, memberUserIds, message.Id));
-            return Task.CompletedTask;
-        }
-    }
-
     private static ApplicationUser NewUser(string userName, string displayName) => new()
     {
         Id = Guid.CreateVersion7(),
@@ -80,7 +54,8 @@ public class MessagingServiceTests : IntegrationTestBase
         return (db, first, second);
     }
 
-    private static ConversationService Conversations(ApplicationDbContext db) => new(db);
+    private static ConversationService Conversations(ApplicationDbContext db) =>
+        new(db, new FakePresenceService(), new NullChatNotifier());
 
     private static MessageService Messages(ApplicationDbContext db) => new(db, new NullChatNotifier());
 
@@ -309,7 +284,7 @@ public class MessagingServiceTests : IntegrationTestBase
         var sent = await service.SendAsync(
             alice.Id, conversationId, new SendMessageRequest(Guid.CreateVersion7(), "xin chào", null));
 
-        var call = Assert.Single(notifier.Calls);
+        var call = Assert.Single(notifier.Messages);
         Assert.Equal(conversationId, call.ConversationId);
         Assert.Equal(sent.Value!.Message.Id, call.MessageId);
         Assert.Equal(2, call.Members.Count);

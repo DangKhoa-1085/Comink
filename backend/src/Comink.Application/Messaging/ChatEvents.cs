@@ -8,6 +8,15 @@ public static class ChatEvents
     /// <summary>Server → client: có tin nhắn mới trong hội thoại.</summary>
     public const string MessageCreated = "MessageCreated";
 
+    /// <summary>Server → client: một người đã đọc tin trong hội thoại (NC Giai đoạn 7).</summary>
+    public const string MessagesRead = "MessagesRead";
+
+    /// <summary>Server → client: trạng thái online của một người vừa đổi (NC Giai đoạn 7).</summary>
+    public const string PresenceChanged = "PresenceChanged";
+
+    /// <summary>Server → client: một người bắt đầu/ngừng gõ trong hội thoại (NC Giai đoạn 7).</summary>
+    public const string TypingChanged = "TypingChanged";
+
     /// <summary>Group theo hội thoại: <c>conversation:{id}</c>.</summary>
     public static string ConversationGroup(Guid conversationId) => $"conversation:{conversationId}";
 

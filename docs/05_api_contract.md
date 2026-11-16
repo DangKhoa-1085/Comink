@@ -480,7 +480,7 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 ## 8. Nhắn tin (Giai đoạn 3)
 
 > Trạng thái: **mục 8.2–8.7 đã cài đặt ở backend và kiểm chứng bằng HTTP thật (2026-10-18)**; web đang làm. Quyết định **D1 đã chốt: chỉ bạn bè mới mở được hội thoại 1–1** (`docs/tasks/phase3_messaging.md` mục 2).
-> Phạm vi CB: **chỉ chat riêng 1–1**. Chat nhóm, trạng thái online, "đang nhập", đã gửi/đã đọc, trả lời, thu hồi/sửa, tìm kiếm, ghim, cảm xúc là **[NC]** — chưa có trong hợp đồng này.
+> **Cập nhật 2026-11-17 (GĐ 7 — Ưu tiên 1):** đã bổ sung **mục 8.9–8.10** — trạng thái online, "đang nhập", đã gửi/đã đọc; `unreadCount` nay là số thật; DTO hội thoại có thêm trường presence/mốc đọc. Đã cài đặt backend + web, kiểm chứng bằng 2 client SignalR thật + HTTP (mục 8.11); app Flutter làm tiếp.
 
 ### 8.1. Quy ước riêng
 
@@ -501,7 +501,7 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 | `userId` | uuid | ✔ | Người muốn nhắn cùng |
 
 - `201 Created` — tạo mới; `200 OK` — hội thoại đã tồn tại (idempotent theo `direct_key`).
-- Trả `ConversationDto`: `{ id, type, title?, avatarUrl?, createdAt, lastMessageAt?, members: [{ userId, displayName, userName, avatarUrl }], lastMessage?: MessageDto }`
+- Trả `ConversationDto`: `{ id, type, title?, avatarUrl?, createdAt, lastMessageAt?, members: [{ userId, displayName, userName, avatarUrl, isOnline, lastSeenAt, lastReadMessageId, lastReadAt }], lastMessage?: MessageDto }`
 - Lỗi: `MESSAGING_CANNOT_MESSAGE_SELF` (400), `MESSAGING_NOT_FRIENDS` (403 — nếu D1 chọn "chỉ bạn bè"), `USER_NOT_FOUND` (404).
 - Mở chat 1–1 với tài khoản Admin khi người gửi là người dùng thường → `404 NOT_FOUND` (ẩn tài khoản); Admin với Admin vẫn hợp lệ.
 
@@ -526,11 +526,12 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 
 - Sắp xếp `last_message_at DESC` (`NULLS LAST` cho hội thoại chưa có tin).
 - Trả cả hội thoại **1–1** và **nhóm**.
-- Trả `PagedList<ConversationSummaryDto>`: `{ id, type, title?, peer?: { userId, displayName, avatarUrl } | null, lastMessage?: { id, senderId, preview, type, createdAt }, unreadCount, memberCount }` — `peer` chỉ có với `type = "Direct"`; nhóm dùng `title` + `memberCount`; `unreadCount = 0` ở CB.
+- Trả `PagedList<ConversationSummaryDto>`: `{ id, type, title?, peer?: { userId, userName, displayName, avatarUrl, isOnline, lastSeenAt } | null, lastMessage?: { id, senderId, preview, type, createdAt }, unreadCount, memberCount }` — `peer` chỉ có với `type = "Direct"`; nhóm dùng `title` + `memberCount`.
+- `unreadCount` (từ GĐ 7): số tin của **người khác** có `(created_at, id)` lớn hơn mốc đọc của tôi (mục 8.9). Trước GĐ 7 trường này luôn `0`.
 
 ### 8.4. Chi tiết hội thoại
 
-`GET /api/conversations/{id}` → `ConversationDto` (cùng hình dạng 8.2). Người ngoài → `404 CONVERSATION_NOT_FOUND`.
+`GET /api/conversations/{id}` → `ConversationDto` (cùng hình dạng 8.2, mỗi `member` có thêm `isOnline`, `lastSeenAt`, `lastReadMessageId`, `lastReadAt` — mục 8.10). Người ngoài → `404 CONVERSATION_NOT_FOUND`.
 
 ### 8.5. Lịch sử tin nhắn
 
@@ -567,9 +568,9 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 | Group người dùng | `user:{userId}` (đã có) |
 | Group hội thoại | `conversation:{conversationId}` — **server tự thêm** khi client kết nối, dựa trên danh sách thành viên còn hiệu lực (`left_at IS NULL`). **Không** có hub method để client tự join/leave |
 | Sự kiện server → client | `MessageCreated` (payload `MessageDto`) gửi tới **`user:{id}` của từng thành viên** *và* group `conversation:{id}`. Phải phát theo `user:{id}` vì client chỉ được thêm vào group hội thoại **lúc kết nối** — hội thoại tạo sau khi kết nối sẽ không có ai trong group (lỗi thật 2026-10-19: phải tải lại trang mới thấy tin). Client ở cả hai group nhận trùng không sao: handler chèn tin theo `id` rồi làm mới dữ liệu |
-| Tín hiệu client → server | Chưa có ở CB ("đang nhập"/presence là **[NC]**) |
-| Đồng bộ sau khi mất kết nối | Client kết nối lại → gọi `GET /api/conversations/{id}/messages?after={lastMessageId}` và `GET /api/conversations` để làm mới |
-| Quyền | Người ngoài không nằm trong group hội thoại ⇒ **không nhận** `MessageCreated`; mọi truy cập REST trả 404 |
+| Tín hiệu client → server | Từ GĐ 7: `Typing(conversationId, isTyping)` — chỉ thành viên, server phát `TypingChanged` cho group hội thoại **trừ** connection gửi; chặn tối thiểu 2 giây/người/hội thoại. `Ping()` — làm mới TTL presence (client gọi mỗi 30 giây). Chi tiết mục 8.10 |
+| Đồng bộ sau khi mất kết nối | Client kết nối lại → gọi `GET /api/conversations/{id}/messages?after={lastMessageId}` và `GET /api/conversations` để làm mới; tải lại `GET /api/conversations/{id}` để cập nhật trạng thái online |
+| Quyền | Người ngoài không nằm trong group hội thoại ⇒ **không nhận** `MessageCreated`; mọi truy cập REST trả 404. Presence/typing/đã đọc cũng chỉ tới người cùng hội thoại (mục 8.10) |
 
 ### 8.8. Mã lỗi mới (GĐ 3)
 
@@ -584,6 +585,60 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 | `MESSAGE_TOO_MANY_ATTACHMENTS` | 400 | Quá 10 tệp trong một tin |
 | `MESSAGE_CLIENT_ID_REQUIRED` | 400 | Thiếu `clientMessageId` |
 | `MESSAGE_INVALID_CURSOR` | 400 | Con trỏ phân trang không hợp lệ |
+| `MESSAGE_NOT_FOUND` | 404 | Tin không tồn tại **hoặc** không thuộc hội thoại đang đánh dấu đã đọc *(GĐ 7)* |
+
+### 8.9. Đánh dấu đã đọc (NC GĐ 7)
+
+`POST /api/conversations/{id}/read`
+
+| Trường | Kiểu | Bắt buộc | Ghi chú |
+|---|---|---|---|
+| `messageId` | uuid | ✔ | Tin cuối cùng người dùng đã xem |
+
+- `204 No Content` — kể cả khi mốc đã bằng hoặc **mới hơn** tin gửi lên (idempotent, **chỉ tiến**).
+- Mốc lưu ở `conversation_members.last_read_message_id` + `last_read_at` (migration **M6**); so sánh theo `(created_at, id)` như con trỏ phân trang.
+- Khi mốc tiến thật: phát `MessagesRead` (mục 8.10) tới mọi thành viên còn hiệu lực (`user:{id}` + group hội thoại).
+- Lỗi: `CONVERSATION_NOT_FOUND` (404 — không phải thành viên), `MESSAGE_NOT_FOUND` (404 — tin không thuộc hội thoại), `VALIDATION_FAILED` (400 — thiếu `messageId`).
+
+### 8.10. Presence, "đang nhập", đã đọc (NC GĐ 7)
+
+**Trường bổ sung trong DTO**
+
+| DTO | Trường mới | Ý nghĩa |
+|---|---|---|
+| `ConversationPeerDto` | `isOnline` (bool), `lastSeenAt` (string?) | Người còn lại của chat 1–1 |
+| `ConversationMemberDto` | `isOnline`, `lastSeenAt`, `lastReadMessageId` (uuid?), `lastReadAt` (string?) | Thành viên; mốc đọc dùng để hiển thị "Đã đọc"/"Đã xem bởi N" |
+| `ConversationSummaryDto` | `unreadCount` — nay là số thật | Xem 8.3 |
+
+**Presence**
+
+- Lưu trạng thái trong **Redis**: mỗi người một sorted set connection id → mốc ping gần nhất, key TTL 90 giây; "online" = còn connection trong cửa sổ 90 giây. Client gửi `Ping` mỗi 30 giây. Nhiều tab/thiết bị: chỉ kết nối đầu → online, kết nối cuối đóng → offline.
+- Server → client: `PresenceChanged` `{ userId, isOnline, lastSeenAt }`, phát qua `user:{id}` cho **những người cùng ít nhất một hội thoại còn hiệu lực** (không phát toàn cục).
+- Redis không sẵn sàng → coi như offline, **không** làm hỏng chat.
+
+**"Đang nhập"**
+
+| Hướng | Tên | Payload |
+|---|---|---|
+| Client → server | `Typing(conversationId, isTyping)` | — (server kiểm tra membership) |
+| Server → client | `TypingChanged` | `{ conversationId, userId, isTyping }` — group `conversation:{id}` **trừ** connection gửi |
+
+- Không lưu DB; client throttle ~3 giây/lần, tự gửi `isTyping=false` sau 5 giây ngừng gõ; server chặn tối thiểu 2 giây/người/hội thoại.
+
+**Đã đọc**
+
+| Hướng | Tên | Payload |
+|---|---|---|
+| Server → client | `MessagesRead` | `{ conversationId, userId, messageId, readAt }` — mọi thành viên còn hiệu lực |
+
+- "Đã gửi" = tin đã lưu DB và đã phát real-time (không có trạng thái "đã nhận" riêng — quyết định #5 của `docs/03_database_design.md` mục 7).
+- Ghi chú: tín hiệu `TypingChanged` dùng group hội thoại (client chỉ vào group lúc kết nối), nên với hội thoại **tạo sau** khi client kết nối, tín hiệu gõ của người mới chỉ tới người kia sau khi tải lại khung chat. Tin nhắn/đã đọc/presence không bị vì phát thêm qua `user:{id}`.
+
+### 8.11. Kiểm chứng GĐ 7 — Ưu tiên 1 (2026-11-17)
+
+- Backend: `dotnet test` **224/224** (Domain 72 · Application 25 · Tích hợp 127, gồm `ReadReceiptTests` 6 + `ChatHubTests` 12), `dotnet build` 0 warning.
+- HTTP + **2 client SignalR thật** (script Node, 3 tài khoản): **28/28** — offline ban đầu → online khi kết nối (alice + carol cùng nhận), `TypingChanged` đúng người nhận/kể cả nhóm và **không** tới người ngoài hội thoại, `unreadCount` 2→0, `MessagesRead` real-time (1–1 và nhóm), mốc cũ không lùi/không phát lại, người ngoài `404 CONVERSATION_NOT_FOUND`, tin khác hội thoại `404 MESSAGE_NOT_FOUND`, offline có `lastSeenAt`.
+- Web: `npm run lint` 0/0, `npm run build` thành công (còn cảnh báo bundle > 1 MB — KI-09).
 
 ---
 
@@ -734,3 +789,4 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 | 2026-10-24 | **Tài khoản Admin ẩn:** không xuất hiện trong `GET /api/users?search=` (kể cả với Admin); hồ sơ/bài viết trang cá nhân của Admin → `404` cho người dùng thường; chặn kết bạn/theo dõi/chat 1–1/mời nhóm tới Admin từ người dùng thường. Trang `/api/admin/users` giữ nguyên |
 | 2026-10-27 | **Mốc A:** thêm security scheme **Bearer JWT** vào OpenAPI (chỉ endpoint cần đăng nhập), chốt bản máy đọc `docs/openapi/comink.v1.json` (45 path); không đổi endpoint/DTO |
 | 2026-10-27 | **GĐ 6:** thêm mục 10 — `POST/DELETE /api/devices`, `GET /api/notifications`, `POST /api/notifications/{id}/read`; push FCM cho tin nhắn/lời mời/cuộc gọi; migration `20261027_Notifications_InitialCreate` |
+| 2026-11-17 | **GĐ 7 — Ưu tiên 1:** thêm `POST /api/conversations/{id}/read`; DTO hội thoại có `isOnline`/`lastSeenAt`/`lastReadMessageId`/`lastReadAt`; `unreadCount` là số thật; sự kiện `PresenceChanged`/`TypingChanged`/`MessagesRead` + hub method `Typing`/`Ping`; mã lỗi `MESSAGE_NOT_FOUND`; migration **M6** `Messaging_AddReadMarkers`. Đã kiểm chứng 28/28 bằng HTTP + 2 client SignalR |

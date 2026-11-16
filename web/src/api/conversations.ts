@@ -7,9 +7,16 @@ export interface ConversationPeer {
   userName: string
   displayName: string
   avatarUrl: string | null
+  /** Trạng thái online (NC GĐ 7) — chỉ đúng cho người cùng hội thoại. */
+  isOnline: boolean
+  lastSeenAt: string | null
 }
 
-export interface ConversationMember extends ConversationPeer {}
+export interface ConversationMember extends ConversationPeer {
+  /** Mốc đã đọc của chính thành viên này (dùng hiển thị "Đã đọc"/"Đã xem bởi N"). */
+  lastReadMessageId: string | null
+  lastReadAt: string | null
+}
 
 export interface MessageAttachment {
   mediaId: string
@@ -66,6 +73,26 @@ export interface SendMessagePayload {
   mediaIds?: string[]
 }
 
+/** Sự kiện real-time của phần nhắn tin nâng cao (khớp `ChatEvents` ở backend). */
+export interface PresenceEvent {
+  userId: string
+  isOnline: boolean
+  lastSeenAt: string | null
+}
+
+export interface TypingEvent {
+  conversationId: string
+  userId: string
+  isTyping: boolean
+}
+
+export interface ReadReceipt {
+  conversationId: string
+  userId: string
+  messageId: string
+  readAt: string
+}
+
 export const conversationsApi = {
   /** Mở hội thoại 1–1 (chỉ bạn bè); đã có thì backend trả lại hội thoại cũ. */
   async openDirect(userId: string): Promise<Conversation> {
@@ -117,5 +144,13 @@ export const conversationsApi = {
       payload,
     )
     return data
+  },
+
+  /**
+   * Đánh dấu đã đọc tới một tin (NC GĐ 7). Server chỉ **tiến** mốc nên gọi lặp lại vô hại;
+   * 204 No Content kể cả khi mốc đã bằng hoặc mới hơn.
+   */
+  async markRead(conversationId: string, messageId: string): Promise<void> {
+    await http.post(`/api/conversations/${conversationId}/read`, { messageId })
   },
 }

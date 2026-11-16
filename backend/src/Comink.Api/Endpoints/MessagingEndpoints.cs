@@ -52,6 +52,13 @@ public static class MessagingEndpoints
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        // NC Giai đoạn 7: mốc đã đọc (chỉ tiến), phát MessagesRead tới các thành viên.
+        conversations.MapPost("/{id:guid}/read", MarkReadAsync)
+            .WithName("MarkConversationRead")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         return app;
     }
 
@@ -205,5 +212,37 @@ public static class MessagingEndpoints
         return result.Value.WasCreated
             ? Results.Created($"/api/conversations/{id}/messages/{result.Value.Message.Id}", result.Value.Message)
             : Results.Ok(result.Value.Message);
+    }
+
+    private static async Task<IResult> MarkReadAsync(
+        Guid id,
+        MarkReadRequest request,
+        IValidator<MarkReadRequest> validator,
+        IConversationService conversationService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var userId = CurrentUser.GetUserId(httpContext.User);
+        if (userId is null)
+        {
+            return ApiResults.Problem(ErrorCodes.Unauthorized);
+        }
+
+        var (isValid, errorResult, _) = await ApiResults.ValidateAsync(validator, request, cancellationToken);
+        if (!isValid)
+        {
+            return errorResult!;
+        }
+
+        var result = await conversationService.MarkReadAsync(
+            userId.Value,
+            id,
+            request.MessageId,
+            cancellationToken);
+
+        // 204 cho cả trường hợp "đã ở mốc này hoặc mới hơn" (idempotent, chỉ tiến).
+        return result.Succeeded
+            ? Results.NoContent()
+            : ApiResults.Problem(result.ErrorCode ?? ErrorCodes.InternalError);
     }
 }

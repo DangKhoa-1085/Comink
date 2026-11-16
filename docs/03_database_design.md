@@ -526,8 +526,8 @@ Khi chặn, backend xóa `friendships` và `follows` giữa hai người trong c
 | `role` | varchar(16) | NN, mặc định `Member` (`Owner`, `Admin`, `Member`); chat riêng luôn `Member` |
 | `joined_at` | timestamptz | NN |
 | `left_at` | timestamptz | null = còn trong nhóm. Rời nhóm thì **giữ dòng** để còn lịch sử tin trước đó |
-| `last_read_message_id` | uuid | FK→messages `SET NULL`. Mốc **đã đọc** (xem ghi chú dưới) |
-| `last_read_at` | timestamptz | |
+| `last_read_message_id` | uuid | FK→messages `SET NULL`. Mốc **đã đọc** (xem ghi chú dưới). Có từ **M6** (NC GĐ 7) |
+| `last_read_at` | timestamptz | Cùng bộ với `last_read_message_id`; có từ **M6** (NC GĐ 7) |
 | `muted_until` | timestamptz | **[NC]** null = bật thông báo; thời điểm tương lai = đang tắt; `'infinity'` = tắt vô thời hạn |
 
 > **Đã đọc:** lưu một mốc cho mỗi thành viên thay vì một dòng cho mỗi tin. Số tin chưa đọc = số tin có `(created_at, id)` lớn hơn tin mốc và `sender_id` khác chính người đó.
@@ -953,6 +953,7 @@ Chỉ tạo bảng khi cần, mỗi nhóm một migration riêng:
 | M3 | `calls`, `call_participants` (+ cột `messages.call_id`) | Gọi **cơ bản** |
 | M4 | `user_devices`, `notifications` | Push/thông báo |
 | M5 | **FK `users.locked_by` → `users(id)` `ON DELETE SET NULL` + chỉ mục `users (locked_by)`** (migration `Admin_AddLockedByForeignKey`, GĐ 5). Cột quản trị trên `users` đã có sẵn từ M0. Khi làm NC: thêm hàng đợi kiểm duyệt `reports`, `audit_logs` | Quản trị cơ bản/nâng cao |
+| M6 | `conversation_members.last_read_message_id` (FK→`messages` `SET NULL`) + `last_read_at` + chỉ mục FK (migration `Messaging_AddReadMarkers`, GĐ 7 — Ưu tiên 1) | Nhắn tin **nâng cao**: đã gửi/đã đọc |
 | N-x | Từng nhóm **nâng cao** khi làm tới: hashtags/saved_posts, reactions/pins/reply/forward/edit/search, `blocks`, albums, `daily_stats`, `banned_keywords`, cài đặt riêng tư và mute | Chỉ sau khi mức cơ bản của nhóm đó xong |
 | Cuối | `ai_conversations`, `ai_messages`, `ai_usage_logs` | Sau khi các chức năng chính ổn định |
 

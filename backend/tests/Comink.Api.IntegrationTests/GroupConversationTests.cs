@@ -30,6 +30,9 @@ public class GroupConversationTests : IntegrationTestBase
         Settings = new UserSettings()
     };
 
+    private static ConversationService Conversations(ApplicationDbContext db) =>
+        new(db, new FakePresenceService(), new NullChatNotifier());
+
     private static void MakeFriends(ApplicationDbContext db, ApplicationUser first, ApplicationUser second) =>
         db.Friendships.Add(new Friendship
         {
@@ -60,7 +63,7 @@ public class GroupConversationTests : IntegrationTestBase
     {
         var (db, alice, bob, carol) = await CreateTriangleAsync();
 
-        var result = await new ConversationService(db)
+        var result = await Conversations(db)
             .CreateGroupAsync(alice.Id, new CreateGroupConversationRequest("Nhom hoc tap", [bob.Id, carol.Id]));
 
         Assert.True(result.Succeeded);
@@ -80,7 +83,7 @@ public class GroupConversationTests : IntegrationTestBase
     {
         var (db, alice, bob, _) = await CreateTriangleAsync();
 
-        var result = await new ConversationService(db)
+        var result = await Conversations(db)
             .CreateGroupAsync(alice.Id, new CreateGroupConversationRequest("Chi hai nguoi", [bob.Id]));
 
         Assert.False(result.Succeeded);
@@ -98,7 +101,7 @@ public class GroupConversationTests : IntegrationTestBase
         // 10 người được mời + người tạo = 11 > 10 → bị chặn trước khi kiểm tra bạn bè.
         var invitees = Enumerable.Range(0, 10).Select(index => Guid.CreateVersion7()).ToList();
 
-        var result = await new ConversationService(db)
+        var result = await Conversations(db)
             .CreateGroupAsync(alice.Id, new CreateGroupConversationRequest("Nhom dong", invitees));
 
         Assert.False(result.Succeeded);
@@ -113,7 +116,7 @@ public class GroupConversationTests : IntegrationTestBase
         db.Users.Add(stranger);
         await db.SaveChangesAsync();
 
-        var result = await new ConversationService(db)
+        var result = await Conversations(db)
             .CreateGroupAsync(alice.Id, new CreateGroupConversationRequest("Nhom la", [bob.Id, stranger.Id]));
 
         Assert.False(result.Succeeded);
@@ -124,7 +127,7 @@ public class GroupConversationTests : IntegrationTestBase
     public async Task GetMyConversations_IncludesGroupWithMemberCountAndNoPeer()
     {
         var (db, alice, bob, carol) = await CreateTriangleAsync();
-        var service = new ConversationService(db);
+        var service = Conversations(db);
         var created = await service.CreateGroupAsync(
             alice.Id,
             new CreateGroupConversationRequest("Nhom ba nguoi", [bob.Id, carol.Id]));
@@ -147,7 +150,7 @@ public class GroupConversationTests : IntegrationTestBase
         db.Users.Add(outsider);
         await db.SaveChangesAsync();
 
-        var service = new ConversationService(db);
+        var service = Conversations(db);
         var created = await service.CreateGroupAsync(
             alice.Id,
             new CreateGroupConversationRequest("Nhom kin", [bob.Id, carol.Id]));

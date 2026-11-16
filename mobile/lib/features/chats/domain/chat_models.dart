@@ -5,6 +5,10 @@ class ConversationPeer {
     required this.displayName,
     this.userName,
     this.avatarUrl,
+    this.isOnline = false,
+    this.lastSeenAt,
+    this.lastReadMessageId,
+    this.lastReadAt,
   });
 
   final String userId;
@@ -12,16 +16,38 @@ class ConversationPeer {
   final String? userName;
   final String? avatarUrl;
 
+  /// Trạng thái online (NC GĐ 7) — chỉ đúng cho người cùng hội thoại.
+  final bool isOnline;
+
+  /// Lần cuối online (chỉ khi đang offline và đã từng kết nối).
+  final DateTime? lastSeenAt;
+
+  /// Mốc đã đọc của riêng người này (dùng hiện "Đã đọc"/"Đã xem bởi N").
+  final String? lastReadMessageId;
+  final DateTime? lastReadAt;
+
   factory ConversationPeer.fromJson(Map<String, dynamic> json) => ConversationPeer(
         userId: (json['userId'] ?? json['id'] ?? '').toString(),
         displayName: (json['displayName'] ?? '').toString(),
         userName: _nullable(json['userName']),
         avatarUrl: _nullable(json['avatarUrl']),
+        isOnline: json['isOnline'] == true,
+        lastSeenAt: _dateTime(json['lastSeenAt']),
+        lastReadMessageId: _nullable(json['lastReadMessageId']),
+        lastReadAt: _dateTime(json['lastReadAt']),
       );
 
   static String? _nullable(dynamic value) {
     final text = value?.toString().trim();
     return (text == null || text.isEmpty) ? null : text;
+  }
+
+  static DateTime? _dateTime(dynamic value) {
+    final text = value?.toString();
+    if (text == null || text.isEmpty) {
+      return null;
+    }
+    return DateTime.tryParse(text)?.toLocal();
   }
 }
 

@@ -177,6 +177,7 @@
     "group_name": "Tên nhóm",
     "group_members_hint": "Đã chọn {{count}}/{{max}} thành viên — nhóm cần ít nhất {{min}} người (gồm bạn).",
     "member_count": "{{count}} thành viên",
+    "online_count": "{{count}} đang online",
     "no_friends": "Bạn cần kết bạn trước khi tạo nhóm.",
     "create": "Tạo",
     "cancel": "Huỷ",
@@ -193,7 +194,16 @@
     "remove_image": "Bỏ ảnh",
     "back": "Danh sách hội thoại",
     "not_found": "Không tìm thấy hội thoại",
-    "open": "Nhắn tin"
+    "open": "Nhắn tin",
+    "online": "Đang hoạt động",
+    "offline": "Không hoạt động",
+    "last_seen": "Truy cập lần cuối {{time}}",
+    "typing": "đang nhập…",
+    "typing_many": "{{names}} đang nhập…",
+    "seen_by": "Đã xem bởi {{count}}",
+    "sent": "Đã gửi",
+    "read": "Đã đọc",
+    "unread_count": "{{count}} tin chưa đọc"
   },
   "social": {
     "feed": "Bảng tin",

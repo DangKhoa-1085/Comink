@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -7,6 +7,7 @@ import { callsApi, type CallType } from '../api/calls'
 import { conversationsApi, type ChatMessage } from '../api/conversations'
 import { mediaApi } from '../api/media'
 import { Avatar } from '../components/social/Avatar'
+import { PresenceDot } from '../components/chat/PresenceDot'
 import { Button } from '../components/ui/Button'
 import { Alert, Spinner } from '../components/ui/Feedback'
 import { toast } from '../stores/toastStore'
@@ -14,7 +15,9 @@ import { ApiError } from '../lib/http'
 import { translateErrorCode } from '../lib/errorMessages'
 import { timeAgo } from '../lib/format'
 import { appendMessageToCache } from '../lib/messageCache'
+import { sendTyping } from '../lib/chatConnection'
 import { useAuthStore } from '../stores/authStore'
+import { useTypingStore } from '../stores/typingStore'
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
@@ -73,6 +76,110 @@ export function ChatPage() {
       bottomRef.current?.scrollIntoView({ block: 'end' })
     }
   }, [lastMessageId])
+
+  // --- NC GĐ 7: "đang nhập" ---
+  const typingUserIds = useTypingStore((state) =>
+    conversationId ? (state.byConversation[conversationId] ?? []) : [],
+  )
+  const typingUsers = typingUserIds.filter((id) => id !== me?.id)
+
+  const typingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastTypingSentAtRef = useRef(0)
+
+  const stopTyping = () => {
+    if (typingStopTimerRef.current) {
+      clearTimeout(typingStopTimerRef.current)
+      typingStopTimerRef.current = null
+    }
+    lastTypingSentAtRef.current = 0
+    if (conversationId) {
+      void sendTyping(conversationId, false)
+    }
+  }
+
+  /** Gõ → báo "đang nhập" (throttle 3 giây); ngừng 5 giây thì tự báo ngừng. */
+  const notifyTyping = () => {
+    if (!conversationId) {
+      return
+    }
+
+    const now = Date.now()
+    if (now - lastTypingSentAtRef.current > 3000) {
+      lastTypingSentAtRef.current = now
+      void sendTyping(conversationId, true)
+    }
+
+    if (typingStopTimerRef.current) {
+      clearTimeout(typingStopTimerRef.current)
+    }
+    typingStopTimerRef.current = setTimeout(stopTyping, 5000)
+  }
+
+  useEffect(() => {
+    // Rời khung chat khi vẫn đang gõ → báo ngừng để người kia không thấy "đang nhập" treo.
+    return () => {
+      if (typingStopTimerRef.current) {
+        clearTimeout(typingStopTimerRef.current)
+      }
+      if (conversationId) {
+        void sendTyping(conversationId, false)
+      }
+    }
+  }, [conversationId])
+
+  // --- NC GĐ 7: đánh dấu đã đọc (server chỉ tiến mốc, gọi lặp lại vô hại) ---
+  const lastMarkedReadRef = useRef<string | null>(null)
+  const newestMessageIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    newestMessageIdRef.current = lastMessageId ?? null
+  }, [lastMessageId])
+
+  const markRead = useCallback(
+    async (messageId: string) => {
+      if (!conversationId || lastMarkedReadRef.current === messageId) {
+        return
+      }
+
+      lastMarkedReadRef.current = messageId
+      try {
+        await conversationsApi.markRead(conversationId, messageId)
+        queryClient.invalidateQueries({ queryKey: ['conversations'] })
+        queryClient.invalidateQueries({ queryKey: ['conversation', conversationId] })
+      } catch {
+        // Mất mạng: lần mở khung chat/quay lại tab kế tiếp sẽ đánh dấu lại.
+        if (lastMarkedReadRef.current === messageId) {
+          lastMarkedReadRef.current = null
+        }
+      }
+    },
+    [conversationId, queryClient],
+  )
+
+  // Đang mở khung chat và tab hiển thị → tin mới nhất được coi là đã đọc.
+  useEffect(() => {
+    if (lastMessageId && document.visibilityState === 'visible') {
+      void markRead(lastMessageId)
+    }
+  }, [lastMessageId, markRead])
+
+  // Quay lại tab sau khi tab bị ẩn → đánh dấu các tin đến trong lúc ẩn.
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      const newest = newestMessageIdRef.current
+      if (document.visibilityState === 'visible' && newest) {
+        void markRead(newest)
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [markRead])
+
+  // Đổi hội thoại → cho phép đánh dấu lại từ đầu ở hội thoại mới.
+  useEffect(() => {
+    lastMarkedReadRef.current = null
+  }, [conversationId])
 
   const sendMutation = useMutation({
     mutationFn: (payload: { content: string; mediaIds: string[] }) =>
@@ -144,6 +251,8 @@ export function ChatPage() {
       return
     }
 
+    // Gửi xong thì không còn "đang nhập" nữa.
+    stopTyping()
     sendMutation.mutate({ content, mediaIds })
   }
 
@@ -166,6 +275,53 @@ export function ChatPage() {
     ? conversation.title || t('chat.group')
     : peer?.displayName || peer?.userName || t('chat.title')
 
+  // --- NC GĐ 7: trạng thái online + "đang nhập" ở đầu khung chat ---
+  const typingNames = typingUsers
+    .map((userId) => {
+      const member = conversation.members.find((item) => item.userId === userId)
+      return member?.displayName || member?.userName || ''
+    })
+    .filter((name) => name.length > 0)
+
+  const presenceLabel = peer?.isOnline ? t('chat.online') : t('chat.offline')
+  const onlineMemberCount = conversation.members.filter((member) => member.isOnline).length
+  const peerStatus = !peer
+    ? null
+    : typingUsers.length > 0
+      ? t('chat.typing')
+      : peer.isOnline
+        ? t('chat.online')
+        : peer.lastSeenAt
+          ? t('chat.last_seen', { time: timeAgo(peer.lastSeenAt, i18n.language) })
+          : t('chat.offline')
+
+  // NC GĐ 7: "Đã gửi"/"Đã đọc"/"Đã xem bởi N" chỉ hiện dưới tin CUỐI của chính mình.
+  const lastOwnMessage = [...messages].reverse().find((message) => message.senderId === me?.id)
+  const peerHasRead =
+    !isGroup &&
+    peer?.lastReadAt !== null &&
+    peer?.lastReadAt !== undefined &&
+    lastOwnMessage !== undefined &&
+    Date.parse(peer.lastReadAt) >= Date.parse(lastOwnMessage.createdAt)
+  const groupSeenCount =
+    isGroup && lastOwnMessage
+      ? conversation.members.filter(
+          (member) =>
+            member.userId !== me?.id &&
+            member.lastReadAt !== null &&
+            Date.parse(member.lastReadAt) >= Date.parse(lastOwnMessage.createdAt),
+        ).length
+      : 0
+  const lastOwnStatus = !lastOwnMessage
+    ? null
+    : isGroup
+      ? groupSeenCount > 0
+        ? t('chat.seen_by', { count: groupSeenCount })
+        : t('chat.sent')
+      : peerHasRead
+        ? t('chat.read')
+        : t('chat.sent')
+
   return (
     <div className="mx-auto flex h-[calc(100vh-9rem)] max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
       <header className="flex items-center gap-3 border-b border-slate-200 p-3 dark:border-slate-800">
@@ -177,16 +333,34 @@ export function ChatPage() {
             <Users className="h-4 w-4" />
           </span>
         ) : (
-          <Avatar name={peerName} url={peer?.avatarUrl} size="sm" />
+          <span className="relative shrink-0">
+            <Avatar name={peerName} url={peer?.avatarUrl} size="sm" />
+            {peer && (
+              <PresenceDot
+                online={peer.isOnline}
+                label={presenceLabel}
+                className="absolute -bottom-0.5 -right-0.5"
+              />
+            )}
+          </span>
         )}
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{peerName}</p>
           {isGroup ? (
             <p className="truncate text-xs text-slate-500">
-              {t('chat.member_count', { count: conversation.members.length })}
+              {typingNames.length > 0
+                ? t('chat.typing_many', { names: typingNames.join(', ') })
+                : `${t('chat.member_count', { count: conversation.members.length })} · ${t(
+                    'chat.online_count',
+                    { count: onlineMemberCount },
+                  )}`}
             </p>
           ) : (
-            peer && <p className="truncate text-xs text-slate-500">@{peer.userName}</p>
+            peer && (
+              <p className="truncate text-xs text-slate-500">
+                {peerStatus ?? `@${peer.userName}`}
+              </p>
+            )
           )}
         </div>
 
@@ -286,6 +460,11 @@ export function ChatPage() {
                       <span className={mine ? 'mt-1 block text-[10px] text-indigo-200' : 'mt-1 block text-[10px] text-slate-400'}>
                         {timeAgo(message.createdAt, i18n.language)}
                       </span>
+                      {mine && lastOwnStatus && message.id === lastOwnMessage?.id && (
+                        <span className="mt-0.5 block text-[10px] text-indigo-100">
+                          {lastOwnStatus}
+                        </span>
+                      )}
                       </div>
                     </div>
                   </li>
@@ -332,7 +511,15 @@ export function ChatPage() {
 
           <input
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => {
+              setDraft(event.target.value)
+              if (event.target.value.trim().length > 0) {
+                notifyTyping()
+              } else {
+                // Xoá hết nội dung → không còn "đang nhập".
+                stopTyping()
+              }
+            }}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault()

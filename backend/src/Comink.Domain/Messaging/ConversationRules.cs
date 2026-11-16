@@ -45,4 +45,34 @@ public static class ConversationRules
     /// <summary>Số thành viên (tính cả người tạo) có hợp lệ cho một nhóm không.</summary>
     public static bool IsGroupSizeValid(int memberCount) =>
         memberCount is >= MinGroupMembers and <= MaxGroupMembers;
+
+    // --- Mốc đã đọc (NC Giai đoạn 7 — docs/tasks/phase7_advanced_messaging.md) ---
+
+    /// <summary>
+    /// Mốc đã đọc chỉ được **tiến**: chỉ nhận tin mới hơn mốc hiện tại theo đúng thứ tự con trỏ
+    /// `(created_at, id)` — giống cách phân trang lịch sử tin (docs/05_api_contract.md mục 8.5).
+    /// <para>
+    /// Nhờ vậy hai client của cùng một người (nhiều tab) gửi mốc lệch thứ tự cũng không làm mốc
+    /// bị lùi, và mở lại khung chat không phát lại sự kiện "đã đọc" vô ích.
+    /// </para>
+    /// </summary>
+    public static bool CanAdvanceReadMarker(
+        DateTimeOffset? currentReadAt,
+        Guid? currentMessageId,
+        DateTimeOffset messageCreatedAt,
+        Guid messageId)
+    {
+        if (currentReadAt is null)
+        {
+            return true;
+        }
+
+        if (messageCreatedAt != currentReadAt.Value)
+        {
+            return messageCreatedAt > currentReadAt.Value;
+        }
+
+        // Cùng thời điểm (hiếm khi xảy ra nhưng vẫn có): so id, UUIDv7 tăng dần theo thời gian.
+        return currentMessageId is null || messageId.CompareTo(currentMessageId.Value) > 0;
+    }
 }

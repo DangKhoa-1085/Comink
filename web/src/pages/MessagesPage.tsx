@@ -5,6 +5,7 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import { MessagesSquare, Plus, Users } from 'lucide-react'
 import { conversationsApi } from '../api/conversations'
 import { Avatar } from '../components/social/Avatar'
+import { PresenceDot } from '../components/chat/PresenceDot'
 import { CreateGroupDialog } from '../components/social/CreateGroupDialog'
 import { Button } from '../components/ui/Button'
 import { Alert, Spinner } from '../components/ui/Feedback'
@@ -87,11 +88,22 @@ export function MessagesPage() {
                       <Users className="h-5 w-5" />
                     </span>
                   ) : (
-                    <Avatar
-                      name={displayName}
-                      url={conversation.peer?.avatarUrl ?? null}
-                      size="md"
-                    />
+                    <span className="relative shrink-0">
+                      <Avatar
+                        name={displayName}
+                        url={conversation.peer?.avatarUrl ?? null}
+                        size="md"
+                      />
+                      {conversation.peer && (
+                        <PresenceDot
+                          online={conversation.peer.isOnline}
+                          label={
+                            conversation.peer.isOnline ? t('chat.online') : t('chat.offline')
+                          }
+                          className="absolute -bottom-0.5 -right-0.5"
+                        />
+                      )}
+                    </span>
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
@@ -104,11 +116,21 @@ export function MessagesPage() {
                     </p>
                     <p className="truncate text-xs text-slate-500 dark:text-slate-400">{preview}</p>
                   </div>
-                  {conversation.lastMessage && (
-                    <span className="shrink-0 text-xs text-slate-400">
-                      {timeAgo(conversation.lastMessage.createdAt, i18n.language)}
-                    </span>
-                  )}
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    {conversation.lastMessage && (
+                      <span className="text-xs text-slate-400">
+                        {timeAgo(conversation.lastMessage.createdAt, i18n.language)}
+                      </span>
+                    )}
+                    {conversation.unreadCount > 0 && (
+                      <span
+                        className="rounded-full bg-indigo-600 px-2 py-0.5 text-[11px] font-semibold text-white"
+                        aria-label={t('chat.unread_count', { count: conversation.unreadCount })}
+                      >
+                        {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
+                      </span>
+                    )}
+                  </div>
                 </Link>
               </li>
             )

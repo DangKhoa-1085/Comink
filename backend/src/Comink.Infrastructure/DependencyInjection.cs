@@ -222,6 +222,9 @@ public static class DependencyInjection
         services.AddSingleton<IConnectionMultiplexer>(_ =>
             ConnectionMultiplexer.Connect(redisConnectionString));
 
+        // Presence (NC Giai đoạn 7): singleton vì chỉ giữ kết nối Redis + clock, không giữ state theo request.
+        services.AddSingleton<IPresenceService, Messaging.RedisPresenceService>();
+
         return services;
     }
 

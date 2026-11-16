@@ -1,13 +1,30 @@
 import { useEffect, useRef, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import type { HubConnection } from '@microsoft/signalr'
-import type { ChatMessage } from '../api/conversations'
+import {
+  type ChatMessage,
+  type Conversation,
+  type ConversationSummary,
+  type PresenceEvent,
+  type ReadReceipt,
+  type TypingEvent,
+} from '../api/conversations'
+import type { PagedResult } from '../api/types'
 import type { CallDto } from '../api/calls'
-import { createChatConnection, MESSAGE_CREATED_EVENT } from '../lib/chatConnection'
+import {
+  createChatConnection,
+  MESSAGE_CREATED_EVENT,
+  MESSAGES_READ_EVENT,
+  PRESENCE_CHANGED_EVENT,
+  sendPresencePing,
+  setActiveChatConnection,
+  TYPING_CHANGED_EVENT,
+} from '../lib/chatConnection'
 import { appendMessageToCache, syncMissedMessages } from '../lib/messageCache'
 import i18n from '../lib/i18n'
 import { useAuthStore } from '../stores/authStore'
 import { useCallStore } from '../stores/callStore'
+import { useTypingStore } from '../stores/typingStore'
 import { toast } from '../stores/toastStore'
 
 /** Tên sự kiện cuộc gọi — khớp `CallEvents` ở backend. */
@@ -17,6 +34,9 @@ const CALL_ENDED_EVENT = 'CallEnded'
 
 /** Tài khoản bị admin khóa — khớp `AdminEvents.AccountLocked` ở backend. */
 const ACCOUNT_LOCKED_EVENT = 'AccountLocked'
+
+/** Nhịp làm mới TTL presence (backend TTL 90 giây). */
+const PRESENCE_PING_INTERVAL_MS = 30_000
 
 export interface ChatConnectionState {
   /** Đang có kết nối tới hub. */
@@ -48,6 +68,8 @@ declare global {
  * Mở một kết nối SignalR cho cả ứng dụng trong lúc đang đăng nhập.
  * Khi có `MessageCreated`, chèn tin vào cache và làm mới danh sách hội thoại.
  * Khi kết nối lại sau khi mất mạng, lấy các tin bị lỡ (`after` cursor).
+ *
+ * NC Giai đoạn 7: nhận `PresenceChanged` / `TypingChanged` / `MessagesRead`, gửi `Ping` định kỳ.
  */
 export function useChatConnection(enabled: boolean): ChatConnectionState {
   const queryClient = useQueryClient()
@@ -63,6 +85,7 @@ export function useChatConnection(enabled: boolean): ChatConnectionState {
 
     let disposed = false
     const connection: HubConnection = createChatConnection()
+    let pingInterval: ReturnType<typeof setInterval> | null = null
 
     const markConnected = () => {
       if (!disposed) {
@@ -75,6 +98,8 @@ export function useChatConnection(enabled: boolean): ChatConnectionState {
     const syncNow = async () => {
       await syncMissedMessages(queryClient)
       await queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      // Trạng thái online có thể đã đổi trong lúc mất kết nối → đọc lại chi tiết đang mở.
+      await queryClient.invalidateQueries({ queryKey: ['conversation'] })
     }
 
     connection.on(MESSAGE_CREATED_EVENT, (message: ChatMessage) => {
@@ -82,6 +107,84 @@ export function useChatConnection(enabled: boolean): ChatConnectionState {
       // với dữ liệu chuẩn từ server.
       appendMessageToCache(queryClient, message)
       queryClient.invalidateQueries({ queryKey: ['messages', message.conversationId] })
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    })
+
+    // --- NC GĐ 7: trạng thái online ---
+    connection.on(PRESENCE_CHANGED_EVENT, (presence: PresenceEvent) => {
+      // Danh sách hội thoại: cập nhật "người còn lại" của chat 1–1.
+      queryClient.setQueriesData<InfiniteData<PagedResult<ConversationSummary>>>(
+        { queryKey: ['conversations'] },
+        (old) => {
+          if (!old) {
+            return old
+          }
+
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((item) =>
+                item.peer?.userId === presence.userId
+                  ? {
+                      ...item,
+                      peer: {
+                        ...item.peer,
+                        isOnline: presence.isOnline,
+                        lastSeenAt: presence.lastSeenAt,
+                      },
+                    }
+                  : item,
+              ),
+            })),
+          }
+        },
+      )
+
+      // Khung chat đang mở: cập nhật thành viên tương ứng (1–1 và nhóm).
+      queryClient.setQueriesData<Conversation>({ queryKey: ['conversation'] }, (old) => {
+        if (!old) {
+          return old
+        }
+
+        return {
+          ...old,
+          members: old.members.map((member) =>
+            member.userId === presence.userId
+              ? { ...member, isOnline: presence.isOnline, lastSeenAt: presence.lastSeenAt }
+              : member,
+          ),
+        }
+      })
+    })
+
+    // --- NC GĐ 7: "đang nhập" (tín hiệu tạm thời, store tự hết hạn) ---
+    connection.on(TYPING_CHANGED_EVENT, (typing: TypingEvent) => {
+      useTypingStore.getState().setTyping(typing.conversationId, typing.userId, typing.isTyping)
+    })
+
+    // --- NC GĐ 7: đã đọc ---
+    connection.on(MESSAGES_READ_EVENT, (receipt: ReadReceipt) => {
+      queryClient.setQueriesData<Conversation>({ queryKey: ['conversation'] }, (old) => {
+        if (!old || old.id !== receipt.conversationId) {
+          return old
+        }
+
+        return {
+          ...old,
+          members: old.members.map((member) =>
+            member.userId === receipt.userId
+              ? {
+                  ...member,
+                  lastReadAt: receipt.readAt,
+                  lastReadMessageId: receipt.messageId,
+                }
+              : member,
+          ),
+        }
+      })
+
+      // Số tin chưa đọc (badge) thay đổi với mọi tab của người vừa đọc.
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
     })
 
@@ -131,6 +234,8 @@ export function useChatConnection(enabled: boolean): ChatConnectionState {
       // Mất kết nối (mất mạng, ngủ máy, server restart…): SignalR sẽ tự thử lại.
       if (!disposed) {
         setIsConnected(false)
+        // Không còn nhận tín hiệu gõ → tránh chữ "đang nhập" treo vĩnh viễn.
+        useTypingStore.getState().clearAll()
       }
     })
 
@@ -140,6 +245,7 @@ export function useChatConnection(enabled: boolean): ChatConnectionState {
       }
 
       markConnected()
+      void sendPresencePing()
       void syncNow()
     })
 
@@ -147,12 +253,31 @@ export function useChatConnection(enabled: boolean): ChatConnectionState {
       // Đóng hẳn (không tự kết nối lại được): hiện dải cảnh báo, KHÔNG tự tải lại trang.
       if (!disposed) {
         setIsConnected(false)
+        useTypingStore.getState().clearAll()
       }
     })
 
+    setActiveChatConnection(connection)
+
+    // Tab quay lại foreground: gia hạn presence (có thể đã hết TTL khi tab bị treo).
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !disposed) {
+        void sendPresencePing()
+      }
+    }
+
     void connection
       .start()
-      .then(markConnected)
+      .then(() => {
+        if (disposed) {
+          return
+        }
+
+        markConnected()
+        // Làm mới TTL presence định kỳ để trạng thái online không hết hạn khi kết nối vẫn sống.
+        pingInterval = setInterval(() => void sendPresencePing(), PRESENCE_PING_INTERVAL_MS)
+        document.addEventListener('visibilitychange', onVisibilityChange)
+      })
       .catch(() => {
         if (!disposed) {
           setIsConnected(false)
@@ -168,13 +293,19 @@ export function useChatConnection(enabled: boolean): ChatConnectionState {
           markConnected()
           await syncNow()
         },
-        syncNow
+        syncNow,
       }
       window.__cominkChat = controlRef.current
     }
 
     return () => {
       disposed = true
+      if (pingInterval) {
+        clearInterval(pingInterval)
+      }
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      setActiveChatConnection(null)
+      useTypingStore.getState().clearAll()
       if (import.meta.env.DEV) {
         delete window.__cominkChat
       }

@@ -2299,6 +2299,65 @@
         ]
       }
     },
+    "/api/conversations/{id}/read": {
+      "post": {
+        "tags": [
+          "Messaging"
+        ],
+        "operationId": "MarkConversationRead",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkReadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
     "/api/calls": {
       "post": {
         "tags": [
@@ -3271,7 +3330,11 @@
           "userId",
           "userName",
           "displayName",
-          "avatarUrl"
+          "avatarUrl",
+          "isOnline",
+          "lastSeenAt",
+          "lastReadMessageId",
+          "lastReadAt"
         ],
         "type": "object",
         "properties": {
@@ -3290,6 +3353,30 @@
               "null",
               "string"
             ]
+          },
+          "isOnline": {
+            "type": "boolean"
+          },
+          "lastSeenAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastReadMessageId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "lastReadAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -3298,7 +3385,9 @@
           "userId",
           "userName",
           "displayName",
-          "avatarUrl"
+          "avatarUrl",
+          "isOnline",
+          "lastSeenAt"
         ],
         "type": "object",
         "properties": {
@@ -3317,6 +3406,16 @@
               "null",
               "string"
             ]
+          },
+          "isOnline": {
+            "type": "boolean"
+          },
+          "lastSeenAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -3589,6 +3688,18 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "MarkReadRequest": {
+        "required": [
+          "messageId"
+        ],
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },

@@ -115,7 +115,7 @@ public class AdminVisibilityTests : IntegrationTestBase
         Assert.False(follow.Succeeded);
         Assert.Equal(ErrorCodes.NotFound, follow.ErrorCode);
 
-        var direct = await new ConversationService(db).OpenDirectAsync(normal.Id, admin.Id);
+        var direct = await new ConversationService(db, new FakePresenceService(), new NullChatNotifier()).OpenDirectAsync(normal.Id, admin.Id);
         Assert.False(direct.Succeeded);
         Assert.Equal(ErrorCodes.NotFound, direct.ErrorCode);
     }
@@ -127,7 +127,7 @@ public class AdminVisibilityTests : IntegrationTestBase
         // rồi bị chặn ở bước kiểm tra tài khoản ẩn.
         var (db, normal, admin, otherAdmin) = await CreateUsersAsync();
 
-        var group = await new ConversationService(db).CreateGroupAsync(
+        var group = await new ConversationService(db, new FakePresenceService(), new NullChatNotifier()).CreateGroupAsync(
             normal.Id,
             new CreateGroupConversationRequest("Nhóm thử", [admin.Id, otherAdmin.Id]));
 

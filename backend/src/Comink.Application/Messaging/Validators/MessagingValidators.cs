@@ -50,3 +50,12 @@ public class SendMessageRequestValidator : AbstractValidator<SendMessageRequest>
             .WithMessage($"Mỗi tin tối đa {MessageRules.MaxAttachments} tệp.");
     }
 }
+
+/// <summary>Kiểm tra yêu cầu đánh dấu đã đọc (NC Giai đoạn 7).</summary>
+public class MarkReadRequestValidator : AbstractValidator<MarkReadRequest>
+{
+    public MarkReadRequestValidator()
+    {
+        RuleFor(x => x.MessageId).NotEmpty().WithMessage("MessageId là bắt buộc.");
+    }
+}

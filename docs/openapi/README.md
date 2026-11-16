@@ -9,7 +9,7 @@ và làm mốc so sánh khi backend thay đổi. File được sinh tự động
 |---|---|
 | Nguồn | `Comink.Api` (Minimal API) |
 | Định dạng | OpenAPI 3.1 (JSON) |
-| Số endpoint hiện tại | **48** |
+| Số endpoint hiện tại | **49** |
 | Xác thực | `securitySchemes.Bearer`: HTTP bearer, JWT |
 | Endpoint công khai | `/api/auth/login`, `/api/auth/register`, `/api/auth/refresh`, `/health`, webhook LiveKit (không có trong danh sách client) |
 | Endpoint cần token | Có `security: [{ "Bearer": [] }]` trong operation tương ứng |
@@ -56,9 +56,9 @@ powershell -ExecutionPolicy Bypass -File docs/openapi/verify.ps1 -Url http://loc
 | # | Tiêu chí | Cách kiểm tra |
 |---|---|---|
 | 1 | Bản chụp là OpenAPI **3.1** hợp lệ, sinh từ code (không sửa tay) | Script (mục 1) |
-| 2 | Có **Bearer JWT** và endpoint cần đăng nhập đều khai báo `security` | Script (mục 2) — hiện 53/57 operation |
+| 2 | Có **Bearer JWT** và endpoint cần đăng nhập đều khai báo `security` | Script (mục 2) — hiện 54/58 operation |
 | 3 | **Mọi endpoint app Flutter gọi đều có trong hợp đồng** (không gọi "chui") | Script (mục 3) — hiện 37 endpoint của app |
-| 4 | **Không drift**: spec đang chạy trùng bản chụp | Script (mục 4) — hiện 48 path khớp |
+| 4 | **Không drift**: spec đang chạy trùng bản chụp | Script (mục 4) — hiện 49 path khớp |
 | 5 | DTO/response đúng thực tế: đã chạy thật các luồng chính (HTTP 12/12, app Chrome, app máy thật) | Thủ công — xem `docs/tasks/phase6_mobile_cb.md` mục 5 |
 | 6 | Quy ước thay đổi: sửa API → cập nhật `docs/05_api_contract.md` → tái sinh bản chụp; **thay đổi breaking phải tăng `info.version`** | Quy trình (AGENTS mục 12) |
 | 7 | Không còn endpoint mới dự kiến đổi trong 2 tuần tới | Quyết định của nhóm |

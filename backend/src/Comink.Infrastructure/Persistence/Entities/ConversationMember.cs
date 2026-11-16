@@ -22,4 +22,14 @@ public class ConversationMember
 
     /// <summary>null = còn trong hội thoại. GĐ 3 luôn null.</summary>
     public DateTimeOffset? LeftAt { get; set; }
+
+    /// <summary>
+    /// Mốc **đã đọc**: tin cuối cùng mà người này đã xem trong hội thoại
+    /// (docs/03_database_design.md mục 3.3). Chỉ **tiến**, không lùi.
+    /// </summary>
+    public Guid? LastReadMessageId { get; set; }
+    public Message? LastReadMessage { get; set; }
+
+    /// <summary>Thời điểm ghi mốc đọc; cùng bộ với <see cref="LastReadMessageId"/>.</summary>
+    public DateTimeOffset? LastReadAt { get; set; }
 }

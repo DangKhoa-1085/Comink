@@ -56,6 +56,9 @@ public static class ErrorCodes
     public const string MessagingGroupTooFew = "MESSAGING_GROUP_TOO_FEW";
     public const string MessagingGroupTooMany = "MESSAGING_GROUP_TOO_MANY";
 
+    // --- Nhắn tin: NC đã gửi/đã đọc (Giai đoạn 7) ---
+    public const string MessageNotFound = "MESSAGE_NOT_FOUND";
+
     // --- Cuộc gọi (Giai đoạn 4) — docs/05_api_contract.md mục 9.7 ---
     public const string CallNotFound = "CALL_NOT_FOUND";
     public const string CallAlreadyActive = "CALL_ALREADY_ACTIVE";

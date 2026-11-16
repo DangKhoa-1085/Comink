@@ -43,6 +43,35 @@ public interface IConversationService
     Task<IReadOnlyList<Guid>> GetActiveConversationIdsAsync(
         Guid currentUserId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Người dùng có đang là thành viên còn hiệu lực của hội thoại không.
+    /// Dùng cho tín hiệu "đang nhập": hub phải kiểm tra quyền chứ không tin id client gửi.
+    /// </summary>
+    Task<bool> IsMemberAsync(
+        Guid currentUserId,
+        Guid conversationId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Những người **cùng ít nhất một hội thoại còn hiệu lực** với người này.
+    /// Là phạm vi được phép thấy trạng thái online (quyết định D2, phase7 mục 2) — không phát toàn cục.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> GetCoMemberUserIdsAsync(
+        Guid currentUserId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Đánh dấu đã đọc tới <paramref name="messageId"/> (NC Giai đoạn 7). Mốc chỉ tiến, không lùi;
+    /// khi tiến thật thì phát <c>MessagesRead</c> tới mọi thành viên còn hiệu lực.
+    /// Không phải thành viên → <c>CONVERSATION_NOT_FOUND</c>; tin không thuộc hội thoại →
+    /// <c>MESSAGE_NOT_FOUND</c>.
+    /// </summary>
+    Task<OperationResult<ReadReceiptDto>> MarkReadAsync(
+        Guid currentUserId,
+        Guid conversationId,
+        Guid messageId,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>Nghiệp vụ tin nhắn.</summary>
@@ -96,5 +125,24 @@ public interface IChatNotifier
         Guid conversationId,
         IReadOnlyList<Guid> memberUserIds,
         MessageDto message,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Phát <c>MessagesRead</c> tới các thành viên (qua <c>user:{id}</c> và group hội thoại)
+    /// để người gửi thấy "Đã đọc" ngay.
+    /// </summary>
+    Task MessageReadAsync(
+        Guid conversationId,
+        IReadOnlyList<Guid> memberUserIds,
+        ReadReceiptDto receipt,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Phát <c>PresenceChanged</c> cho **những người được phép thấy** trạng thái của người dùng
+    /// (cùng hội thoại — quyết định D2). Gửi qua <c>user:{id}</c>.
+    /// </summary>
+    Task PresenceChangedAsync(
+        IReadOnlyList<Guid> audienceUserIds,
+        PresenceDto presence,
         CancellationToken cancellationToken = default);
 }

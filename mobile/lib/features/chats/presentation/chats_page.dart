@@ -109,10 +109,30 @@ class _ConversationTile extends StatelessWidget {
               backgroundColor: colors.primaryContainer,
               child: Icon(Icons.groups, color: colors.onPrimaryContainer),
             )
-          : AppAvatar(
-              name: title,
-              url: conversation.avatarUrl,
-              radius: 24,
+          : Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AppAvatar(
+                  name: title,
+                  url: conversation.avatarUrl,
+                  radius: 24,
+                ),
+                // Chấm online (NC GĐ 7): chỉ chat 1–1 mới có trạng thái của người kia.
+                if (conversation.peer?.isOnline == true)
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 13,
+                      height: 13,
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: colors.surface, width: 2),
+                      ),
+                    ),
+                  ),
+              ],
             ),
       title: Row(
         children: [
@@ -137,12 +157,35 @@ class _ConversationTile extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: TextStyle(color: colors.onSurfaceVariant),
       ),
-      trailing: conversation.isGroup
-          ? Text(
+      trailing: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (conversation.unreadCount > 0)
+            Container(
+              constraints: const BoxConstraints(minWidth: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: colors.primary,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                conversation.unreadCount > 99 ? '99+' : '${conversation.unreadCount}',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: colors.onPrimary,
+                ),
+              ),
+            ),
+          if (conversation.isGroup)
+            Text(
               '${conversation.memberCount}',
               style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
-            )
-          : null,
+            ),
+        ],
+      ),
     );
   }
 }

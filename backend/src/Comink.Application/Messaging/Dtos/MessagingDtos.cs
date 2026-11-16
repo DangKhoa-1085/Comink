@@ -13,8 +13,36 @@ public record CreateGroupConversationRequest(string Name, IReadOnlyList<Guid> Pa
 /// <summary>Yêu cầu gửi tin nhắn. <c>ClientMessageId</c> do client sinh để chống gửi trùng.</summary>
 public record SendMessageRequest(Guid ClientMessageId, string? Content, IReadOnlyList<Guid>? MediaIds);
 
-/// <summary>Một thành viên hội thoại (thông tin hiển thị).</summary>
-public record ConversationMemberDto(Guid UserId, string UserName, string DisplayName, string? AvatarUrl);
+/// <summary>
+/// Yêu cầu đánh dấu đã đọc tới một tin (NC Giai đoạn 7). Server chỉ **tiến** mốc,
+/// không bao giờ lùi (docs/05_api_contract.md mục 8.9).
+/// </summary>
+public record MarkReadRequest(Guid MessageId);
+
+/// <summary>
+/// Trạng thái online của một người. <c>LastSeenAt</c> là thời điểm ngắt kết nối gần nhất,
+/// chỉ có khi đang offline và đã từng kết nối.
+/// </summary>
+public record PresenceDto(Guid UserId, bool IsOnline, DateTimeOffset? LastSeenAt);
+
+/// <summary>Mốc đọc đã được ghi nhận (dùng cho sự kiện <c>MessagesRead</c>).</summary>
+public record ReadReceiptDto(Guid ConversationId, Guid UserId, Guid MessageId, DateTimeOffset ReadAt);
+
+/// <summary>
+/// Tín hiệu "đang nhập" (NC Giai đoạn 7). Không lưu DB — chỉ chuyển tiếp trong hội thoại.
+/// </summary>
+public record TypingSignalDto(Guid ConversationId, Guid UserId, bool IsTyping);
+
+/// <summary>Một thành viên hội thoại (thông tin hiển thị + trạng thái online + mốc đọc).</summary>
+public record ConversationMemberDto(
+    Guid UserId,
+    string UserName,
+    string DisplayName,
+    string? AvatarUrl,
+    bool IsOnline,
+    DateTimeOffset? LastSeenAt,
+    Guid? LastReadMessageId,
+    DateTimeOffset? LastReadAt);
 
 /// <summary>Tệp đính kèm của tin nhắn.</summary>
 public record MessageAttachmentDto(Guid MediaId, string Url, string? ThumbnailUrl, int? Width, int? Height);
@@ -42,7 +70,13 @@ public record ConversationDto(
     MessageDto? LastMessage);
 
 /// <summary>Người còn lại trong hội thoại 1–1 (dùng cho danh sách hội thoại).</summary>
-public record ConversationPeerDto(Guid UserId, string UserName, string DisplayName, string? AvatarUrl);
+public record ConversationPeerDto(
+    Guid UserId,
+    string UserName,
+    string DisplayName,
+    string? AvatarUrl,
+    bool IsOnline,
+    DateTimeOffset? LastSeenAt);
 
 /// <summary>Xem trước tin cuối trong danh sách hội thoại.</summary>
 public record ConversationLastMessageDto(Guid Id, Guid SenderId, string Preview, string Type, DateTimeOffset CreatedAt);
