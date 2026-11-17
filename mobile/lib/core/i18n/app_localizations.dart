@@ -26,9 +26,13 @@ class AppLocalizations {
     GlobalCupertinoLocalizations.delegate,
   ];
 
-  String t(String key) {
+  String t(String key, [Map<String, String> params = const {}]) {
     final language = locale.languageCode == 'en' ? 'en' : 'vi';
-    return _values[language]?[key] ?? _values['vi']![key] ?? key;
+    var value = _values[language]?[key] ?? _values['vi']![key] ?? key;
+    for (final entry in params.entries) {
+      value = value.replaceAll('{${entry.key}}', entry.value);
+    }
+    return value;
   }
 
   /// Dịch mã lỗi backend (`AUTH_...`, `VALIDATION_FAILED`...). Mã lạ rơi về lỗi chung.
@@ -226,6 +230,7 @@ class AppLocalizations {
       'chat_typing': 'đang nhập...',
       'chat_typing_many': 'đang nhập...',
       'chat_seen_by': 'Đã xem bởi',
+      'chat_and_more': 'và {count} người khác',
       'chat_sent': 'Đã gửi',
       'chat_read': 'Đã đọc',
       'chat_online_suffix': 'đang online',
@@ -439,9 +444,10 @@ class AppLocalizations {
       'chat_online': 'Online',
       'chat_offline': 'Offline',
       'chat_last_seen': 'Last seen',
-      'chat_typing': 'typing...',
+      'chat_typing': 'is typing...',
       'chat_typing_many': 'are typing...',
       'chat_seen_by': 'Seen by',
+      'chat_and_more': 'and {count} more',
       'chat_sent': 'Sent',
       'chat_read': 'Read',
       'chat_online_suffix': 'online',

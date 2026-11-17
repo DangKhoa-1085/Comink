@@ -199,8 +199,9 @@
     "offline": "Không hoạt động",
     "last_seen": "Truy cập lần cuối {{time}}",
     "typing": "đang nhập…",
-    "typing_many": "{{names}} đang nhập…",
-    "seen_by": "Đã xem bởi {{count}}",
+    "typing_many": "đang nhập…",
+    "seen_by": "Đã xem bởi",
+    "and_more": "và {{count}} người khác",
     "sent": "Đã gửi",
     "read": "Đã đọc",
     "unread_count": "{{count}} tin chưa đọc"

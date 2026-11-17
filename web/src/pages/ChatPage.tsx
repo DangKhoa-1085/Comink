@@ -278,7 +278,7 @@ export function ChatPage() {
     ? conversation.title || t('chat.group')
     : peer?.displayName || peer?.userName || t('chat.title')
 
-  // --- NC GĐ 7: trạng thái online + "đang nhập" ở đầu khung chat ---
+  // --- NC GĐ 7: "đang nhập" hiển thị NGAY TRÊN KHUNG NHẬP (không thay dòng trạng thái ở tiêu đề) ---
   const typingNames = typingUsers
     .map((userId) => {
       const member = conversation.members.find((item) => item.userId === userId)
@@ -286,19 +286,34 @@ export function ChatPage() {
     })
     .filter((name) => name.length > 0)
 
+  const typingText = isGroup
+    ? typingNames.length === 1
+      ? `${typingNames[0]} ${t('chat.typing')}`
+      : typingNames.length > 1
+        ? `${typingNames.slice(0, 3).join(', ')}${
+            typingNames.length > 3
+              ? ` ${t('chat.and_more', { count: typingNames.length - 3 })}`
+              : ''
+          } ${t('chat.typing_many')}`
+        : typingUsers.length > 0
+          ? t('chat.typing_many')
+          : ''
+    : typingUsers.length > 0
+      ? `${peerName} ${t('chat.typing')}`
+      : ''
+
   const presenceLabel = peer?.isOnline ? t('chat.online') : t('chat.offline')
   const onlineMemberCount = conversation.members.filter((member) => member.isOnline).length
+  // Tiêu đề chỉ còn trạng thái presence; "đang nhập" đã chuyển xuống trên khung nhập.
   const peerStatus = !peer
     ? null
-    : typingUsers.length > 0
-      ? t('chat.typing')
-      : peer.isOnline
-        ? t('chat.online')
-        : peer.lastSeenAt
-          ? t('chat.last_seen', { time: timeAgo(peer.lastSeenAt, i18n.language) })
-          : t('chat.offline')
+    : peer.isOnline
+      ? t('chat.online')
+      : peer.lastSeenAt
+        ? t('chat.last_seen', { time: timeAgo(peer.lastSeenAt, i18n.language) })
+        : t('chat.offline')
 
-  // NC GĐ 7: "Đã gửi"/"Đã đọc"/"Đã xem bởi N" chỉ hiện dưới tin CUỐI của chính mình.
+  // NC GĐ 7: "Đã gửi"/"Đã đọc"/"Đã xem bởi <tên>" chỉ hiện dưới tin CUỐI của chính mình.
   const lastOwnMessage = [...messages].reverse().find((message) => message.senderId === me?.id)
   const peerHasRead =
     !isGroup &&
@@ -306,24 +321,41 @@ export function ChatPage() {
     peer?.lastReadAt !== undefined &&
     lastOwnMessage !== undefined &&
     Date.parse(peer.lastReadAt) >= Date.parse(lastOwnMessage.createdAt)
-  const groupSeenCount =
+
+  // Nhóm: liệt kê TÊN người đã đọc (mốc đọc là mốc mới nhất của từng người).
+  const groupSeenNames =
     isGroup && lastOwnMessage
-      ? conversation.members.filter(
-          (member) =>
-            member.userId !== me?.id &&
-            member.lastReadAt !== null &&
-            Date.parse(member.lastReadAt) >= Date.parse(lastOwnMessage.createdAt),
-        ).length
-      : 0
+      ? conversation.members
+          .filter((member) => {
+            if (member.userId === me?.id || member.lastReadAt === null) {
+              return false
+            }
+            return Date.parse(member.lastReadAt) >= Date.parse(lastOwnMessage.createdAt)
+          })
+          .sort((first, second) => Date.parse(first.lastReadAt ?? '') - Date.parse(second.lastReadAt ?? ''))
+          .map((member) => member.displayName || member.userName)
+          .filter((name) => name.length > 0)
+      : []
+
   const lastOwnStatus = !lastOwnMessage
     ? null
     : isGroup
-      ? groupSeenCount > 0
-        ? t('chat.seen_by', { count: groupSeenCount })
-        : t('chat.sent')
+      ? groupSeenNames.length === 0
+        ? t('chat.sent')
+        : `${t('chat.seen_by')} ${groupSeenNames.slice(0, 3).join(', ')}${
+            groupSeenNames.length > 3
+              ? ` ${t('chat.and_more', { count: groupSeenNames.length - 3 })}`
+              : ''
+          }`
       : peerHasRead
         ? t('chat.read')
         : t('chat.sent')
+
+  // Khi danh sách bị rút gọn, rê chuột vào thấy đầy đủ tên.
+  const lastOwnStatusTitle =
+    isGroup && groupSeenNames.length > 3
+      ? `${t('chat.seen_by')} ${groupSeenNames.join(', ')}`
+      : undefined
 
   return (
     <div className="mx-auto flex h-[calc(100vh-9rem)] max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
@@ -351,12 +383,10 @@ export function ChatPage() {
           <p className="truncate text-sm font-semibold">{peerName}</p>
           {isGroup ? (
             <p className="truncate text-xs text-slate-500">
-              {typingNames.length > 0
-                ? t('chat.typing_many', { names: typingNames.join(', ') })
-                : `${t('chat.member_count', { count: conversation.members.length })} · ${t(
-                    'chat.online_count',
-                    { count: onlineMemberCount },
-                  )}`}
+              {`${t('chat.member_count', { count: conversation.members.length })} · ${t(
+                'chat.online_count',
+                { count: onlineMemberCount },
+              )}`}
             </p>
           ) : (
             peer && (
@@ -464,7 +494,10 @@ export function ChatPage() {
                         {timeAgo(message.createdAt, i18n.language)}
                       </span>
                       {mine && lastOwnStatus && message.id === lastOwnMessage?.id && (
-                        <span className="mt-0.5 block text-[10px] text-indigo-100">
+                        <span
+                          className="mt-0.5 block max-w-full truncate text-[10px] text-indigo-100"
+                          title={lastOwnStatusTitle}
+                        >
                           {lastOwnStatus}
                         </span>
                       )}
@@ -480,6 +513,17 @@ export function ChatPage() {
       </div>
 
       <footer className="border-t border-slate-200 p-3 dark:border-slate-800">
+        {/*
+          "Đang nhập" ngay trên khung nhập (theo yêu cầu 2026-11-17). Giữ chiều cao cố định
+          để ô nhập không bị giật lên/xuống khi có/không có người gõ.
+        */}
+        <p
+          className="h-5 truncate px-1 text-xs text-slate-500 dark:text-slate-400"
+          aria-live="polite"
+        >
+          {typingText}
+        </p>
+
         {pendingImage && (
           <div className="mb-2 flex items-center gap-2">
             <img src={pendingImage.url} alt="" className="h-14 w-14 rounded-lg object-cover" />

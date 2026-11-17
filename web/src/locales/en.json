@@ -199,9 +199,10 @@
     "online": "Online",
     "offline": "Offline",
     "last_seen": "Last seen {{time}}",
-    "typing": "typing…",
-    "typing_many": "{{names}} are typing…",
-    "seen_by": "Seen by {{count}}",
+    "typing": "is typing…",
+    "typing_many": "are typing…",
+    "seen_by": "Seen by",
+    "and_more": "and {{count}} more",
     "sent": "Sent",
     "read": "Read",
     "unread_count": "{{count}} unread messages"

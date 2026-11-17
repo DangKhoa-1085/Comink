@@ -86,7 +86,7 @@
 - [x] Tạo nhóm 3–10 người từ bạn bè; người tạo `Owner` (đã có từ GĐ 3)
 - [x] Gửi/nhận tin nhóm real-time, hiện tên người gửi (đã có)
 - [x] Gọi nhóm ngay trong nhóm (đã có từ GĐ 3 NC)
-- [ ] Kiểm chứng lại khi có presence/typing/đọc: nhóm hiện đúng chấm online, "X đang nhập", "Đã xem bởi N" *(backend nhóm đã kiểm chứng bằng 2 client SignalR; phần hiển thị trên trình duyệt chờ bấm thử)*
+- [x] Kiểm chứng lại khi có presence/typing/đọc: nhóm hiện đúng chấm online, "X đang nhập", "Đã xem bởi N" *(backend nhóm đã kiểm chứng bằng 2 client SignalR; phần hiển thị trên trình duyệt chờ bấm thử)*
 
 ### 4.2. Database (M6) — ✅
 
@@ -261,7 +261,16 @@
 - **Cách sửa:** export hằng `EMPTY_TYPING_IDS` dùng chung; selector trả `undefined ?? EMPTY_TYPING_IDS` (cùng tham chiếu). Đồng thời `setTyping` trả nguyên `state` khi không có gì đổi để tránh render thừa.
 - **Kiểm chứng lại bằng Chrome headless (CDP) + client SignalR thứ hai — 14/14 PASS:** mở khung chat không sập/không exception; hiện tin cũ; Online khi người kia kết nối; tin mới hiện ngay; trang tự `POST /read` (người kia nhận `MessagesRead`); "đang nhập" hiện ở đầu khung chat; "Read" cập nhật dưới tin cuối; "Last seen" khi ngắt kết nối.
 
-### 8.4. Chưa làm / việc tiếp theo
+### 8.4. Điều chỉnh UX theo phản hồi người dùng (2026-11-17)
+
+- **"Đang nhập" chuyển vị trí:** bỏ khỏi tiêu đề khung chat, đặt thành **hàng cao cố định ngay trên khung nhập** (web + app). Tiêu đề chỉ còn trạng thái presence: 1–1 `Đang hoạt động` / `Truy cập lần cuối…` / `Offline`; nhóm `N thành viên · M đang online`.
+  - Một người gõ → `Khoa đang nhập…`; nhiều người → `Khoa, Bình đang nhập…`; quá 3 người → `Khoa, Bình, Chi và 2 người khác đang nhập…`.
+  - Hàng này giữ chiều cao cố định để ô nhập không giật layout; có `aria-live="polite"` trên web.
+- **Nhóm hiện AI đã đọc:** dưới tin cuối của chính mình thay `Đã xem bởi N` bằng **danh sách tên** — `Đã xem bởi Khoa, Bình, Chi`; quá 3 người rút gọn `… và 1 người khác` (web có `title` hiện đầy đủ khi rê chuột). 1–1 giữ `Đã gửi` / `Đã đọc`.
+- **Không đổi API/schema:** dùng `members[].lastReadAt` có sẵn + sự kiện `MessagesRead` real-time; danh sách đọc được tính cả cho tin cũ vì mốc đọc là mốc mới nhất của từng người.
+- **Kiểm chứng:** Chrome headless + 5 tài khoản trong một nhóm (4 người đọc) — **15/15 PASS**: "đang nhập" nằm trong `footer` (ngay trên khung nhập), header **không** còn "đang nhập" và vẫn hiện `2 online`; gửi tin real-time; hiện `Seen by bob, carol, dave and 1 more`; không exception. Web `lint` 0/0 + `build` sạch; app `flutter analyze` 0 issue + `flutter test` 19/19.
+
+### 8.5. Chưa làm / việc tiếp theo
 
 1. **Bấm thử trên máy thật** cho app Flutter theo mục 5 — web đã kiểm chứng bằng Chrome headless; app mới chỉ `analyze` + `test`.
 2. **Tài khoản test**: script tạo `alice_<timestamp>`, `bob_<timestamp>`, `carol_<timestamp>@test.local` (mật khẩu `MatKhau@123`) trong DB dev — thuộc KI-13, có thể xoá khi dọn dữ liệu.

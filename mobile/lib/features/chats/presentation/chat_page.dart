@@ -259,23 +259,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       return null;
     }
 
-    final typingIds = ref
-        .read(chatRealtimeProvider)
-        .typingUserIds(widget.conversationId)
-      ..remove(currentUserId);
-
+    // Tiêu đề chỉ còn trạng thái presence; "đang nhập" hiện ngay trên khung nhập.
     if (detail.isGroup) {
-      if (typingIds.isNotEmpty) {
-        final names = detail.members
-            .where((member) => typingIds.contains(member.userId))
-            .map((member) => member.displayName)
-            .where((name) => name.isNotEmpty)
-            .toList(growable: false);
-        if (names.isNotEmpty) {
-          return '${names.join(', ')} ${l10n.t('chat_typing_many')}';
-        }
-      }
-
       final online = detail.members.where((member) => member.isOnline).length;
       return '${detail.members.length} ${l10n.t('chat_members')} · '
           '$online ${l10n.t('chat_online_suffix')}';
@@ -292,9 +277,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       return null;
     }
 
-    if (typingIds.contains(peer.userId)) {
-      return l10n.t('chat_typing');
-    }
     if (peer.isOnline) {
       return l10n.t('chat_online');
     }
@@ -302,6 +284,55 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       return '${l10n.t('chat_last_seen')} ${_formatMoment(context, peer.lastSeenAt!)}';
     }
     return l10n.t('chat_offline');
+  }
+
+  /// Dòng "đang nhập" hiển thị ngay trên khung nhập (1–1: tên người kia; nhóm: tối đa 3 tên + N).
+  String _typingText(
+    AppLocalizations l10n,
+    ConversationDetail? detail,
+    String currentUserId,
+  ) {
+    if (detail == null) {
+      return '';
+    }
+
+    final typingIds = ref
+        .read(chatRealtimeProvider)
+        .typingUserIds(widget.conversationId)
+      ..remove(currentUserId);
+    if (typingIds.isEmpty) {
+      return '';
+    }
+
+    final names = detail.members
+        .where((member) => typingIds.contains(member.userId))
+        .map((member) => member.displayName)
+        .where((name) => name.isNotEmpty)
+        .toList(growable: false);
+
+    if (detail.isGroup) {
+      if (names.isEmpty) {
+        return l10n.t('chat_typing_many');
+      }
+      // Một người dùng câu số ít ("bob is typing..."), nhiều người dùng số nhiều.
+      if (names.length == 1) {
+        return '${names.first} ${l10n.t('chat_typing')}';
+      }
+      final visible = names.length > 3 ? names.sublist(0, 3) : names;
+      final more = names.length > 3
+          ? ' ${l10n.t('chat_and_more', {'count': '${names.length - 3}'})}'
+          : '';
+      return '${visible.join(', ')}$more ${l10n.t('chat_typing_many')}';
+    }
+
+    ConversationPeer? peer;
+    for (final member in detail.members) {
+      if (member.userId != currentUserId) {
+        peer = member;
+        break;
+      }
+    }
+    return '${peer?.displayName ?? ''} ${l10n.t('chat_typing')}'.trim();
   }
 
   String _formatMoment(BuildContext context, DateTime time) {
@@ -329,13 +360,27 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
 
     if (detail.isGroup) {
-      final seen = detail.members
+      final readers = detail.members
           .where((member) =>
               member.userId != currentUserId &&
               member.lastReadAt != null &&
               !member.lastReadAt!.isBefore(lastOwnMessage.createdAt))
-          .length;
-      return seen > 0 ? '${l10n.t('chat_seen_by')} $seen' : l10n.t('chat_sent');
+          .toList()
+        ..sort((first, second) => first.lastReadAt!.compareTo(second.lastReadAt!));
+
+      final names = readers
+          .map((member) => member.displayName)
+          .where((name) => name.isNotEmpty)
+          .toList(growable: false);
+      if (names.isEmpty) {
+        return l10n.t('chat_sent');
+      }
+
+      final visible = names.length > 3 ? names.sublist(0, 3) : names;
+      final more = names.length > 3
+          ? ' ${l10n.t('chat_and_more', {'count': '${names.length - 3}'})}'
+          : '';
+      return '${l10n.t('chat_seen_by')} ${visible.join(', ')}$more';
     }
 
     ConversationPeer? peer;
@@ -370,6 +415,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     final title = detailValue?.displayTitle(currentUserId) ?? l10n.t('chats_title');
     final statusText = _statusText(context, l10n, detailValue, currentUserId);
+    final typingText = _typingText(l10n, detailValue, currentUserId);
 
     return Scaffold(
       appBar: AppBar(
@@ -469,6 +515,25 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
               child: Column(
                 children: [
+                  // "Đang nhập" ngay trên khung nhập; giữ chiều cao cố định để không giật layout.
+                  SizedBox(
+                    height: 20,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Text(
+                          typingText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                   if (_uploading)
                     Align(
                       alignment: Alignment.centerLeft,
@@ -722,6 +787,8 @@ class _MessageBubble extends StatelessWidget {
             if (statusLabel != null)
               Text(
                 statusLabel!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 10,
                   color: textColor.withValues(alpha: 0.8),
