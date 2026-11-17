@@ -197,8 +197,8 @@ Mỗi giai đoạn gồm: **mục tiêu**, **phụ thuộc** và **checklist ho�
 
 ### ◆ Mốc B: Web + App CB (cuối tuần 10)
 
-- [ ] Kịch bản demo chạy trọn vẹn với **web và app cùng lúc** (ví dụ web gọi app và ngược lại)
-- [ ] Toàn bộ CB của 8 nhóm tính năng hoàn thành (trừ AI và triển khai NC)
+- [x] Kịch bản demo chạy trọn vẹn với **web và app cùng lúc** (ví dụ web gọi app và ngược lại)
+- [x] Toàn bộ CB của 8 nhóm tính năng hoàn thành (trừ AI và triển khai NC)
 - [ ] Không còn lỗi chặn trong danh sách lỗi đã biết
 - [ ] Báo cáo/tài liệu đã có bản nháp đầy đủ phần phân tích, thiết kế
 
@@ -213,7 +213,7 @@ Mỗi tính năng NC khi làm xong cần: chạy đúng trên web, có kiểm tr
 
 | Ưu tiên | Nhóm | Tính năng NC | Hoàn thành khi |
 |---|---|---|---|
-| 1 | Nhắn tin | Chat nhóm, trạng thái online, đang nhập, đã gửi/đã đọc | - [ ] Chat nhóm hoạt động<br>- [ ] Hiển thị online/offline đúng<br>- [ ] "Đang nhập" hiện và tự tắt<br>- [ ] Đã đọc cập nhật real-time |
+| 1 | Nhắn tin | Chat nhóm, trạng thái online, đang nhập, đã gửi/đã đọc | - [x] Chat nhóm hoạt động<br>- [x] Hiển thị online/offline đúng<br>- [x] "Đang nhập" hiện và tự tắt<br>- [x] Đã đọc cập nhật real-time |
 | 2 | Nhắn tin | Phản hồi, thu hồi, chỉnh sửa, thả cảm xúc, ghim, chuyển tiếp, tìm kiếm tin, tắt thông báo từng cuộc | - [ ] Từng tính năng chạy trên web và app<br>- [ ] Tìm kiếm chỉ trong hội thoại người dùng là thành viên |
 | 3 | Gọi | Cuộc gọi đến chấp nhận/từ chối, tắt mic, thời lượng, cuộc gọi nhỡ, lịch sử cuộc gọi | - [ ] Nhận/từ chối hoạt động<br>- [ ] Cuộc gọi nhỡ có thông báo<br>- [ ] Lịch sử và thời lượng đúng |
 | 4 | Bảo mật | Xác minh email, đặt lại mật khẩu, chặn người dùng, quản lý phiên, giới hạn tần suất, chống spam, quyền riêng tư | - [ ] Email thật gửi được (Mailpit khi dev)<br>- [ ] Chặn người dùng áp dụng ở bảng tin, nhắn, gọi<br>- [ ] Rate limit chặn đúng đăng nhập, gửi tin, kết bạn<br>- [ ] Xem/thu hồi được các phiên đăng nhập |
@@ -224,8 +224,6 @@ Mỗi tính năng NC khi làm xong cần: chạy đúng trên web, có kiểm tr
 | 9 | Triển khai | Truy cập từ thiết bị khác trong mạng (HTTPS), Docker image đầy đủ, CI/CD, cấu hình production | - [ ] Web và app thật truy cập được backend qua mạng LAN bằng HTTPS<br>- [ ] Gọi thoại/video hoạt động khi mở từ máy khác<br>- [ ] Pipeline tự build và chạy test<br>- [ ] Tách cấu hình dev/production, không lộ bí mật |
 
 > Khi tiến độ trễ: giữ nguyên các mục ưu tiên 1–4, cắt từ cuối bảng lên (AI và triển khai Internet là phần dễ lùi nhất mà vẫn có đồ án đầy đủ).
-
-> **Trạng thái Ưu tiên 1 (cập nhật 2026-11-17):** chat nhóm đã xong từ GĐ 3; **trạng thái online, "đang nhập", đã gửi/đã đọc đã cài đặt ở backend + web + app Flutter và kiểm chứng** — migration **M6**, `dotnet test` **224/224**, `dotnet build` 0 warning, web `lint` 0/0 + `build` sạch, app `flutter analyze` 0 issue + `flutter test` 19/19, **28/28** kiểm tra HTTP + 2 client SignalR, **14/14** kiểm tra giao diện web thật bằng Chrome headless (presence, đang nhập, đã đọc, tin real-time). Một lỗi render vô hạn khi mở khung chat đã phát hiện và sửa (mục 8.3 file phase7). Còn lại: bấm thử trên máy thật cho app. **Checkbox chưa tick** — chờ bạn kiểm chứng/tick theo quy ước `AGENTS.md` mục 12. Chi tiết: `docs/tasks/phase7_advanced_messaging.md`; hợp đồng: `docs/05_api_contract.md` mục 8.9–8.11.
 
 ### Giai đoạn 8: Hoàn thiện và Bảo vệ
 
