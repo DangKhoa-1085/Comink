@@ -4,7 +4,7 @@
 > **Mục tiêu:** hoàn thiện nhóm **Nhắn tin nâng cao (NC)** theo thứ tự ưu tiên của nhóm:
 > **chat nhóm → trạng thái online → "đang nhập" → đã gửi/đã đọc**.
 > **Phụ thuộc:** GĐ 3 (nhắn tin CB + chat nhóm) — **đã xong**; GĐ 6 (app Flutter CB) — **đã xong**.
-> **Trạng thái:** ✅ **đã cài đặt backend + web + app Flutter của 4 mục (2026-11-17)** — backend 224/224 test, 28/28 kiểm chứng HTTP + 2 client SignalR thật; web lint/build sạch; app `flutter analyze` 0 issue, `flutter test` 19/19. Còn lại: bấm thử bằng mắt trên trình duyệt và trên máy thật. Xem mục 8.
+> **Trạng thái:** ✅ **đã cài đặt backend + web + app Flutter của 4 mục (2026-11-17)** — backend 224/224 test; **28/28** kiểm chứng HTTP + 2 client SignalR thật; web lint/build sạch + **14/14** kiểm chứng giao diện thật bằng Chrome headless; app `flutter analyze` 0 issue, `flutter test` 19/19. Còn lại: bấm thử trên máy thật cho app. Xem mục 8.
 > **Ước lượng:** 1–1,5 tuần. Migration tương ứng: **M6** (`Messaging_AddReadMarkers`).
 
 ---
@@ -143,7 +143,7 @@
 - [x] HTTP thật: 3 tài khoản + 1 người ngoài — mốc đọc, unread, quyền 404, chỉ tiến
 - [x] 2 client SignalR thật: presence bật/tắt đúng người trong hội thoại, typing đúng người nhận, đọc cập nhật ngay, người ngoài **không** nhận gì (28/28)
 - [x] App: `flutter analyze` 0 issue; `flutter test` **19/19**
-- [ ] Trình duyệt / máy thật: mở 2 tài khoản, xem chấm online, gõ thấy "đang nhập", mở khung chat thấy "Đã đọc"; ngắt kết nối thấy offline *(chưa có công cụ trình duyệt/thiết bị trong phiên này — cần bạn bấm thử theo mục 5)*
+- [x] Trình duyệt: kiểm chứng bằng **Chrome headless + CDP** — mở khung chat không sập, Online/Last seen, "đang nhập", tin real-time, "Read" cập nhật (14/14). *Máy thật cho app vẫn cần bạn bấm thử theo mục 5.*
 - [x] Cập nhật `docs/05_api_contract.md` (mục 8.9–8.11), `docs/03_database_design.md` (M6), ghi chú trạng thái ở `docs/04_roadmap.md`
 
 ---
@@ -253,8 +253,16 @@
   - người ngoài `404 CONVERSATION_NOT_FOUND`; tin của hội thoại khác `404 MESSAGE_NOT_FOUND`;
   - đóng kết nối cuối → offline kèm `lastSeenAt`, danh sách trả đúng.
 
-### 8.3. Chưa làm / việc tiếp theo
+### 8.3. Lỗi thật đã sửa trong quá trình kiểm chứng
 
-1. **Bấm thử trình duyệt + máy thật** theo mục 5 — phiên này không có công cụ điều khiển trình duyệt/thiết bị.
+**Lỗi: mở một cuộc trò chuyện trên web → "Maximum update depth exceeded" (2026-11-17, người dùng phát hiện).**
+
+- **Nguyên nhân:** selector Zustand trong `ChatPage` viết `state.byConversation[conversationId] ?? []` → mỗi lần React đọc snapshot trả về **một mảng rỗng mới**. `useSyncExternalStore` so sánh bằng `Object.is` nên luôn thấy "đã đổi", gọi `forceStoreRerender` liên tục (stack lỗi có `forceStoreRerender`/`updateStoreInstance`).
+- **Cách sửa:** export hằng `EMPTY_TYPING_IDS` dùng chung; selector trả `undefined ?? EMPTY_TYPING_IDS` (cùng tham chiếu). Đồng thời `setTyping` trả nguyên `state` khi không có gì đổi để tránh render thừa.
+- **Kiểm chứng lại bằng Chrome headless (CDP) + client SignalR thứ hai — 14/14 PASS:** mở khung chat không sập/không exception; hiện tin cũ; Online khi người kia kết nối; tin mới hiện ngay; trang tự `POST /read` (người kia nhận `MessagesRead`); "đang nhập" hiện ở đầu khung chat; "Read" cập nhật dưới tin cuối; "Last seen" khi ngắt kết nối.
+
+### 8.4. Chưa làm / việc tiếp theo
+
+1. **Bấm thử trên máy thật** cho app Flutter theo mục 5 — web đã kiểm chứng bằng Chrome headless; app mới chỉ `analyze` + `test`.
 2. **Tài khoản test**: script tạo `alice_<timestamp>`, `bob_<timestamp>`, `carol_<timestamp>@test.local` (mật khẩu `MatKhau@123`) trong DB dev — thuộc KI-13, có thể xoá khi dọn dữ liệu.
 3. Cân nhắc chỉnh **KI-09** (bundle web vượt 1 MB) khi làm tối ưu ở GĐ 8.

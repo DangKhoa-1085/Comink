@@ -17,7 +17,7 @@ import { timeAgo } from '../lib/format'
 import { appendMessageToCache } from '../lib/messageCache'
 import { sendTyping } from '../lib/chatConnection'
 import { useAuthStore } from '../stores/authStore'
-import { useTypingStore } from '../stores/typingStore'
+import { EMPTY_TYPING_IDS, useTypingStore } from '../stores/typingStore'
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
@@ -78,8 +78,11 @@ export function ChatPage() {
   }, [lastMessageId])
 
   // --- NC GĐ 7: "đang nhập" ---
-  const typingUserIds = useTypingStore((state) =>
-    conversationId ? (state.byConversation[conversationId] ?? []) : [],
+  // ⚠️ Selector phải trả về CÙNG một tham chiếu khi không có ai gõ. Viết `?? []` ở đây
+  // từng làm React render vô hạn ("Maximum update depth exceeded", lỗi thật 2026-11-17).
+  const typingUserIds = useTypingStore(
+    (state) =>
+      (conversationId ? state.byConversation[conversationId] : undefined) ?? EMPTY_TYPING_IDS,
   )
   const typingUsers = typingUserIds.filter((id) => id !== me?.id)
 

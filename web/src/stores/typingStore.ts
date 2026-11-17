@@ -20,6 +20,14 @@ interface TypingState {
 /** Bộ hẹn giờ ẩn từng cặp (hội thoại, người) — key `${conversationId}:${userId}`. */
 const hideTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
+/**
+ * Mảng rỗng DÙNG CHUNG cho selector.
+ * ⚠️ Không được viết `?? []` trong selector: mỗi lần đọc trả một mảng mới → React
+ * (`useSyncExternalStore`) thấy snapshot luôn "đổi" và render vô hạn
+ * ("Maximum update depth exceeded" — lỗi thật gặp 2026-11-17 khi mở khung chat).
+ */
+export const EMPTY_TYPING_IDS: string[] = []
+
 export const useTypingStore = create<TypingState>((set) => ({
   byConversation: {},
 
@@ -32,15 +40,32 @@ export const useTypingStore = create<TypingState>((set) => ({
     }
 
     set((state) => {
-      const current = state.byConversation[conversationId] ?? []
-      const next = !isTyping
-        ? current.filter((id) => id !== userId)
-        : current.includes(userId)
-          ? current
-          : [...current, userId]
+      const current = state.byConversation[conversationId] ?? EMPTY_TYPING_IDS
+
+      if (!isTyping) {
+        // Người này vốn không có trong danh sách → không tạo state mới (tránh render thừa).
+        if (!current.includes(userId)) {
+          return state
+        }
+
+        return {
+          byConversation: {
+            ...state.byConversation,
+            [conversationId]: current.filter((id) => id !== userId),
+          },
+        }
+      }
+
+      // Đã có trong danh sách: chỉ cần gia hạn timer (làm ở trên), không đổi state.
+      if (current.includes(userId)) {
+        return state
+      }
 
       return {
-        byConversation: { ...state.byConversation, [conversationId]: next },
+        byConversation: {
+          ...state.byConversation,
+          [conversationId]: [...current, userId],
+        },
       }
     })
 
@@ -50,7 +75,10 @@ export const useTypingStore = create<TypingState>((set) => ({
         setTimeout(() => {
           hideTimers.delete(key)
           set((state) => {
-            const current = state.byConversation[conversationId] ?? []
+            const current = state.byConversation[conversationId] ?? EMPTY_TYPING_IDS
+            if (!current.includes(userId)) {
+              return state
+            }
             return {
               byConversation: {
                 ...state.byConversation,
