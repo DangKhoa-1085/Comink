@@ -11,6 +11,12 @@
 appsettings.*.local.json
 appsettings.Local.json
 
+# Cấu hình chạy app mobile cho từng máy (Firebase + API base URL).
+# Mẫu được commit: mobile/config/dev.example.json
+mobile/config/dev.json
+mobile/config/dev.*.json
+!mobile/config/dev.example.json
+
 # Khoá bí mật thô (ví dụ Firebase service account JSON)
 *.pem
 *.key

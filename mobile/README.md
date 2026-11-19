@@ -56,38 +56,97 @@ flutter run               # chạy app trên thiết bị/giả lập đang kế
 dart format lib test      # định dạng mã
 ```
 
-### 3.1. Build và chạy trên Android
+### 3.1. Cấu hình một lần — không lặp lại chuỗi `--dart-define`
 
-**Build APK debug (không cần thiết bị cắm vào):**
+Flutter hỗ trợ đọc toàn bộ `--dart-define` từ **một file JSON**, nên không cần gõ lại 5 giá trị mỗi lần chạy:
 
-```bash
-flutter build apk --debug
-# → build/app/outputs/flutter-apk/app-debug.apk
+1. Chép file mẫu (chạy ở thư mục gốc repo):
+
+   ```powershell
+   Copy-Item mobile\config\dev.example.json mobile\config\dev.json
+   ```
+
+   `mobile/config/dev.json` đã được **git-ignore** (chứa cấu hình Firebase của máy bạn); file mẫu
+   `dev.example.json` mới được commit.
+
+2. Điền `API_BASE_URL` và 4 giá trị Firebase trong `config/dev.json` (cách lấy giá trị ở mục 3.2).
+
+3. Từ `mobile/`, chạy:
+
+   ```powershell
+   .\scripts\run-dev.ps1
+   ```
+
+   Script sẽ tự: chọn thiết bị Android đang cắm, chạy `adb reverse` khi dùng `127.0.0.1`,
+   kiểm tra `GET /health` và chỉ chạy `flutter run` khi backend trả lời được.
+
+Các lệnh tương đương:
+
+```powershell
+.\scripts\run-dev.ps1 -Device R58M45SH22R   # chọn thiết bị cụ thể
+.\scripts\run-dev.ps1 -CheckOnly            # chỉ kiểm tra config/thiết bị/backend
+.\scripts\run-dev.ps1 -BuildApk             # build APK debug với đúng cấu hình
+flutter build apk --debug --dart-define-from-file=config/dev.json
 ```
 
-**Chạy trên emulator** (backend chạy trên máy host):
+### 3.1.1. Chạy trên emulator
+
+Sửa `API_BASE_URL` trong `config/dev.json` thành `http://10.0.2.2:5117` (10.0.2.2 là localhost của máy host), rồi:
 
 ```bash
 flutter emulators --launch Pixel_7
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5117
+flutter run -d emulator-5554 --dart-define-from-file=config/dev.json
 ```
 
-**Chạy trên điện thoại thật** (backend phải vào được qua LAN):
+### 3.1.2. Chạy trên điện thoại thật
 
-1. Trên điện thoại: `Cài đặt → Giới thiệu điện thoại → Nhấn "Số bản dựng" 7 lần` → bật **Tùy chọn nhà phát triển** → bật **Gỡ lỗi USB (USB debugging)**.
-2. Cắm cáp USB, trên điện thoại chọn chế độ **Truyền tệp** và bấm **Cho phép** ở hộp thoại "Cho phép gỡ lỗi USB".
-3. Kiểm tra: `adb devices` phải hiện `<serial>  device` (nếu là `unauthorized` thì bấm lại "Cho phép" trên điện thoại).
-4. Lấy IP LAN của máy tính (`ipconfig`), rồi chạy:
+Có **hai cách**; cách A khuyến nghị vì không phụ thuộc IP Wi-Fi hay tường lửa:
 
-```bash
-flutter run --dart-define=API_BASE_URL=http://<ip-lan-máy-tính>:5117
-```
+**A. Qua cáp USB (`adb reverse`) — khuyến nghị**
+
+1. Bật **Tùy chọn nhà phát triển** + **Gỡ lỗi USB**, cắm cáp, bấm **Cho phép** trên điện thoại.
+2. `adb devices` phải hiện `<serial>  device`.
+3. `config/dev.json` để `"API_BASE_URL": "http://127.0.0.1:5117"`.
+4. Chạy `.\scripts\run-dev.ps1` — script tự chạy `adb reverse tcp:5117 tcp:5117`.
+
+`adb reverse` chuyển cổng 5117 của điện thoại về máy tính qua cáp USB: **không cần LAN, không cần mở
+tường lửa**, và WebSocket của SignalR cũng đi qua cổng này. Lưu ý: `adb reverse` **mất khi rút cáp,
+khởi động lại điện thoại hoặc ADB restart** → chạy lại script là xong.
+
+**B. Qua LAN (Wi-Fi)**
+
+1. Backend phải lắng nghe `0.0.0.0:5117`, không chỉ `localhost`. Profile `http` trong
+   `backend/src/Comink.Api/Properties/launchSettings.json` đã đặt `http://0.0.0.0:5117`, nên
+   `dotnet run --project backend/src/Comink.Api` là đủ.
+   Nếu chạy bằng `--no-launch-profile`, đặt `ASPNETCORE_URLS=http://0.0.0.0:5117` hoặc truyền `--urls`.
+2. Điện thoại và máy tính **cùng một Wi-Fi/LAN**. Lấy IP máy tính bằng `ipconfig`
+   (ví dụ `192.168.1.37`), rồi đặt `"API_BASE_URL": "http://192.168.1.37:5117"` trong `config/dev.json`.
+3. Kiểm tra từ **trình duyệt trên điện thoại**: mở `http://192.168.1.37:5117/health` → phải thấy
+   JSON `{"status":"healthy",...}`. Nếu không mở được thì app cũng không kết nối được.
+4. Nếu trình duyệt điện thoại không mở được: thêm rule tường lửa (PowerShell **Run as administrator**):
+
+   ```powershell
+   New-NetFirewallRule -DisplayName "Comink API 5117" -Direction Inbound -Protocol TCP -LocalPort 5117 -Action Allow
+   ```
+
+   Hoặc đơn giản hơn: dùng cách A (`adb reverse`).
+
+**Không cần đổi cổng backend**: backend luôn dùng **5117**. Khi IP máy tính thay đổi (đổi Wi-Fi/router),
+chỉ cần cập nhật **host** trong `API_BASE_URL`, không đổi cổng.
+
+**Chẩn đoán nhanh khi app báo "Không kết nối được tới máy chủ":**
+
+| Kiểm tra | Kết quả mong đợi |
+|---|---|
+| `Get-NetTCPConnection -State Listen -LocalPort 5117` trên Windows | `LocalAddress` = `0.0.0.0` (LAN) hoặc chỉ `127.0.0.1` (USB reverse) |
+| Mở `http://<URL đã cấu hình>/health` từ **trình duyệt điện thoại** | JSON `healthy` |
+| `adb reverse --list` (khi dùng USB) | có dòng `tcp:5117 tcp:5117` |
+| Điện thoại và máy tính | cùng subnet `192.168.1.x`; tắt Cloudflare WARP nếu nó chặn LAN |
+| `config/dev.json` | `API_BASE_URL` đúng host, **không có dấu `/` ở cuối** |
 
 Lưu ý cho máy thật:
 
-- Điện thoại và máy tính phải cùng mạng LAN; tường lửa Windows phải cho phép cổng **5117** (backend) và **7880** (LiveKit).
-- Backend phải lắng nghe trên `0.0.0.0`, không chỉ `localhost` (xem `backend/src/Comink.Api/Properties/launchSettings.json` hoặc biến `ASPNETCORE_URLS`).
-- Gọi thoại/video cần `LiveKit__PublicUrl=ws://<ip-lan-máy-tính>:7880` khi khởi động backend, nếu không app sẽ nhận `ws://localhost:7880` và không kết nối được.
+- Gọi thoại/video cần LiveKit bind đúng IP LAN (xem các mục dưới) — kết nối API thành công chưa đủ để gọi được.
 - Nếu gọi báo **"Không kết nối được phòng gọi"** (nhất là sau khi đổi Wi-Fi hoặc router cấp IP mới): chạy lại
   `powershell -ExecutionPolicy Bypass -File infra/set-lan-ip.ps1` (cập nhật `rtc.node_ip` + `turn.domain` rồi restart LiveKit),
   sau đó khởi động lại backend với `LiveKit__PublicUrl=ws://<ip-mới>:7880` và chạy lại app với `API_BASE_URL` mới — xem KI-03.
@@ -148,7 +207,16 @@ Nếu báo `TẮT — không tìm thấy file service account tại …` thì sa
 
 **Bước 5 — Chạy app với cấu hình công khai**
 
-Các giá trị này **không phải secret** (được nhúng vào app), truyền qua `--dart-define`:
+Các giá trị này **không phải secret** (được nhúng vào app) và nằm trong `config/dev.json` (mục 3.1).
+Sau khi điền, chạy:
+
+```powershell
+.\scripts\run-dev.ps1
+# hoặc chỉ build APK:
+.\scripts\run-dev.ps1 -BuildApk
+```
+
+Nếu muốn truyền trực tiếp không qua file (không khuyến nghị vì phải gõ lại mỗi lần):
 
 ```bash
 flutter run \

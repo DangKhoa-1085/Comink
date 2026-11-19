@@ -245,15 +245,25 @@ netsh interface portproxy reset        # xoá hết khi test xong
 cd mobile
 flutter pub get
 
-# Android emulator (mặc định backend 10.0.2.2:5117)
-flutter run
+# Cấu hình một lần: chép file mẫu rồi điền API_BASE_URL + 4 giá trị Firebase
+# (Windows: Copy-Item config\dev.example.json config\dev.json)
+# config/dev.json đã bị git-ignore.
 
-# Thiết bị thật cùng LAN — thay IP máy chạy backend
-flutter run --dart-define=API_BASE_URL=http://192.168.1.43:5117
+# Thiết bị thật qua cáp USB — khuyến nghị (script tự chạy adb reverse + kiểm tra /health)
+.\scripts\run-dev.ps1
+
+# Hoặc LAN: sửa "API_BASE_URL" trong config/dev.json thành http://<ip-lan>:5117
+# rồi chạy cùng script; backend đã lắng nghe 0.0.0.0:5117 (launchSettings profile http).
+
+# Emulator: đặt API_BASE_URL=http://10.0.2.2:5117 rồi
+flutter run -d emulator-5554 --dart-define-from-file=config/dev.json
 
 # Kiểm tra nhanh trên Chrome (không cần thiết bị)
 flutter run -d web-server --web-port 5173 --dart-define=API_BASE_URL=http://localhost:5117
 ```
+
+> Không cần đổi cổng backend (luôn **5117**) và không cần gõ lại 5 `--dart-define` mỗi lần.
+> Chi tiết USB vs LAN, chẩn đoán "Không kết nối được tới máy chủ": `mobile/README.md` mục 3.1.
 
 Tài khoản demo: `an.demo` / `binh.demo` / `chi.demo` (mật khẩu do bạn đặt ở `DemoSeed:Password`).
 
@@ -289,10 +299,7 @@ trị công khai cho app. Hướng dẫn từng bước — tạo project, bật
 Firebase__ServiceAccountPath=D:\DACN\Comink\backend\secrets\fcm-service-account.json
 
 # App: 4 giá trị công khai lấy từ Firebase Console (Project settings → General)
-flutter run --dart-define=FIREBASE_PROJECT_ID=... \
-  --dart-define=FIREBASE_APP_ID=... \
-  --dart-define=FIREBASE_API_KEY=... \
-  --dart-define=FIREBASE_MESSAGING_SENDER_ID=...
+# điền vào mobile/config/dev.json (xem mobile/config/dev.example.json) rồi chạy scripts/run-dev.ps1
 ```
 
 Nếu thiếu cấu hình, app vẫn chạy bình thường; backend bỏ qua push và ghi log.
