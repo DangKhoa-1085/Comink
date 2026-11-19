@@ -23,6 +23,8 @@ class ChatRealtime {
   ChatRealtime(this._ref);
 
   static const String messageCreatedEvent = 'MessageCreated';
+  static const String messageUpdatedEvent = 'MessageUpdated';
+  static const String pinnedMessagesChangedEvent = 'PinnedMessagesChanged';
   static const String presenceChangedEvent = 'PresenceChanged';
   static const String typingChangedEvent = 'TypingChanged';
   static const String messagesReadEvent = 'MessagesRead';
@@ -76,6 +78,8 @@ class ChatRealtime {
         .build();
 
     connection.on(messageCreatedEvent, _onMessageCreated);
+    connection.on(messageUpdatedEvent, _onMessageUpdated);
+    connection.on(pinnedMessagesChangedEvent, _onPinnedMessagesChanged);
     connection.on(presenceChangedEvent, _onPresenceChanged);
     connection.on(typingChangedEvent, _onTypingChanged);
     connection.on(messagesReadEvent, _onMessagesRead);
@@ -238,6 +242,34 @@ class ChatRealtime {
     _ref.invalidate(conversationsProvider);
     if (conversationId != null && conversationId.isNotEmpty) {
       _ref.invalidate(messagesProvider(conversationId));
+    }
+  }
+
+  /// Tin bị sửa/thu hồi/đổi cảm xúc (NC Ưu tiên 2) → tải lại lịch sử hội thoại.
+  void _onMessageUpdated(List<Object?>? arguments) {
+    final data = _payload(arguments);
+    if (data == null) {
+      return;
+    }
+
+    final conversationId = data['conversationId']?.toString();
+    _ref.invalidate(conversationsProvider);
+    if (conversationId != null && conversationId.isNotEmpty) {
+      _ref.invalidate(messagesProvider(conversationId));
+    }
+  }
+
+  /// Danh sách ghim thay đổi (ghim/bỏ ghim/thu hồi tin đang ghim).
+  void _onPinnedMessagesChanged(List<Object?>? arguments) {
+    final data = _payload(arguments);
+    if (data == null) {
+      return;
+    }
+
+    final conversationId = data['conversationId']?.toString();
+    _ref.invalidate(conversationsProvider);
+    if (conversationId != null && conversationId.isNotEmpty) {
+      _ref.invalidate(pinnedMessagesProvider(conversationId));
     }
   }
 

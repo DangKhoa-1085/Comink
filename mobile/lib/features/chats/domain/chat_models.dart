@@ -1,6 +1,5 @@
 /// Người dùng trong hội thoại.
-class ConversationPeer {
-  const ConversationPeer({
+class ConversationPeer {  const ConversationPeer({
     required this.userId,
     required this.displayName,
     this.userName,
@@ -58,6 +57,7 @@ class LastMessagePreview {
     required this.preview,
     required this.type,
     required this.createdAt,
+    this.isDeleted = false,
   });
 
   final String id;
@@ -65,6 +65,7 @@ class LastMessagePreview {
   final String preview;
   final String type;
   final DateTime createdAt;
+  final bool isDeleted;
 
   factory LastMessagePreview.fromJson(Map<String, dynamic> json) => LastMessagePreview(
         id: (json['id'] ?? '').toString(),
@@ -73,6 +74,7 @@ class LastMessagePreview {
         type: (json['type'] ?? 'Text').toString(),
         createdAt: DateTime.tryParse((json['createdAt'] ?? '').toString())?.toLocal() ??
             DateTime.now(),
+        isDeleted: json['isDeleted'] == true,
       );
 }
 
@@ -87,6 +89,8 @@ class ConversationSummary {
     this.peer,
     this.lastMessage,
     this.lastMessageAt,
+    this.isMuted = false,
+    this.mutedUntil,
   });
 
   final String id;
@@ -97,6 +101,10 @@ class ConversationSummary {
   final int unreadCount;
   final int memberCount;
   final DateTime? lastMessageAt;
+
+  /// Trạng thái tắt thông báo của chính tôi (NC Ưu tiên 2).
+  final bool isMuted;
+  final DateTime? mutedUntil;
 
   bool get isGroup => type == 'Group';
   String get displayTitle => isGroup ? (title ?? '') : (peer?.displayName ?? '');
@@ -116,6 +124,8 @@ class ConversationSummary {
         memberCount: _intValue(json['memberCount']),
         lastMessageAt:
             DateTime.tryParse((json['lastMessageAt'] ?? '').toString())?.toLocal(),
+        isMuted: json['isMuted'] == true,
+        mutedUntil: _parseDate(json['mutedUntil']),
       );
 
   static int _intValue(dynamic value) =>
@@ -130,6 +140,8 @@ class ConversationDetail {
     required this.members,
     this.title,
     this.avatarUrl,
+    this.isMuted = false,
+    this.mutedUntil,
   });
 
   final String id;
@@ -137,6 +149,8 @@ class ConversationDetail {
   final String? title;
   final String? avatarUrl;
   final List<ConversationPeer> members;
+  final bool isMuted;
+  final DateTime? mutedUntil;
 
   bool get isGroup => type == 'Group';
 
@@ -161,6 +175,8 @@ class ConversationDetail {
             .whereType<Map>()
             .map((item) => ConversationPeer.fromJson(item.cast<String, dynamic>()))
             .toList(growable: false),
+        isMuted: json['isMuted'] == true,
+        mutedUntil: _parseDate(json['mutedUntil']),
       );
 }
 
@@ -188,6 +204,77 @@ class MessageAttachment {
       );
 }
 
+/// Ảnh chụp tin được phản hồi (NC Ưu tiên 2).
+class MessageQuote {
+  const MessageQuote({
+    required this.messageId,
+    required this.senderId,
+    required this.senderDisplayName,
+    required this.type,
+    required this.isDeleted,
+    this.contentPreview,
+  });
+
+  final String messageId;
+  final String senderId;
+  final String senderDisplayName;
+  final String? contentPreview;
+  final String type;
+  final bool isDeleted;
+
+  factory MessageQuote.fromJson(Map<String, dynamic> json) => MessageQuote(
+        messageId: (json['messageId'] ?? '').toString(),
+        senderId: (json['senderId'] ?? '').toString(),
+        senderDisplayName: (json['senderDisplayName'] ?? '').toString(),
+        contentPreview: (json['contentPreview']?.toString().isEmpty ?? true)
+            ? null
+            : json['contentPreview'].toString(),
+        type: (json['type'] ?? 'Text').toString(),
+        isDeleted: json['isDeleted'] == true,
+      );
+}
+
+/// Nguồn của tin chuyển tiếp (NC Ưu tiên 2).
+class ForwardedFrom {
+  const ForwardedFrom({
+    required this.messageId,
+    required this.senderId,
+    required this.senderDisplayName,
+  });
+
+  final String messageId;
+  final String senderId;
+  final String senderDisplayName;
+
+  factory ForwardedFrom.fromJson(Map<String, dynamic> json) => ForwardedFrom(
+        messageId: (json['messageId'] ?? '').toString(),
+        senderId: (json['senderId'] ?? '').toString(),
+        senderDisplayName: (json['senderDisplayName'] ?? '').toString(),
+      );
+}
+
+/// Một loại cảm xúc đang có trên tin (NC Ưu tiên 2).
+class ChatReaction {
+  const ChatReaction({
+    required this.reaction,
+    required this.emoji,
+    required this.count,
+    required this.reactedByMe,
+  });
+
+  final String reaction;
+  final String emoji;
+  final int count;
+  final bool reactedByMe;
+
+  factory ChatReaction.fromJson(Map<String, dynamic> json) => ChatReaction(
+        reaction: (json['reaction'] ?? '').toString(),
+        emoji: (json['emoji'] ?? '').toString(),
+        count: json['count'] is int ? json['count'] as int : 0,
+        reactedByMe: json['reactedByMe'] == true,
+      );
+}
+
 /// Tin nhắn trong khung chat.
 class ChatMessage {
   const ChatMessage({
@@ -199,6 +286,11 @@ class ChatMessage {
     required this.clientMessageId,
     required this.createdAt,
     this.content,
+    this.replyTo,
+    this.forwardedFrom,
+    this.editedAt,
+    this.deletedAt,
+    this.reactions = const [],
   });
 
   final String id;
@@ -209,6 +301,15 @@ class ChatMessage {
   final List<MessageAttachment> attachments;
   final String clientMessageId;
   final DateTime createdAt;
+  final MessageQuote? replyTo;
+  final ForwardedFrom? forwardedFrom;
+  final DateTime? editedAt;
+
+  /// Khác null = tin đã bị thu hồi; nội dung/tệp/cảm xúc đã rỗng.
+  final DateTime? deletedAt;
+  final List<ChatReaction> reactions;
+
+  bool get isDeleted => deletedAt != null;
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
         id: (json['id'] ?? '').toString(),
@@ -225,6 +326,112 @@ class ChatMessage {
         clientMessageId: (json['clientMessageId'] ?? '').toString(),
         createdAt: DateTime.tryParse((json['createdAt'] ?? '').toString())?.toLocal() ??
             DateTime.now(),
+        replyTo: json['replyTo'] is Map
+            ? MessageQuote.fromJson((json['replyTo'] as Map).cast<String, dynamic>())
+            : null,
+        forwardedFrom: json['forwardedFrom'] is Map
+            ? ForwardedFrom.fromJson((json['forwardedFrom'] as Map).cast<String, dynamic>())
+            : null,
+        editedAt: _parseDate(json['editedAt']),
+        deletedAt: _parseDate(json['deletedAt']),
+        reactions: (json['reactions'] as List<dynamic>? ?? const [])
+            .whereType<Map>()
+            .map((item) => ChatReaction.fromJson(item.cast<String, dynamic>()))
+            .toList(growable: false),
+      );
+}
+
+DateTime? _parseDate(dynamic value) {
+  final text = value?.toString();
+  if (text == null || text.isEmpty) {
+    return null;
+  }
+  return DateTime.tryParse(text)?.toLocal();
+}
+
+/// Một tin đang được ghim trong hội thoại.
+class PinnedMessage {
+  const PinnedMessage({
+    required this.message,
+    required this.pinnedByUserId,
+    required this.pinnedByDisplayName,
+    required this.pinnedAt,
+  });
+
+  final ChatMessage message;
+  final String pinnedByUserId;
+  final String pinnedByDisplayName;
+  final DateTime pinnedAt;
+
+  factory PinnedMessage.fromJson(Map<String, dynamic> json) => PinnedMessage(
+        message: ChatMessage.fromJson(
+          (json['message'] as Map).cast<String, dynamic>(),
+        ),
+        pinnedByUserId: (json['pinnedByUserId'] ?? '').toString(),
+        pinnedByDisplayName: (json['pinnedByDisplayName'] ?? '').toString(),
+        pinnedAt: _parseDate(json['pinnedAt']) ?? DateTime.now(),
+      );
+}
+
+/// Danh sách ghim hiện tại của hội thoại.
+class PinnedMessages {
+  const PinnedMessages({required this.conversationId, required this.pinned});
+
+  final String conversationId;
+  final List<PinnedMessage> pinned;
+
+  factory PinnedMessages.fromJson(Map<String, dynamic> json) => PinnedMessages(
+        conversationId: (json['conversationId'] ?? '').toString(),
+        pinned: (json['pinned'] as List<dynamic>? ?? const [])
+            .whereType<Map>()
+            .map((item) => PinnedMessage.fromJson(item.cast<String, dynamic>()))
+            .toList(growable: false),
+      );
+}
+
+/// Một kết quả tìm kiếm tin nhắn.
+class MessageSearchResult {
+  const MessageSearchResult({
+    required this.messageId,
+    required this.conversationId,
+    required this.conversationType,
+    required this.senderId,
+    required this.senderDisplayName,
+    required this.createdAt,
+    this.conversationTitle,
+    this.peerDisplayName,
+    this.contentPreview,
+  });
+
+  final String messageId;
+  final String conversationId;
+  final String conversationType;
+  final String? conversationTitle;
+  final String? peerDisplayName;
+  final String senderId;
+  final String senderDisplayName;
+  final String? contentPreview;
+  final DateTime createdAt;
+
+  String get conversationLabel =>
+      conversationTitle ?? peerDisplayName ?? senderDisplayName;
+
+  factory MessageSearchResult.fromJson(Map<String, dynamic> json) => MessageSearchResult(
+        messageId: (json['messageId'] ?? '').toString(),
+        conversationId: (json['conversationId'] ?? '').toString(),
+        conversationType: (json['conversationType'] ?? 'Direct').toString(),
+        conversationTitle: (json['conversationTitle']?.toString().isEmpty ?? true)
+            ? null
+            : json['conversationTitle'].toString(),
+        peerDisplayName: (json['peerDisplayName']?.toString().isEmpty ?? true)
+            ? null
+            : json['peerDisplayName'].toString(),
+        senderId: (json['senderId'] ?? '').toString(),
+        senderDisplayName: (json['senderDisplayName'] ?? '').toString(),
+        contentPreview: (json['contentPreview']?.toString().isEmpty ?? true)
+            ? null
+            : json['contentPreview'].toString(),
+        createdAt: _parseDate(json['createdAt']) ?? DateTime.now(),
       );
 }
 

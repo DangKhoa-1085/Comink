@@ -38,3 +38,15 @@ final messagesProvider =
     hasMore: page.hasMore,
   );
 });
+
+/// Danh sách tin ghim của hội thoại (NC Ưu tiên 2) — cập nhật qua `PinnedMessagesChanged`.
+final pinnedMessagesProvider =
+    FutureProvider.autoDispose.family<PinnedMessages, String>((ref, conversationId) async {
+  final data = await ref.watch(apiClientProvider).get(
+        '/api/conversations/$conversationId/pinned',
+      );
+  if (data is! Map) {
+    throw const ApiException(code: 'INTERNAL_ERROR');
+  }
+  return PinnedMessages.fromJson(data.cast<String, dynamic>());
+});

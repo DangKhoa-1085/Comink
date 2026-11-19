@@ -4,7 +4,7 @@
 > **Mục tiêu:** hoàn thiện 8 tính năng **Nhắn tin nâng cao (NC)**: phản hồi, thu hồi, chỉnh sửa, thả cảm xúc,
 > ghim, chuyển tiếp, tìm kiếm tin nhắn, tắt thông báo từng cuộc.
 > **Phụ thuộc:** GĐ 3 (nhắn tin CB + chat nhóm) và GĐ 7 ưu tiên 1 (presence/đang nhập/đã đọc) — **đã xong**.
-> **Trạng thái:** 🚧 **Đợt A + B đã xong (2026-11-20)** — backend + web cho cả 8 tính năng; Đợt C (app Flutter) làm tiếp. Xem mục 8.
+> **Trạng thái:** ✅ **cả 3 đợt đã xong (2026-11-20)** — backend + web + app Flutter cho 8 tính năng. `flutter analyze` 0 issue, `flutter test` 23/23, APK debug build được; **còn lại: bấm thử trên máy thật**. Xem mục 8.
 > **Ước lượng:** 2–3 tuần công. Migration tương ứng: **M7** (`Messaging_AddMessageFeatures`).
 
 ---
@@ -15,14 +15,14 @@
 
 | # | Yêu cầu roadmap | Hoàn thành khi | Trạng thái |
 |---|---|---|---|
-| 1 | **Phản hồi** | Chọn "Phản hồi" trên một tin → ô nhập hiện trích dẫn → gửi kèm `replyToMessageId`; bong bóng hiện trích dẫn; bấm trích dẫn nhảy tới tin gốc; tin gốc bị thu hồi vẫn hiển thị an toàn | ✅ backend + web (Đợt A) |
-| 2 | **Thu hồi** | Người gửi thu hồi trong 24 giờ → mọi người thấy "Tin nhắn đã bị thu hồi" real-time, không tải lại; preview danh sách hội thoại đổi theo | ✅ backend + web (Đợt A) |
-| 3 | **Chỉnh sửa** | Người gửi sửa nội dung trong 24 giờ → mọi người thấy nội dung mới + nhãn "(đã chỉnh sửa)" real-time | ✅ backend + web (Đợt A) |
-| 4 | **Thả cảm xúc** | 6 cảm xúc cố định; một người được thả nhiều loại trên một tin; đếm và trạng thái "của tôi" đúng; real-time | ✅ backend + web (Đợt A) |
-| 5 | **Ghim tin** | Ghim/bỏ ghim tin còn hiệu lực, tối đa 10/hội thoại; panel ghim; bấm để nhảy tới tin; thu hồi tin đã ghim → tự bỏ ghim | ✅ backend + web (Đợt B) |
-| 6 | **Chuyển tiếp** | Chọn hội thoại đích → tạo tin mới có nhãn "Chuyển tiếp", giữ `forwarded_from_message_id`; không chuyển tiếp tin đã thu hồi | ✅ backend + web (Đợt B) |
-| 7 | **Tìm kiếm tin nhắn** | Tìm trong hội thoại đang mở **và** toàn bộ hội thoại tôi là thành viên; gõ không dấu vẫn khớp; bấm kết quả mở đúng tin trong ngữ cảnh | ✅ backend + web (Đợt B) |
-| 8 | **Tắt thông báo từng cuộc** | Tắt theo 1 giờ/8 giờ/1 tuần/vĩnh viễn và bật lại; **chặn push**; số tin chưa đọc không đổi | ✅ backend + web (Đợt B) |
+| 1 | **Phản hồi** | Chọn "Phản hồi" trên một tin → ô nhập hiện trích dẫn → gửi kèm `replyToMessageId`; bong bóng hiện trích dẫn; bấm trích dẫn nhảy tới tin gốc; tin gốc bị thu hồi vẫn hiển thị an toàn | ✅ backend + web + app |
+| 2 | **Thu hồi** | Người gửi thu hồi trong 24 giờ → mọi người thấy "Tin nhắn đã bị thu hồi" real-time, không tải lại; preview danh sách hội thoại đổi theo | ✅ backend + web + app |
+| 3 | **Chỉnh sửa** | Người gửi sửa nội dung trong 24 giờ → mọi người thấy nội dung mới + nhãn "(đã chỉnh sửa)" real-time | ✅ backend + web + app |
+| 4 | **Thả cảm xúc** | 6 cảm xúc cố định; một người được thả nhiều loại trên một tin; đếm và trạng thái "của tôi" đúng; real-time | ✅ backend + web + app |
+| 5 | **Ghim tin** | Ghim/bỏ ghim tin còn hiệu lực, tối đa 10/hội thoại; panel ghim; bấm để nhảy tới tin; thu hồi tin đã ghim → tự bỏ ghim | ✅ backend + web + app |
+| 6 | **Chuyển tiếp** | Chọn hội thoại đích → tạo tin mới có nhãn "Chuyển tiếp", giữ `forwarded_from_message_id`; không chuyển tiếp tin đã thu hồi | ✅ backend + web + app |
+| 7 | **Tìm kiếm tin nhắn** | Tìm trong hội thoại đang mở **và** toàn bộ hội thoại tôi là thành viên; gõ không dấu vẫn khớp; bấm kết quả mở đúng tin trong ngữ cảnh | ✅ backend + web + app |
+| 8 | **Tắt thông báo từng cuộc** | Tắt theo 1 giờ/8 giờ/1 tuần/vĩnh viễn và bật lại; **chặn push**; số tin chưa đọc không đổi | ✅ backend + web + app |
 
 > Điều kiện chung của roadmap: *"Từng tính năng chạy trên web **và** app"*, *"Tìm kiếm chỉ trong hội thoại người dùng là thành viên"*.
 
@@ -129,12 +129,13 @@
 - [x] Test tích hợp: giới hạn 10, thu hồi tin đã ghim, quyền forward nguồn/đích, search chỉ trả hội thoại của tôi, context đúng cửa sổ, mute chặn push (`MessageFeaturesTests` 20 test)
 - [x] Kiểm chứng + tái sinh `docs/openapi/comink.v1.json` + `verify.ps1` (59 path, 70 operation — ĐẠT)
 
-### 4.3. Đợt C — App Flutter + hoàn thiện
+### 4.3. Đợt C — App Flutter + hoàn thiện — ✅ 2026-11-20 (còn bấm thử máy thật)
 
-- [ ] Model/API/realtime: quote, reaction, edited/deleted, pinned, search, mute
-- [ ] `chat_page.dart`: menu dài (bottom sheet), thanh trả lời/sửa, chip cảm xúc, panel ghim, màn hình tìm kiếm, sheet tắt thông báo
-- [ ] i18n vi/en; `flutter analyze` 0 issue; `flutter test` xanh
-- [ ] Kiểm chứng web + app trên cùng hội thoại; rà lại tài liệu; tái sinh OpenAPI lần cuối; ghi kết quả vào mục 8
+- [x] Model/API/realtime: quote, reaction, edited/deleted, pinned, search, mute (`chat_models.dart`, `ApiClient.put`, `chat_realtime.dart`)
+- [x] `chat_page.dart`: menu dài (bottom sheet), thanh trả lời/sửa, chip cảm xúc, panel ghim, tìm kiếm trong hội thoại + toàn bộ, sheet tắt thông báo, chế độ ngữ cảnh
+- [x] i18n vi/en (~40 khoá mới); `flutter analyze` 0 issue; `flutter test` **23/23**; `flutter build apk --debug` thành công
+- [ ] Bấm thử trên máy thật (Samsung A50) theo mục 5 — chờ người dùng xác nhận
+- [x] Rà lại tài liệu; OpenAPI không đổi trong đợt này; ghi kết quả vào mục 8
 
 ---
 
@@ -241,3 +242,33 @@
 - Tìm kiếm dùng `LIKE` trên `immutable_unaccent(lower(content))` với mẫu cũng `lower` — khớp một phần từ; chỉ mục GIN trigram của M7.
 - Mute chỉ lọc **danh sách nhận push**; `unreadCount` và `MessagesRead` giữ nguyên.
 - Script kiểm chứng (`web/verify-b.mjs`, `web/verify-b-ui.mjs`) chỉ dùng tại chỗ, **không commit**.
+
+### 8.3. Đợt C — App Flutter (2026-11-20)
+
+**Tệp đã thay đổi**
+
+| Tệp | Nội dung |
+|---|---|
+| `mobile/lib/features/chats/domain/chat_models.dart` | `MessageQuote`, `ForwardedFrom`, `ChatReaction`, `PinnedMessage(s)`, `MessageSearchResult`; `ChatMessage` có `replyTo`/`forwardedFrom`/`editedAt`/`deletedAt`/`reactions`; hội thoại có `isMuted`/`mutedUntil`; preview có `isDeleted` |
+| `mobile/lib/core/network/api_client.dart` | Thêm `put` (ghim/bỏ ghim, tắt thông báo) |
+| `mobile/lib/features/chats/data/chat_providers.dart` | `pinnedMessagesProvider` |
+| `mobile/lib/features/chats/data/chat_realtime.dart` | Nhận `MessageUpdated` + `PinnedMessagesChanged`, invalidate đúng provider |
+| `mobile/lib/features/chats/presentation/message_search_page.dart` (mới) | Tìm trong hội thoại và toàn bộ; phân trang con trỏ; chọn kết quả trả về |
+| `mobile/lib/features/chats/presentation/chat_page.dart` | Menu dài (reaction/reply/forward/pin/copy/edit/recall), thanh trả lời/sửa, chip cảm xúc, panel ghim + banner, tắt thông báo, tìm kiếm, chế độ ngữ cảnh, nhãn đã sửa/đã thu hồi |
+| `mobile/lib/features/chats/presentation/chats_page.dart` | Nút tìm kiếm toàn bộ, icon tắt thông báo, preview "đã thu hồi" |
+| `mobile/lib/router/app_router.dart` | Hỗ trợ `?focus={messageId}` cho `/chats/:id` |
+| `mobile/lib/core/i18n/app_localizations.dart` | ~40 khoá chat_* mới + mã lỗi MESSAGE_* (vi/en) |
+| `mobile/test/chat_models_test.dart` (mới) | 4 test parse DTO mới |
+
+**Kết quả chạy**
+
+- `flutter analyze` — **No issues found**.
+- `flutter test` — **23/23** pass (19 test cũ + 4 test model mới).
+- `flutter build apk --debug` — **thành công** (`build/app/outputs/flutter-apk/app-debug.apk`); chỉ còn cảnh báo KGP của plugin bên thứ ba (không do mã dự án).
+- OpenAPI không đổi trong đợt này; `verify.ps1` vẫn ĐẠT (app chỉ gọi endpoint đã có trong hợp đồng).
+
+**Chưa làm / việc tiếp theo**
+
+1. **Bấm thử trên máy thật** (Samsung A50/Android) theo kịch bản mục 5 — cần thiết bị + backend LAN; chưa thể tự động hoá trong phiên này.
+2. Cân nhắc thêm **widget test** cho menu thao tác/panel ghim nếu còn thời gian; hiện đã có test model + toàn bộ nghiệp vụ phía backend.
+3. Nếu demo bằng web + app cùng lúc: nhớ **bật thông báo lại** cho hội thoại đã tắt khi thử push (mute chỉ chặn push).

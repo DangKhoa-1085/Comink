@@ -88,6 +88,9 @@ class ApiClient {
   Future<dynamic> patch(String path, {Object? data}) =>
       _send(() => _dio.patch<dynamic>(path, data: data));
 
+  Future<dynamic> put(String path, {Object? data}) =>
+      _send(() => _dio.put<dynamic>(path, data: data));
+
   Future<dynamic> postMultipart(String path, FormData data) =>
       _send(() => _dio.post<dynamic>(path, data: data));
 

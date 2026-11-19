@@ -9,6 +9,7 @@ import '../../../core/widgets/states.dart';
 import '../data/chat_providers.dart';
 import '../domain/chat_models.dart';
 import 'create_group_dialog.dart';
+import 'message_search_page.dart';
 
 /// Tab Tin nhắn: danh sách hội thoại 1–1 và nhóm.
 class ChatsPage extends ConsumerWidget {
@@ -23,6 +24,18 @@ class ChatsPage extends ConsumerWidget {
       appBar: AppBar(
         title: Text(l10n.t('chats_title')),
         actions: [
+          IconButton(
+            tooltip: l10n.t('chat_search_all_messages'),
+            onPressed: () async {
+              final result = await Navigator.of(context).push<MessageSearchResult>(
+                MaterialPageRoute(builder: (_) => const MessageSearchPage()),
+              );
+              if (result != null && context.mounted) {
+                context.push('/chats/${result.conversationId}?focus=${result.messageId}');
+              }
+            },
+            icon: const Icon(Icons.search),
+          ),
           IconButton(
             tooltip: l10n.t('common_retry'),
             onPressed: () => ref.invalidate(conversationsProvider),
@@ -95,11 +108,13 @@ class _ConversationTile extends StatelessWidget {
     final lastMessage = conversation.lastMessage;
     final preview = lastMessage == null
         ? ''
-        : (lastMessage.type == 'Image'
-            ? l10n.t('chat_image')
-            : lastMessage.type == 'Call'
-                ? l10n.t('chat_call')
-                : lastMessage.preview);
+        : (lastMessage.isDeleted
+            ? l10n.t('chat_recalled')
+            : lastMessage.type == 'Image'
+                ? l10n.t('chat_image')
+                : lastMessage.type == 'Call'
+                    ? l10n.t('chat_call')
+                    : lastMessage.preview);
 
     return ListTile(
       onTap: onTap,
@@ -144,6 +159,16 @@ class _ConversationTile extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
+          if (conversation.isMuted)
+            Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: Icon(
+                Icons.notifications_off_outlined,
+                size: 14,
+                color: colors.onSurfaceVariant,
+                semanticLabel: l10n.t('chat_muted'),
+              ),
+            ),
           if (conversation.lastMessageAt != null)
             Text(
               MaterialLocalizations.of(context).formatShortDate(conversation.lastMessageAt!),
