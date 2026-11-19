@@ -482,6 +482,7 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 > Trạng thái: **mục 8.2–8.7 đã cài đặt ở backend và kiểm chứng bằng HTTP thật (2026-10-18)**; web đang làm. Quyết định **D1 đã chốt: chỉ bạn bè mới mở được hội thoại 1–1** (`docs/tasks/phase3_messaging.md` mục 2).
 > **Cập nhật 2026-11-17 (GĐ 7 — Ưu tiên 1):** đã bổ sung **mục 8.9–8.10** — trạng thái online, "đang nhập", đã gửi/đã đọc; `unreadCount` nay là số thật; DTO hội thoại có thêm trường presence/mốc đọc. Đã cài đặt backend + web, kiểm chứng bằng 2 client SignalR thật + HTTP (mục 8.11); app Flutter làm tiếp.
 > **Cập nhật 2026-11-20 (GĐ 7 — Ưu tiên 2, Đợt A):** đã bổ sung **mục 8.12–8.17** — phản hồi, chỉnh sửa, thu hồi, thả cảm xúc; DTO tin nhắn có `replyTo`/`forwardedFrom`/`editedAt`/`deletedAt`/`reactions`; sự kiện `MessageUpdated`. Đã cài đặt backend + web và kiểm chứng thật (HTTP + SignalR 23/23, Chrome headless 21/21).
+> **Cập nhật 2026-11-20 (GĐ 7 — Ưu tiên 2, Đợt B):** bổ sung **mục 8.18–8.22** — ghim, chuyển tiếp, tìm kiếm + ngữ cảnh, tắt thông báo; sự kiện `PinnedMessagesChanged`; DTO hội thoại có `isMuted`/`mutedUntil`. Kiểm chứng thật: HTTP + SignalR 27/27, Chrome headless 26/26; OpenAPI tái sinh (59 path).
 
 ### 8.1. Quy ước riêng
 
@@ -502,7 +503,7 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 | `userId` | uuid | ✔ | Người muốn nhắn cùng |
 
 - `201 Created` — tạo mới; `200 OK` — hội thoại đã tồn tại (idempotent theo `direct_key`).
-- Trả `ConversationDto`: `{ id, type, title?, avatarUrl?, createdAt, lastMessageAt?, members: [{ userId, displayName, userName, avatarUrl, isOnline, lastSeenAt, lastReadMessageId, lastReadAt }], lastMessage?: MessageDto }`
+- Trả `ConversationDto`: `{ id, type, title?, avatarUrl?, createdAt, lastMessageAt?, members: [{ userId, displayName, userName, avatarUrl, isOnline, lastSeenAt, lastReadMessageId, lastReadAt }], lastMessage?, isMuted, mutedUntil }`
 - Lỗi: `MESSAGING_CANNOT_MESSAGE_SELF` (400), `MESSAGING_NOT_FRIENDS` (403 — nếu D1 chọn "chỉ bạn bè"), `USER_NOT_FOUND` (404).
 - Mở chat 1–1 với tài khoản Admin khi người gửi là người dùng thường → `404 NOT_FOUND` (ẩn tài khoản); Admin với Admin vẫn hợp lệ.
 
@@ -527,12 +528,12 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 
 - Sắp xếp `last_message_at DESC` (`NULLS LAST` cho hội thoại chưa có tin).
 - Trả cả hội thoại **1–1** và **nhóm**.
-- Trả `PagedList<ConversationSummaryDto>`: `{ id, type, title?, peer?: { userId, userName, displayName, avatarUrl, isOnline, lastSeenAt } | null, lastMessage?: { id, senderId, preview, type, createdAt }, unreadCount, memberCount }` — `peer` chỉ có với `type = "Direct"`; nhóm dùng `title` + `memberCount`.
+- Trả `PagedList<ConversationSummaryDto>`: `{ id, type, title?, peer?: { userId, userName, displayName, avatarUrl, isOnline, lastSeenAt } | null, lastMessage?: { id, senderId, preview, type, createdAt, isDeleted }, unreadCount, memberCount, isMuted, mutedUntil }` — `peer` chỉ có với `type = "Direct"`; nhóm dùng `title` + `memberCount`. `isMuted`/`mutedUntil` là trạng thái tắt thông báo của **chính người gọi** (NC Ưu tiên 2, mục 8.22).
 - `unreadCount` (từ GĐ 7): số tin của **người khác** có `(created_at, id)` lớn hơn mốc đọc của tôi (mục 8.9). Trước GĐ 7 trường này luôn `0`.
 
 ### 8.4. Chi tiết hội thoại
 
-`GET /api/conversations/{id}` → `ConversationDto` (cùng hình dạng 8.2, mỗi `member` có thêm `isOnline`, `lastSeenAt`, `lastReadMessageId`, `lastReadAt` — mục 8.10). Người ngoài → `404 CONVERSATION_NOT_FOUND`.
+`GET /api/conversations/{id}` → `ConversationDto` (cùng hình dạng 8.2, mỗi `member` có thêm `isOnline`, `lastSeenAt`, `lastReadMessageId`, `lastReadAt` — mục 8.10; hội thoại có thêm `isMuted`, `mutedUntil` của chính người gọi — mục 8.22). Người ngoài → `404 CONVERSATION_NOT_FOUND`.
 
 ### 8.5. Lịch sử tin nhắn
 
@@ -721,6 +722,73 @@ Tin gốc bị thu hồi **sau đó** vẫn trả `replyTo` với `isDeleted = t
 | `MESSAGE_NOT_EDITABLE` | 400 | Tin `System`/`Call` không sửa/thu hồi được |
 | `MESSAGE_REACTION_INVALID` | 400 | Khoá cảm xúc không thuộc danh mục |
 | `MESSAGE_PIN_LIMIT_REACHED` | 400 | Đã ghim đủ 10 tin (dùng từ Đợt B) |
+
+### 8.18. Ghim tin nhắn (NC GĐ 7 — Ưu tiên 2)
+
+| Method | Đường dẫn | Kết quả |
+|---|---|---|
+| `GET` | `/api/conversations/{id}/pinned` | `200 PinnedMessagesDto` |
+| `PUT` | `/api/conversations/{id}/pinned/{messageId}` | `200 PinnedMessagesDto` |
+| `DELETE` | `/api/conversations/{id}/pinned/{messageId}` | `200 PinnedMessagesDto` |
+
+`PinnedMessagesDto`: `{ conversationId, pinned: [{ message: MessageDto, pinnedByUserId, pinnedByDisplayName, pinnedAt }] }`, mới ghim trước.
+`PinnedMessageDto.message` là `MessageDto` đầy đủ (có trích dẫn/cảm xúc) để panel hiển thị nhất quán.
+
+- Mọi **thành viên còn hiệu lực** được ghim/bỏ ghim; tối đa **10** tin/hội thoại → tin thứ 11 trả `400 MESSAGE_PIN_LIMIT_REACHED`.
+- Ghim lặp lại / bỏ ghim tin không được ghim là **idempotent** (không phát lại sự kiện).
+- Ghim tin đã thu hồi → `400 MESSAGE_ALREADY_DELETED`; tin không thuộc hội thoại → `404 MESSAGE_NOT_FOUND`; không phải thành viên → `404 CONVERSATION_NOT_FOUND`.
+- Mỗi thay đổi phát `PinnedMessagesChanged` (mục 8.16); thu hồi một tin đang ghim → tự bỏ ghim + phát sự kiện.
+
+### 8.19. Chuyển tiếp tin nhắn (NC GĐ 7 — Ưu tiên 2)
+
+`POST /api/conversations/{targetId}/messages/forward`
+
+| Trường | Kiểu | Bắt buộc | Ghi chú |
+|---|---|---|---|
+| `sourceMessageId` | uuid | ✔ | Tin gốc |
+| `clientMessageId` | uuid | ✔ | Client sinh; chống chuyển tiếp trùng |
+
+- `201 Created` tin mới trong hội thoại đích; `200 OK` nếu trùng `clientMessageId` (idempotent).
+- **Server** sao chép nội dung + tệp, ghi `forwardedFromMessageId`; DTO có `forwardedFrom: { messageId, senderId, senderDisplayName }`.
+- Người gọi phải là thành viên **cả** hội thoại nguồn lẫn đích. Không thuộc hội thoại nguồn → `404 MESSAGE_NOT_FOUND` (không lộ tin); không thuộc đích → `404 CONVERSATION_NOT_FOUND`.
+- Tin nguồn đã thu hồi → `400 MESSAGE_ALREADY_DELETED`; tin `System`/`Call` → `400 MESSAGE_NOT_EDITABLE`.
+- Phát `MessageCreated` tới thành viên hội thoại đích; push tuân theo tắt thông báo (mục 8.22).
+
+### 8.20. Tìm kiếm tin nhắn (NC GĐ 7 — Ưu tiên 2)
+
+| Method | Đường dẫn | Phạm vi |
+|---|---|---|
+| `GET` | `/api/conversations/{id}/messages/search?q=&limit=&cursor=` | Chỉ hội thoại đó (phải là thành viên) |
+| `GET` | `/api/messages/search?q=&limit=&cursor=` | **Mọi** hội thoại người dùng còn là thành viên |
+
+- `q` bắt buộc **2–100 ký tự** (ngắn/dài hơn → `400 VALIDATION_FAILED`); `limit` ≤ 50, mặc định 20; con trỏ `(created_at, id)`, mới nhất trước.
+- Khớp **một phần từ**, **không phân biệt dấu** và chữ hoa/thường (`hop` khớp `họp`) — dùng `pg_trgm` + `immutable_unaccent` (quyết định D5).
+- Không bao giờ trả tin ở hội thoại người dùng không còn là thành viên, kể cả bài `Public`; tin đã thu hồi bị loại.
+- Trả `PagedList<MessageSearchResultDto>`: `{ messageId, conversationId, conversationTitle, conversationType, peerDisplayName, senderId, senderDisplayName, contentPreview, createdAt }`
+  (`peerDisplayName` chỉ có với chat 1–1; nhóm dùng `conversationTitle`).
+- Người ngoài tìm trong hội thoại → `404 CONVERSATION_NOT_FOUND` (không dùng 403).
+
+### 8.21. Ngữ cảnh quanh một tin (NC GĐ 7 — Ưu tiên 2)
+
+`GET /api/conversations/{id}/messages/{messageId}/context?limit=31`
+
+- `limit` trong 3–51 (mặc định 31): khoảng một nửa tin **trước**, một nửa tin **sau** tin đích.
+- `200 MessageContextDto`: `{ items: MessageDto[] (tăng dần theo thời gian), hasMoreBefore, hasMoreAfter }`.
+- Dùng khi bấm kết quả tìm kiếm để mở đúng tin mà không phải tải ngược nhiều trang.
+- Tin không thuộc hội thoại → `404 MESSAGE_NOT_FOUND`; không phải thành viên → `404 CONVERSATION_NOT_FOUND`.
+
+### 8.22. Tắt thông báo từng cuộc (NC GĐ 7 — Ưu tiên 2)
+
+`PUT /api/conversations/{id}/mute`
+
+| Trường | Kiểu | Bắt buộc | Ghi chú |
+|---|---|---|---|
+| `duration` | string | ✔ | `Off` · `OneHour` · `EightHours` · `OneWeek` · `Forever` |
+
+- `200 MuteStateDto`: `{ isMuted, mutedUntil }`. `Off` → `mutedUntil = null`; `Forever` lưu mốc `9999-12-31T23:59:59Z`.
+- **Chỉ chặn push** (FCM) — tin real-time và số tin chưa đọc **không đổi** (quyết định D7).
+- `ConversationDto` và `ConversationSummaryDto` thêm `isMuted`, `mutedUntil` **của chính người gọi**.
+- Lỗi: `VALIDATION_FAILED` (400 — thời hạn lạ), `CONVERSATION_NOT_FOUND` (404).
 
 ---
 

@@ -72,6 +72,16 @@ public interface IConversationService
         Guid conversationId,
         Guid messageId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Tắt/bật thông báo của chính mình trong hội thoại (NC Ưu tiên 2). Chỉ ảnh hưởng push;
+    /// số tin chưa đọc và sự kiện real-time không đổi. Không phải thành viên → 404.
+    /// </summary>
+    Task<OperationResult<MuteStateDto>> MuteAsync(
+        Guid currentUserId,
+        Guid conversationId,
+        MuteConversationRequest request,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>Nghiệp vụ tin nhắn.</summary>
@@ -126,6 +136,41 @@ public interface IMessageService
         Guid conversationId,
         Guid messageId,
         string reaction,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Chuyển tiếp một tin sang hội thoại đích (NC Ưu tiên 2): server sao chép nội dung + tệp,
+    /// giữ <c>forwarded_from_message_id</c>. Người gọi phải là thành viên **cả** hội thoại nguồn
+    /// và đích; tin nguồn phải còn hiệu lực. Trùng <c>ClientMessageId</c> thì trả tin đã tạo.
+    /// </summary>
+    Task<OperationResult<MessageSendResult>> ForwardAsync(
+        Guid currentUserId,
+        Guid targetConversationId,
+        ForwardMessageRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Tìm tin nhắn (NC Ưu tiên 2): <paramref name="conversationId"/> có giá trị thì chỉ tìm trong
+    /// hội thoại đó; <c>null</c> thì tìm trong **mọi** hội thoại người dùng còn là thành viên.
+    /// Khớp không dấu, một phần từ; bỏ qua tin đã thu hồi; sắp mới nhất trước.
+    /// </summary>
+    Task<OperationResult<PagedList<MessageSearchResultDto>>> SearchAsync(
+        Guid currentUserId,
+        Guid? conversationId,
+        string query,
+        string? cursor,
+        int limit,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Cửa sổ tin quanh một tin đích (dùng khi nhảy từ kết quả tìm kiếm), gồm tin đích và
+    /// các tin lân cận theo thứ tự thời gian tăng dần.
+    /// </summary>
+    Task<OperationResult<MessageContextDto>> GetContextAsync(
+        Guid currentUserId,
+        Guid conversationId,
+        Guid messageId,
+        int limit,
         CancellationToken cancellationToken = default);
 
     /// <summary>

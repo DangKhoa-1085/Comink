@@ -86,6 +86,9 @@ export interface ConversationSummary {
   lastMessage: ConversationLastMessage | null
   unreadCount: number
   memberCount: number
+  /** NC Ưu tiên 2: tôi đang tắt thông báo hội thoại này. */
+  isMuted: boolean
+  mutedUntil: string | null
 }
 
 export interface Conversation {
@@ -97,6 +100,50 @@ export interface Conversation {
   lastMessageAt: string | null
   members: ConversationMember[]
   lastMessage: ChatMessage | null
+  isMuted: boolean
+  mutedUntil: string | null
+}
+
+/** Một tin đang ghim; `message` là DTO tin đầy đủ. */
+export interface PinnedMessage {
+  message: ChatMessage
+  pinnedByUserId: string
+  pinnedByDisplayName: string
+  pinnedAt: string
+}
+
+/** Payload của sự kiện `PinnedMessagesChanged` và kết quả endpoint ghim. */
+export interface PinnedMessages {
+  conversationId: string
+  pinned: PinnedMessage[]
+}
+
+/** Một kết quả tìm kiếm tin nhắn (chỉ trong hội thoại tôi là thành viên). */
+export interface MessageSearchResult {
+  messageId: string
+  conversationId: string
+  conversationTitle: string | null
+  conversationType: string
+  peerDisplayName: string | null
+  senderId: string
+  senderDisplayName: string
+  contentPreview: string | null
+  createdAt: string
+}
+
+/** Cửa sổ tin quanh một tin đích (dùng khi nhảy từ kết quả tìm kiếm). */
+export interface MessageContext {
+  items: ChatMessage[]
+  hasMoreBefore: boolean
+  hasMoreAfter: boolean
+}
+
+/** Thời hạn tắt thông báo — phải khớp `MuteRules` ở backend. */
+export type MuteDuration = 'Off' | 'OneHour' | 'EightHours' | 'OneWeek' | 'Forever'
+
+export interface MuteState {
+  isMuted: boolean
+  mutedUntil: string | null
 }
 
 export interface SendMessagePayload {
@@ -143,9 +190,11 @@ export const conversationsApi = {
     return data
   },
 
-  async list(cursor?: string | null): Promise<PagedResult<ConversationSummary>> {
+  async list(cursor?: string | null, limit = 20): Promise<PagedResult<ConversationSummary>> {
+    const params: Record<string, string | number> = { limit }
+    if (cursor) params.cursor = cursor
     const { data } = await http.get<PagedResult<ConversationSummary>>('/api/conversations', {
-      params: cursor ? { cursor } : {},
+      params,
     })
     return data
   },
@@ -219,6 +268,79 @@ export const conversationsApi = {
     const { data } = await http.delete<ChatMessage>(
       `/api/conversations/${conversationId}/messages/${messageId}/reactions/${encodeURIComponent(reaction)}`,
     )
+    return data
+  },
+
+  /** Danh sách tin ghim (tối đa 10) — NC Ưu tiên 2. */
+  async pinned(conversationId: string): Promise<PinnedMessages> {
+    const { data } = await http.get<PinnedMessages>(`/api/conversations/${conversationId}/pinned`)
+    return data
+  },
+
+  async pin(conversationId: string, messageId: string): Promise<PinnedMessages> {
+    const { data } = await http.put<PinnedMessages>(
+      `/api/conversations/${conversationId}/pinned/${messageId}`,
+    )
+    return data
+  },
+
+  async unpin(conversationId: string, messageId: string): Promise<PinnedMessages> {
+    const { data } = await http.delete<PinnedMessages>(
+      `/api/conversations/${conversationId}/pinned/${messageId}`,
+    )
+    return data
+  },
+
+  /** Chuyển tiếp tin sang hội thoại đích (server sao chép nội dung + tệp) — NC Ưu tiên 2. */
+  async forward(
+    targetConversationId: string,
+    sourceMessageId: string,
+    clientMessageId: string,
+  ): Promise<ChatMessage> {
+    const { data } = await http.post<ChatMessage>(
+      `/api/conversations/${targetConversationId}/messages/forward`,
+      { sourceMessageId, clientMessageId },
+    )
+    return data
+  },
+
+  /**
+   * Tìm tin nhắn: `conversationId = null` thì tìm trong **mọi** hội thoại tôi còn là thành viên.
+   * Gõ không dấu vẫn khớp (backend dùng unaccent + trigram).
+   */
+  async search(
+    conversationId: string | null,
+    q: string,
+    cursor?: string | null,
+  ): Promise<PagedResult<MessageSearchResult>> {
+    const url = conversationId
+      ? `/api/conversations/${conversationId}/messages/search`
+      : '/api/messages/search'
+    const params: Record<string, string | number> = { q, limit: 20 }
+    if (cursor) params.cursor = cursor
+
+    const { data } = await http.get<PagedResult<MessageSearchResult>>(url, { params })
+    return data
+  },
+
+  /** Cửa sổ tin quanh một tin đích để mở đúng tin từ kết quả tìm kiếm — NC Ưu tiên 2. */
+  async context(
+    conversationId: string,
+    messageId: string,
+    limit = 31,
+  ): Promise<MessageContext> {
+    const { data } = await http.get<MessageContext>(
+      `/api/conversations/${conversationId}/messages/${messageId}/context`,
+      { params: { limit } },
+    )
+    return data
+  },
+
+  /** Tắt/bật thông báo hội thoại — chỉ chặn push, số chưa đọc không đổi. */
+  async mute(conversationId: string, duration: MuteDuration): Promise<MuteState> {
+    const { data } = await http.put<MuteState>(`/api/conversations/${conversationId}/mute`, {
+      duration,
+    })
     return data
   },
 

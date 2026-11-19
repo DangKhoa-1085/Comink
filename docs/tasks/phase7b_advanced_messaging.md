@@ -4,7 +4,7 @@
 > **Mục tiêu:** hoàn thiện 8 tính năng **Nhắn tin nâng cao (NC)**: phản hồi, thu hồi, chỉnh sửa, thả cảm xúc,
 > ghim, chuyển tiếp, tìm kiếm tin nhắn, tắt thông báo từng cuộc.
 > **Phụ thuộc:** GĐ 3 (nhắn tin CB + chat nhóm) và GĐ 7 ưu tiên 1 (presence/đang nhập/đã đọc) — **đã xong**.
-> **Trạng thái:** 🚧 **Đợt A đã xong (2026-11-20)** — backend + web cho phản hồi, chỉnh sửa, thu hồi, cảm xúc; Đợt B (ghim, chuyển tiếp, tìm kiếm, tắt thông báo) làm tiếp. Xem mục 8.
+> **Trạng thái:** 🚧 **Đợt A + B đã xong (2026-11-20)** — backend + web cho cả 8 tính năng; Đợt C (app Flutter) làm tiếp. Xem mục 8.
 > **Ước lượng:** 2–3 tuần công. Migration tương ứng: **M7** (`Messaging_AddMessageFeatures`).
 
 ---
@@ -19,10 +19,10 @@
 | 2 | **Thu hồi** | Người gửi thu hồi trong 24 giờ → mọi người thấy "Tin nhắn đã bị thu hồi" real-time, không tải lại; preview danh sách hội thoại đổi theo | ✅ backend + web (Đợt A) |
 | 3 | **Chỉnh sửa** | Người gửi sửa nội dung trong 24 giờ → mọi người thấy nội dung mới + nhãn "(đã chỉnh sửa)" real-time | ✅ backend + web (Đợt A) |
 | 4 | **Thả cảm xúc** | 6 cảm xúc cố định; một người được thả nhiều loại trên một tin; đếm và trạng thái "của tôi" đúng; real-time | ✅ backend + web (Đợt A) |
-| 5 | **Ghim tin** | Ghim/bỏ ghim tin còn hiệu lực, tối đa 10/hội thoại; panel ghim; bấm để nhảy tới tin; thu hồi tin đã ghim → tự bỏ ghim | ❌ chưa có |
-| 6 | **Chuyển tiếp** | Chọn hội thoại đích → tạo tin mới có nhãn "Chuyển tiếp", giữ `forwarded_from_message_id`; không chuyển tiếp tin đã thu hồi | ❌ chưa có |
-| 7 | **Tìm kiếm tin nhắn** | Tìm trong hội thoại đang mở **và** toàn bộ hội thoại tôi là thành viên; gõ không dấu vẫn khớp; bấm kết quả mở đúng tin trong ngữ cảnh | ❌ chưa có |
-| 8 | **Tắt thông báo từng cuộc** | Tắt theo 1 giờ/8 giờ/1 tuần/vĩnh viễn và bật lại; **chặn push**; số tin chưa đọc không đổi | ❌ chưa có |
+| 5 | **Ghim tin** | Ghim/bỏ ghim tin còn hiệu lực, tối đa 10/hội thoại; panel ghim; bấm để nhảy tới tin; thu hồi tin đã ghim → tự bỏ ghim | ✅ backend + web (Đợt B) |
+| 6 | **Chuyển tiếp** | Chọn hội thoại đích → tạo tin mới có nhãn "Chuyển tiếp", giữ `forwarded_from_message_id`; không chuyển tiếp tin đã thu hồi | ✅ backend + web (Đợt B) |
+| 7 | **Tìm kiếm tin nhắn** | Tìm trong hội thoại đang mở **và** toàn bộ hội thoại tôi là thành viên; gõ không dấu vẫn khớp; bấm kết quả mở đúng tin trong ngữ cảnh | ✅ backend + web (Đợt B) |
+| 8 | **Tắt thông báo từng cuộc** | Tắt theo 1 giờ/8 giờ/1 tuần/vĩnh viễn và bật lại; **chặn push**; số tin chưa đọc không đổi | ✅ backend + web (Đợt B) |
 
 > Điều kiện chung của roadmap: *"Từng tính năng chạy trên web **và** app"*, *"Tìm kiếm chỉ trong hội thoại người dùng là thành viên"*.
 
@@ -121,13 +121,13 @@
 - [x] Web: `api/conversations.ts`, `MessageBubble` (menu, trích dẫn, chip cảm xúc, nhãn đã sửa/đã thu hồi), thanh trả lời/sửa trên ô nhập, cache real-time, i18n vi/en
 - [x] Kiểm chứng: `dotnet build` 0 warning / `dotnet test` **289/289**, `npm run lint` 0/0 / `build` sạch, script HTTP + 2 client SignalR **23/23**, Chrome headless CDP **21/21**
 
-### 4.2. Đợt B — Ghim, chuyển tiếp, tìm kiếm, tắt thông báo (backend + web)
+### 4.2. Đợt B — Ghim, chuyển tiếp, tìm kiếm, tắt thông báo (backend + web) — ✅ 2026-11-20
 
-- [ ] Application/Infrastructure: `IPinnedMessageService`, `ForwardAsync`, `SearchAsync` (trong hội thoại + toàn bộ), `GetContextAsync`, `MuteAsync`
-- [ ] Api + validator; chặn push theo `muted_until`; `ConversationDto`/summary có `isMuted`/`mutedUntil`
-- [ ] Web: panel ghim, dialog chuyển tiếp, panel/trang tìm kiếm + nhảy tới tin, menu tắt thông báo ở header; i18n
-- [ ] Test tích hợp: giới hạn 10, thu hồi tin đã ghim, quyền forward nguồn/đích, search chỉ trả hội thoại của tôi, context đúng cửa sổ, mute chặn push
-- [ ] Kiểm chứng + tái sinh `docs/openapi/comink.v1.json` + `verify.ps1`
+- [x] Application/Infrastructure: `IPinnedMessageService`, `ForwardAsync`, `SearchAsync` (trong hội thoại + toàn bộ), `GetContextAsync`, `MuteAsync`
+- [x] Api + validator; chặn push theo `muted_until`; `ConversationDto`/summary có `isMuted`/`mutedUntil`
+- [x] Web: panel ghim, dialog chuyển tiếp, panel/trang tìm kiếm + nhảy tới tin (endpoint context + chế độ ngữ cảnh), menu tắt thông báo ở header; i18n
+- [x] Test tích hợp: giới hạn 10, thu hồi tin đã ghim, quyền forward nguồn/đích, search chỉ trả hội thoại của tôi, context đúng cửa sổ, mute chặn push (`MessageFeaturesTests` 20 test)
+- [x] Kiểm chứng + tái sinh `docs/openapi/comink.v1.json` + `verify.ps1` (59 path, 70 operation — ĐẠT)
 
 ### 4.3. Đợt C — App Flutter + hoàn thiện
 
@@ -208,3 +208,36 @@
 - Tin bị thu hồi vẫn giữ dòng + tệp trong DB (ẩn ở API) để hiện đúng khung; xoá tệp trên cloud thuộc Ưu tiên 6.
 - Container test Postgres được nâng `max_connections=400` vì cả bộ test tạo ~150 database riêng; trước đây chạm giới hạn 100 khi số test tăng.
 - Hai script kiểm chứng (`web/verify-a.mjs`, `web/verify-a-ui.mjs`) chỉ dùng tại chỗ, **không commit**.
+
+### 8.2. Đợt B (2026-11-20)
+
+**Tệp đã thay đổi**
+
+| Nhóm | Tệp |
+|---|---|
+| Application | `Dtos/MessagingDtos.cs` (DTO ghim/chuyển tiếp/tìm kiếm/ngữ cảnh/mute), `Abstractions/IConversationService.cs` (forward/search/context/mute), `Abstractions/IPinnedMessageService.cs` (mới), `Validators/MessagingValidators.cs` |
+| Infrastructure | `Messaging/MessageService.cs` (forward/search/context + push theo mute), `Messaging/PinnedMessageService.cs` (mới), `Messaging/ConversationService.cs` (mute + `isMuted`/`mutedUntil`), `DependencyInjection.cs` |
+| Api | `Endpoints/MessagingEndpoints.cs` (12 endpoint mới), `docs/openapi/comink.v1.json` (tái sinh) |
+| Web | `api/conversations.ts`, `hooks/useChatConnection.ts`, `lib/chatConnection.ts`, `components/chat/PinnedPanel.tsx` (mới), `ForwardDialog.tsx` (mới), `MessageSearchPanel.tsx` (mới), `components/chat/MessageBubble.tsx`, `pages/ChatPage.tsx`, `pages/MessagesPage.tsx`, `locales/{vi,en}.json` |
+| Test | `tests/Comink.Api.IntegrationTests/MessageFeaturesTests.cs` (mới, 20 test) |
+| Tài liệu | `docs/05` (mục 8.18–8.22), `docs/03` (mục 3.3/5.2/6.3/7), tệp này |
+
+**Kết quả chạy**
+
+- `dotnet build` — 0 warning, 0 error; `dotnet test` — **309/309** pass (Domain 115 · Application 25 · Tích hợp 169).
+- `npm run lint` — 0 warning, 0 error; `npm run build` — thành công (cảnh báo bundle > 1 MB: KI-09).
+- HTTP + **2 client SignalR thật** (3 tài khoản) — **27/27 PASS**: ghim 10 tin + tin 11 bị chặn, sự kiện ghim/bỏ ghim, chuyển tiếp sao chép nội dung + `forwardedFrom` và chỉ tới thành viên đích, chặn chuyển tiếp tin đã thu hồi/hội thoại mình không thuộc, tìm không dấu (`hop`→`họp`) + chữ hoa + chỉ hội thoại của tôi + loại tin đã thu hồi, ngữ cảnh đúng cửa sổ, tắt/bật thông báo + `isMuted` trong danh sách/chi tiết, real-time vẫn chạy khi đang tắt thông báo.
+- **Chrome headless + CDP** — **26/26 PASS**: ghim + panel, chuyển tiếp qua dialog, tìm trong hội thoại → mở ngữ cảnh, "Back to latest", tắt/bật thông báo ở header, tìm toàn bộ → mở đúng hội thoại + ngữ cảnh; không exception/lỗi console.
+- `docs/openapi/verify.ps1` — **ĐẠT** (59 path, 70 operation, 66/70 có Bearer, 38 endpoint app có trong hợp đồng, không drift).
+
+**Lỗi thật đã sửa trong quá trình kiểm chứng**
+
+1. **Tìm kiếm phân biệt chữ hoa/thường** khi client gõ `HOP`: cột đã hạ chữ thường nhưng mẫu LIKE chưa → sửa `term.ToLowerInvariant()` khi tạo mẫu; thêm test dùng chữ hoa.
+2. **Mở từ kết quả tìm kiếm toàn bộ không hiện ngữ cảnh**: effect xoá `?focus=` khỏi URL ngay sau khi bắt đầu fetch → cleanup huỷ kết quả. Bỏ việc xoá URL trong effect và bỏ cleanup; thêm `loadedFocusRef` để mỗi tin chỉ nạp một lần (có ghi chú lỗi trong code).
+3. (Kiểm chứng) Script UI dùng chung profile Chrome giữa các lần chạy gây nhiễu phiên → chạy lại với profile sạch; không ảnh hưởng mã nguồn.
+
+**Ghi chú kỹ thuật**
+
+- Tìm kiếm dùng `LIKE` trên `immutable_unaccent(lower(content))` với mẫu cũng `lower` — khớp một phần từ; chỉ mục GIN trigram của M7.
+- Mute chỉ lọc **danh sách nhận push**; `unreadCount` và `MessagesRead` giữ nguyên.
+- Script kiểm chứng (`web/verify-b.mjs`, `web/verify-b-ui.mjs`) chỉ dùng tại chỗ, **không commit**.

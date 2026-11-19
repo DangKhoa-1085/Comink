@@ -253,6 +253,17 @@ public class ConversationService : IConversationService
 
         var conversationIds = pageRows.Select(r => r.Id).ToList();
 
+        // Trạng thái tắt thông báo của CHÍNH tôi trong từng hội thoại (NC Ưu tiên 2).
+        var myMuteRows = await _db.ConversationMembers
+            .AsNoTracking()
+            .Where(m => conversationIds.Contains(m.ConversationId) && m.UserId == currentUserId)
+            .Select(m => new { m.ConversationId, m.MutedUntil })
+            .ToListAsync(cancellationToken);
+        var myMuteByConversation = myMuteRows
+            .GroupBy(row => row.ConversationId)
+            .ToDictionary(group => group.Key, group => group.First().MutedUntil);
+        var now = DateTimeOffset.UtcNow;
+
         // Người còn lại trong hội thoại 1–1 (một truy vấn, không N+1).
         var peers = await _db.ConversationMembers
             .AsNoTracking()
@@ -321,6 +332,7 @@ public class ConversationService : IConversationService
             var last = lastMessages.FirstOrDefault(m => m.Id == row.LastMessageId);
             var memberCount = memberCounts.FirstOrDefault(x => x.ConversationId == row.Id)?.Count ?? 0;
             var peerPresence = peer is null ? null : presenceByUser.GetValueOrDefault(peer.UserId);
+            var mutedUntil = myMuteByConversation.GetValueOrDefault(row.Id);
 
             return new ConversationSummaryDto(
                 row.Id,
@@ -346,7 +358,9 @@ public class ConversationService : IConversationService
                         last.CreatedAt,
                         last.DeletedAt is not null),
                 unreadByConversation.GetValueOrDefault(row.Id),
-                memberCount);
+                memberCount,
+                MuteRules.IsMuted(mutedUntil, now),
+                mutedUntil);
         }).ToList();
 
         var nextCursor = hasMore && pageRows.Count > 0
@@ -413,7 +427,11 @@ public class ConversationService : IConversationService
             conversation.CreatedAt,
             conversation.LastMessageAt,
             members,
-            conversation.LastMessage is null ? null : MessagingMapping.ToMessageDto(conversation.LastMessage)));
+            conversation.LastMessage is null ? null : MessagingMapping.ToMessageDto(conversation.LastMessage),
+            MuteRules.IsMuted(
+                conversation.Members.First(m => m.UserId == currentUserId && m.LeftAt is null).MutedUntil,
+                DateTimeOffset.UtcNow),
+            conversation.Members.First(m => m.UserId == currentUserId && m.LeftAt is null).MutedUntil));
     }
 
     /// <inheritdoc />
@@ -548,6 +566,36 @@ public class ConversationService : IConversationService
         await _notifier.MessageReadAsync(conversationId, memberUserIds, receipt, cancellationToken);
 
         return OperationResult<ReadReceiptDto>.Success(receipt);
+    }
+
+    /// <inheritdoc />
+    public async Task<OperationResult<MuteStateDto>> MuteAsync(
+        Guid currentUserId,
+        Guid conversationId,
+        MuteConversationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var member = await _db.ConversationMembers
+            .FirstOrDefaultAsync(
+                m => m.ConversationId == conversationId && m.UserId == currentUserId && m.LeftAt == null,
+                cancellationToken);
+
+        if (member is null)
+        {
+            return OperationResult<MuteStateDto>.Failure(ErrorCodes.ConversationNotFound);
+        }
+
+        if (!MuteRules.IsValidDuration(request.Duration))
+        {
+            return OperationResult<MuteStateDto>.Failure(ErrorCodes.ValidationFailed);
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        member.MutedUntil = MuteRules.ResolveMutedUntil(request.Duration!, now);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return OperationResult<MuteStateDto>.Success(
+            new MuteStateDto(MuteRules.IsMuted(member.MutedUntil, now), member.MutedUntil));
     }
 
     /// <summary>Lỗi vi phạm ràng buộc duy nhất của PostgreSQL (SqlState 23505).</summary>

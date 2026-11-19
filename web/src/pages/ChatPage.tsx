@@ -1,13 +1,38 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, ImagePlus, Loader2, Pencil, Phone, Reply, Send, Users, Video, X } from 'lucide-react'
+import {
+  ArrowLeft,
+  Bell,
+  BellOff,
+  ImagePlus,
+  Loader2,
+  Pencil,
+  Phone,
+  Pin,
+  Reply,
+  Search,
+  Send,
+  Users,
+  Video,
+  X,
+} from 'lucide-react'
 import { callsApi, type CallType } from '../api/calls'
-import { conversationsApi, type ChatMessage } from '../api/conversations'
+import {
+  conversationsApi,
+  type ChatMessage,
+  type Conversation,
+  type MessageContext,
+  type MessageSearchResult,
+  type MuteDuration,
+} from '../api/conversations'
 import { mediaApi } from '../api/media'
 import { Avatar } from '../components/social/Avatar'
+import { ForwardDialog } from '../components/chat/ForwardDialog'
 import { MessageBubble } from '../components/chat/MessageBubble'
+import { MessageSearchPanel } from '../components/chat/MessageSearchPanel'
+import { PinnedPanel } from '../components/chat/PinnedPanel'
 import { PresenceDot } from '../components/chat/PresenceDot'
 import { Button } from '../components/ui/Button'
 import { Alert, Spinner } from '../components/ui/Feedback'
@@ -22,6 +47,15 @@ import { EMPTY_TYPING_IDS, useTypingStore } from '../stores/typingStore'
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+
+/** Các lựa chọn tắt thông báo — khoá phải khớp `MuteRules` ở backend. */
+const MUTE_OPTIONS: { duration: MuteDuration; label: string }[] = [
+  { duration: 'Off', label: 'chat.mute_off' },
+  { duration: 'OneHour', label: 'chat.mute_1h' },
+  { duration: 'EightHours', label: 'chat.mute_8h' },
+  { duration: 'OneWeek', label: 'chat.mute_1w' },
+  { duration: 'Forever', label: 'chat.mute_forever' },
+]
 
 /** Đồng hồ cho throttle "đang nhập" — tách ngoài component để không bị coi là gọi trong render. */
 function currentTimeMs(): number {
@@ -42,6 +76,14 @@ function ChatPageView() {
   const navigate = useNavigate()
   const me = useAuthStore((state) => state.user)
   const queryClient = useQueryClient()
+  const [searchParams] = useSearchParams()
+  const loadedFocusRef = useRef<string | null>(null)
+
+  /** Hiện lỗi nghiệp vụ từ backend bằng chuỗi đã dịch (AGENTS.md mục 3). */
+  const showError = (error: unknown) => {
+    const code = error instanceof ApiError ? error.code : 'INTERNAL_ERROR'
+    toast.error(translateErrorCode(t, code))
+  }
 
   // Bắt đầu gọi thoại/video trong hội thoại này rồi sang màn hình gọi.
   const startCall = useMutation({
@@ -60,6 +102,12 @@ function ChatPageView() {
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null)
   const [editing, setEditing] = useState<ChatMessage | null>(null)
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
+  // NC Ưu tiên 2 — Đợt B: panel ghim, tìm kiếm, chuyển tiếp, tắt thông báo, chế độ ngữ cảnh.
+  const [pinnedOpen, setPinnedOpen] = useState(false)
+  const [muteOpen, setMuteOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [forwarding, setForwarding] = useState<ChatMessage | null>(null)
+  const [context, setContext] = useState<{ targetId: string; data: MessageContext } | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const draftInputRef = useRef<HTMLInputElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
@@ -78,6 +126,67 @@ function ChatPageView() {
     getNextPageParam: (last) => (last.hasMore && last.nextCursor ? last.nextCursor : undefined),
     enabled: Boolean(conversationId),
   })
+
+  // NC Ưu tiên 2: danh sách ghim (cập nhật real-time qua PinnedMessagesChanged) + thao tác.
+  const pinnedQuery = useQuery({
+    queryKey: ['pinned', conversationId],
+    queryFn: () => conversationsApi.pinned(conversationId!),
+    enabled: Boolean(conversationId),
+  })
+  const pinnedMessages = pinnedQuery.data?.pinned ?? []
+  const pinnedIds = new Set(pinnedMessages.map((item) => item.message.id))
+
+  const pinMutation = useMutation({
+    mutationFn: (payload: { messageId: string; pinned: boolean }) =>
+      payload.pinned
+        ? conversationsApi.unpin(conversationId!, payload.messageId)
+        : conversationsApi.pin(conversationId!, payload.messageId),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['pinned', conversationId], data)
+    },
+    onError: showError,
+  })
+
+  const muteMutation = useMutation({
+    mutationFn: (duration: MuteDuration) => conversationsApi.mute(conversationId!, duration),
+    onSuccess: (state) => {
+      queryClient.setQueryData<Conversation>(['conversation', conversationId], (old) =>
+        old ? { ...old, isMuted: state.isMuted, mutedUntil: state.mutedUntil } : old,
+      )
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      setMuteOpen(false)
+    },
+    onError: showError,
+  })
+
+  // Mở khung chat từ kết quả tìm kiếm toàn bộ (`/messages/{id}?focus={messageId}`).
+  useEffect(() => {
+    const focus = searchParams.get('focus')
+    // Mỗi tin chỉ nạp ngữ cảnh một lần; KHÔNG xoá `focus` khỏi URL trong lúc fetch vì cleanup
+    // của effect sẽ huỷ kết quả (lỗi thật gặp khi kiểm chứng 2026-11-20).
+    if (!focus || !conversationId || loadedFocusRef.current === focus) {
+      return
+    }
+
+    loadedFocusRef.current = focus
+    // KHÔNG cleanup/huỷ fetch: StrictMode ở dev chạy effect 2 lần (setup → cleanup → setup),
+    // nếu huỷ theo cleanup thì lần chạy lại bị chặn bởi loadedFocusRef và ngữ cảnh không bao giờ hiện
+    // (lỗi thật gặp khi kiểm chứng 2026-11-20). Cập nhật state sau khi unmount là vô hại.
+    const loadContext = async () => {
+      try {
+        const data = await conversationsApi.context(conversationId, focus, 31)
+        setContext({ targetId: focus, data })
+        setHighlightedId(focus)
+        window.setTimeout(() => {
+          document.getElementById(`message-${focus}`)?.scrollIntoView({ block: 'center' })
+        }, 120)
+      } catch {
+        // Tin không còn (bị xoá cứng) → mở khung chat bình thường.
+      }
+    }
+
+    void loadContext()
+  }, [conversationId, searchParams])
 
   // Mỗi trang là "mới nhất trước" và các trang đi ngược thời gian → đảo lại để hiển thị cũ → mới.
   const messages: ChatMessage[] = [...(messagesQuery.data?.pages ?? [])]
@@ -228,11 +337,6 @@ function ChatPageView() {
   })
 
   // --- NC Ưu tiên 2: sửa / thu hồi / cảm xúc ---
-  const showError = (error: unknown) => {
-    const code = error instanceof ApiError ? error.code : 'INTERNAL_ERROR'
-    toast.error(translateErrorCode(t, code))
-  }
-
   const editMutation = useMutation({
     mutationFn: (payload: { message: ChatMessage; content: string }) =>
       conversationsApi.edit(conversationId!, payload.message.id, payload.content),
@@ -345,8 +449,8 @@ function ChatPageView() {
   }
 
   /**
-   * Nhảy tới một tin (từ trích dẫn): cuộn nếu đã có trong DOM, ngược lại tải thêm tin cũ
-   * (tối đa 10 trang) rồi cuộn. Không tìm thấy thì thôi, không làm hỏng khung chat.
+   * Nhảy tới một tin (từ trích dẫn hoặc kết quả tìm kiếm): cuộn nếu đã có trong DOM, ngược lại
+   * tải **cửa sổ ngữ cảnh** quanh tin đó và hiện chế độ ngữ cảnh (không phải tải ngược nhiều trang).
    */
   const jumpToMessage = async (messageId: string) => {
     const scrollTo = () => {
@@ -365,13 +469,27 @@ function ChatPageView() {
       return
     }
 
-    for (let attempt = 0; attempt < 10 && messagesQuery.hasNextPage; attempt++) {
-      await messagesQuery.fetchNextPage()
-      await new Promise((resolve) => window.setTimeout(resolve, 80))
-      if (scrollTo()) {
-        return
-      }
+    try {
+      const data = await conversationsApi.context(conversationId!, messageId, 31)
+      setContext({ targetId: messageId, data })
+      setHighlightedId(messageId)
+      window.setTimeout(() => {
+        document.getElementById(`message-${messageId}`)?.scrollIntoView({ block: 'center' })
+      }, 120)
+      window.setTimeout(() => setHighlightedId(null), 3000)
+    } catch (error) {
+      showError(error)
     }
+  }
+
+  const pickSearchResult = (result: MessageSearchResult) => {
+    setSearchOpen(false)
+    if (result.conversationId === conversationId) {
+      void jumpToMessage(result.messageId)
+      return
+    }
+
+    navigate(`/messages/${result.conversationId}?focus=${result.messageId}`)
   }
 
   const submit = () => {
@@ -408,6 +526,9 @@ function ChatPageView() {
 
   const conversation = conversationQuery.data
   const isGroup = conversation.type === 'Group'
+  const isMuted = conversation.isMuted
+  // Chế độ ngữ cảnh (mở từ kết quả tìm kiếm): hiển thị cửa sổ quanh tin đích thay cho lịch sử cuộn.
+  const visibleMessages = context ? context.data.items : messages
   const peer = isGroup ? undefined : conversation.members.find((member) => member.userId !== me?.id)
   const peerName = isGroup
     ? conversation.title || t('chat.group')
@@ -554,8 +675,76 @@ function ChatPageView() {
           >
             <Video className="h-4 w-4" />
           </Button>
+
+          {/* NC Ưu tiên 2: ghim, tìm kiếm trong hội thoại, tắt thông báo. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setPinnedOpen((open) => !open)}
+            title={t('chat.pinned')}
+            aria-label={t('chat.pinned')}
+            aria-expanded={pinnedOpen}
+            className="relative"
+          >
+            <Pin className="h-4 w-4" />
+            {pinnedMessages.length > 0 && (
+              <span className="absolute -right-1 -top-1 rounded-full bg-indigo-600 px-1 text-[9px] font-semibold leading-4 text-white">
+                {pinnedMessages.length}
+              </span>
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSearchOpen(true)}
+            title={t('chat.search_in_conversation')}
+            aria-label={t('chat.search_in_conversation')}
+          >
+            <Search className="h-4 w-4" />
+          </Button>
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setMuteOpen((open) => !open)}
+              title={isMuted ? t('chat.unmute') : t('chat.mute')}
+              aria-label={isMuted ? t('chat.unmute') : t('chat.mute')}
+              aria-expanded={muteOpen}
+            >
+              {isMuted ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+            </Button>
+            {muteOpen && (
+              <div
+                role="menu"
+                className="absolute right-0 top-full z-30 mt-1 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 text-sm text-slate-700 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              >
+                {MUTE_OPTIONS.map((option) => (
+                  <button
+                    key={option.duration}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => muteMutation.mutate(option.duration)}
+                    className="block w-full rounded-lg px-2 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    {t(option.label)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </header>
+
+      {pinnedOpen && (
+        <PinnedPanel
+          pinned={pinnedMessages}
+          loading={pinnedQuery.isLoading}
+          error={pinnedQuery.isError}
+          onClose={() => setPinnedOpen(false)}
+          onJump={(messageId) => void jumpToMessage(messageId)}
+          onUnpin={(messageId) => pinMutation.mutate({ messageId, pinned: true })}
+        />
+      )}
 
       <div className="flex-1 overflow-y-auto p-3">
         {messagesQuery.isLoading ? (
@@ -564,25 +753,38 @@ function ChatPageView() {
           </div>
         ) : messagesQuery.isError ? (
           <Alert variant="error">{t('chat.error')}</Alert>
-        ) : messages.length === 0 ? (
+        ) : visibleMessages.length === 0 ? (
           <p className="py-8 text-center text-sm text-slate-500">{t('chat.no_messages')}</p>
         ) : (
           <>
-            {messagesQuery.hasNextPage && (
-              <div className="mb-3 text-center">
+            {context ? (
+              <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-700 dark:bg-amber-950 dark:text-amber-200">
+                <span>{t('chat.context_banner')}</span>
                 <button
                   type="button"
-                  className="text-xs text-indigo-600 hover:underline disabled:opacity-60"
-                  onClick={() => void messagesQuery.fetchNextPage()}
-                  disabled={messagesQuery.isFetchingNextPage}
+                  onClick={() => setContext(null)}
+                  className="shrink-0 font-semibold underline"
                 >
-                  {messagesQuery.isFetchingNextPage ? t('social.loading') : t('chat.load_older')}
+                  {t('chat.context_latest')}
                 </button>
               </div>
+            ) : (
+              messagesQuery.hasNextPage && (
+                <div className="mb-3 text-center">
+                  <button
+                    type="button"
+                    className="text-xs text-indigo-600 hover:underline disabled:opacity-60"
+                    onClick={() => void messagesQuery.fetchNextPage()}
+                    disabled={messagesQuery.isFetchingNextPage}
+                  >
+                    {messagesQuery.isFetchingNextPage ? t('social.loading') : t('chat.load_older')}
+                  </button>
+                </div>
+              )
             )}
 
             <ul className="space-y-2">
-              {messages.map((message) => {
+              {visibleMessages.map((message) => {
                 const mine = message.senderId === me?.id
                 // Trong nhóm, phải thấy tin này của ai (yêu cầu người dùng 2026-10-23).
                 const sender = isGroup
@@ -595,6 +797,7 @@ function ChatPageView() {
                     key={message.id}
                     message={message}
                     isMine={mine}
+                    isPinned={pinnedIds.has(message.id)}
                     senderName={sender?.displayName || sender?.userName}
                     showSender={isGroup && !mine}
                     readStatus={isLastOwn ? lastOwnStatus ?? undefined : undefined}
@@ -606,6 +809,9 @@ function ChatPageView() {
                     onRecall={confirmRecall}
                     onReact={(target, reaction) => reactionMutation.mutate({ message: target, reaction })}
                     onJumpTo={(messageId) => void jumpToMessage(messageId)}
+                    onPin={(target) => pinMutation.mutate({ messageId: target.id, pinned: false })}
+                    onUnpin={(target) => pinMutation.mutate({ messageId: target.id, pinned: true })}
+                    onForward={setForwarding}
                   />
                 )
               })}
@@ -728,6 +934,28 @@ function ChatPageView() {
           </Button>
         </div>
       </footer>
+
+      {searchOpen && (
+        <MessageSearchPanel
+          conversationId={conversationId!}
+          onClose={() => setSearchOpen(false)}
+          onPick={pickSearchResult}
+        />
+      )}
+
+      {forwarding && (
+        <ForwardDialog
+          sourceConversationId={conversationId!}
+          message={forwarding}
+          onClose={() => setForwarding(null)}
+          onForwarded={(forwarded) => {
+            if (forwarded.conversationId === conversationId) {
+              appendMessageToCache(queryClient, forwarded)
+            }
+            queryClient.invalidateQueries({ queryKey: ['conversations'] })
+          }}
+        />
+      )}
     </div>
   )
 }

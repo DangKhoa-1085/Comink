@@ -85,3 +85,29 @@ public class ReactionRequestValidator : AbstractValidator<ReactionRequest>
             .WithMessage("Reaction không hợp lệ.");
     }
 }
+
+/// <summary>Kiểm tra yêu cầu chuyển tiếp tin (NC Ưu tiên 2).</summary>
+public class ForwardMessageRequestValidator : AbstractValidator<ForwardMessageRequest>
+{
+    public ForwardMessageRequestValidator()
+    {
+        RuleFor(x => x.SourceMessageId).NotEmpty().WithMessage("SourceMessageId là bắt buộc.");
+        RuleFor(x => x.ClientMessageId)
+            .NotEmpty()
+            .WithMessage("ClientMessageId là bắt buộc (dùng để chống gửi trùng).");
+    }
+}
+
+/// <summary>Kiểm tra yêu cầu tắt thông báo; danh sách thời hạn lấy từ domain.</summary>
+public class MuteConversationRequestValidator : AbstractValidator<MuteConversationRequest>
+{
+    public MuteConversationRequestValidator()
+    {
+        RuleFor(x => x.Duration)
+            .Cascade(CascadeMode.Stop)
+            .NotEmpty()
+            .WithMessage("Duration là bắt buộc.")
+            .Must(MuteRules.IsValidDuration)
+            .WithMessage("Duration phải là Off, OneHour, EightHours, OneWeek hoặc Forever.");
+    }
+}

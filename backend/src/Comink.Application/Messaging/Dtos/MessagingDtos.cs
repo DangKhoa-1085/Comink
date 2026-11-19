@@ -26,6 +26,33 @@ public record EditMessageRequest(string? Content);
 /// <summary>Yêu cầu thả một cảm xúc lên tin nhắn. <c>Reaction</c> là khoá trong <c>ReactionCatalog</c>.</summary>
 public record ReactionRequest(string Reaction);
 
+/// <summary>Yêu cầu chuyển tiếp một tin sang hội thoại đích (NC Ưu tiên 2).</summary>
+public record ForwardMessageRequest(Guid SourceMessageId, Guid ClientMessageId);
+
+/// <summary>Yêu cầu tắt/bật thông báo một hội thoại (NC Ưu tiên 2).</summary>
+public record MuteConversationRequest(string? Duration);
+
+/// <summary>Trạng thái tắt thông báo sau khi đổi; <c>MutedUntil = null</c> nghĩa là đang bật.</summary>
+public record MuteStateDto(bool IsMuted, DateTimeOffset? MutedUntil);
+
+/// <summary>Một kết quả tìm kiếm tin nhắn (chỉ trong hội thoại người dùng là thành viên).</summary>
+public record MessageSearchResultDto(
+    Guid MessageId,
+    Guid ConversationId,
+    string? ConversationTitle,
+    string ConversationType,
+    string? PeerDisplayName,
+    Guid SenderId,
+    string SenderDisplayName,
+    string? ContentPreview,
+    DateTimeOffset CreatedAt);
+
+/// <summary>Cửa sổ tin quanh một tin đích (dùng khi nhảy từ kết quả tìm kiếm tới tin).</summary>
+public record MessageContextDto(
+    IReadOnlyList<MessageDto> Items,
+    bool HasMoreBefore,
+    bool HasMoreAfter);
+
 /// <summary>
 /// Yêu cầu đánh dấu đã đọc tới một tin (NC Giai đoạn 7). Server chỉ **tiến** mốc,
 /// không bao giờ lùi (docs/05_api_contract.md mục 8.9).
@@ -101,7 +128,9 @@ public record ConversationDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset? LastMessageAt,
     IReadOnlyList<ConversationMemberDto> Members,
-    MessageDto? LastMessage);
+    MessageDto? LastMessage,
+    bool IsMuted,
+    DateTimeOffset? MutedUntil);
 
 /// <summary>Người còn lại trong hội thoại 1–1 (dùng cho danh sách hội thoại).</summary>
 public record ConversationPeerDto(
@@ -140,4 +169,6 @@ public record ConversationSummaryDto(
     ConversationPeerDto? Peer,
     ConversationLastMessageDto? LastMessage,
     int UnreadCount,
-    int MemberCount);
+    int MemberCount,
+    bool IsMuted,
+    DateTimeOffset? MutedUntil);

@@ -87,6 +87,55 @@ public static class MessagingEndpoints
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        // NC Ưu tiên 2 — Đợt B: chuyển tiếp, tìm kiếm, ngữ cảnh, ghim, tắt thông báo.
+        conversations.MapPost("/{id:guid}/messages/forward", ForwardMessageAsync)
+            .WithName("ForwardMessage")
+            .Produces<MessageDto>(StatusCodes.Status201Created)
+            .Produces<MessageDto>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        conversations.MapGet("/{id:guid}/messages/search", SearchConversationMessagesAsync)
+            .WithName("SearchConversationMessages")
+            .Produces<PagedList<MessageSearchResultDto>>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        conversations.MapGet("/{id:guid}/messages/{messageId:guid}/context", GetMessageContextAsync)
+            .WithName("GetMessageContext")
+            .Produces<MessageContextDto>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        conversations.MapGet("/{id:guid}/pinned", GetPinnedMessagesAsync)
+            .WithName("GetPinnedMessages")
+            .Produces<PinnedMessagesDto>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        conversations.MapPut("/{id:guid}/pinned/{messageId:guid}", PinMessageAsync)
+            .WithName("PinMessage")
+            .Produces<PinnedMessagesDto>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        conversations.MapDelete("/{id:guid}/pinned/{messageId:guid}", UnpinMessageAsync)
+            .WithName("UnpinMessage")
+            .Produces<PinnedMessagesDto>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        conversations.MapPut("/{id:guid}/mute", MuteConversationAsync)
+            .WithName("MuteConversation")
+            .Produces<MuteStateDto>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        // Tìm trong MỌI hội thoại người dùng còn là thành viên (yêu cầu roadmap GĐ 7).
+        app.MapGet("/api/messages/search", SearchAllMessagesAsync)
+            .WithTags("Messaging")
+            .RequireAuthorization("Authenticated")
+            .WithName("SearchAllMessages")
+            .Produces<PagedList<MessageSearchResultDto>>()
+            .ProducesProblem(StatusCodes.Status400BadRequest);
+
         return app;
     }
 
@@ -363,5 +412,173 @@ public static class MessagingEndpoints
             userId.Value, id, messageId, reaction, cancellationToken);
 
         return ApiResults.FromResult(result, message => Results.Ok(message));
+    }
+
+    private static async Task<IResult> ForwardMessageAsync(
+        Guid id,
+        ForwardMessageRequest request,
+        IValidator<ForwardMessageRequest> validator,
+        IMessageService messageService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var userId = CurrentUser.GetUserId(httpContext.User);
+        if (userId is null)
+        {
+            return ApiResults.Problem(ErrorCodes.Unauthorized);
+        }
+
+        var (isValid, errorResult, _) = await ApiResults.ValidateAsync(validator, request, cancellationToken);
+        if (!isValid)
+        {
+            return errorResult!;
+        }
+
+        var result = await messageService.ForwardAsync(userId.Value, id, request, cancellationToken);
+        if (!result.Succeeded || result.Value is null)
+        {
+            return ApiResults.Problem(result.ErrorCode ?? ErrorCodes.InternalError);
+        }
+
+        return result.Value.WasCreated
+            ? Results.Created(
+                $"/api/conversations/{id}/messages/{result.Value.Message.Id}",
+                result.Value.Message)
+            : Results.Ok(result.Value.Message);
+    }
+
+    private static async Task<IResult> SearchConversationMessagesAsync(
+        Guid id,
+        IMessageService messageService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken,
+        string? q = null,
+        string? cursor = null,
+        int limit = 20)
+    {
+        var userId = CurrentUser.GetUserId(httpContext.User);
+        if (userId is null)
+        {
+            return ApiResults.Problem(ErrorCodes.Unauthorized);
+        }
+
+        var result = await messageService.SearchAsync(
+            userId.Value, id, q ?? string.Empty, cursor, limit, cancellationToken);
+
+        return ApiResults.FromResult(result, page => Results.Ok(page));
+    }
+
+    private static async Task<IResult> SearchAllMessagesAsync(
+        IMessageService messageService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken,
+        string? q = null,
+        string? cursor = null,
+        int limit = 20)
+    {
+        var userId = CurrentUser.GetUserId(httpContext.User);
+        if (userId is null)
+        {
+            return ApiResults.Problem(ErrorCodes.Unauthorized);
+        }
+
+        var result = await messageService.SearchAsync(
+            userId.Value, null, q ?? string.Empty, cursor, limit, cancellationToken);
+
+        return ApiResults.FromResult(result, page => Results.Ok(page));
+    }
+
+    private static async Task<IResult> GetMessageContextAsync(
+        Guid id,
+        Guid messageId,
+        IMessageService messageService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken,
+        int limit = 31)
+    {
+        var userId = CurrentUser.GetUserId(httpContext.User);
+        if (userId is null)
+        {
+            return ApiResults.Problem(ErrorCodes.Unauthorized);
+        }
+
+        var result = await messageService.GetContextAsync(
+            userId.Value, id, messageId, limit, cancellationToken);
+
+        return ApiResults.FromResult(result, context => Results.Ok(context));
+    }
+
+    private static async Task<IResult> GetPinnedMessagesAsync(
+        Guid id,
+        IPinnedMessageService pinnedMessageService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var userId = CurrentUser.GetUserId(httpContext.User);
+        if (userId is null)
+        {
+            return ApiResults.Problem(ErrorCodes.Unauthorized);
+        }
+
+        var result = await pinnedMessageService.GetAsync(userId.Value, id, cancellationToken);
+        return ApiResults.FromResult(result, pinned => Results.Ok(pinned));
+    }
+
+    private static async Task<IResult> PinMessageAsync(
+        Guid id,
+        Guid messageId,
+        IPinnedMessageService pinnedMessageService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var userId = CurrentUser.GetUserId(httpContext.User);
+        if (userId is null)
+        {
+            return ApiResults.Problem(ErrorCodes.Unauthorized);
+        }
+
+        var result = await pinnedMessageService.PinAsync(userId.Value, id, messageId, cancellationToken);
+        return ApiResults.FromResult(result, pinned => Results.Ok(pinned));
+    }
+
+    private static async Task<IResult> UnpinMessageAsync(
+        Guid id,
+        Guid messageId,
+        IPinnedMessageService pinnedMessageService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var userId = CurrentUser.GetUserId(httpContext.User);
+        if (userId is null)
+        {
+            return ApiResults.Problem(ErrorCodes.Unauthorized);
+        }
+
+        var result = await pinnedMessageService.UnpinAsync(userId.Value, id, messageId, cancellationToken);
+        return ApiResults.FromResult(result, pinned => Results.Ok(pinned));
+    }
+
+    private static async Task<IResult> MuteConversationAsync(
+        Guid id,
+        MuteConversationRequest request,
+        IValidator<MuteConversationRequest> validator,
+        IConversationService conversationService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var userId = CurrentUser.GetUserId(httpContext.User);
+        if (userId is null)
+        {
+            return ApiResults.Problem(ErrorCodes.Unauthorized);
+        }
+
+        var (isValid, errorResult, _) = await ApiResults.ValidateAsync(validator, request, cancellationToken);
+        if (!isValid)
+        {
+            return errorResult!;
+        }
+
+        var result = await conversationService.MuteAsync(userId.Value, id, request, cancellationToken);
+        return ApiResults.FromResult(result, state => Results.Ok(state));
     }
 }

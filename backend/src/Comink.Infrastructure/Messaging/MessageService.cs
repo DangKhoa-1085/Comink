@@ -185,34 +185,8 @@ public class MessageService : IMessageService
         await _notifier.MessageCreatedAsync(conversationId, memberUserIds, dto, cancellationToken);
 
         // Push cho người nhận khi họ không mở app; không tạo dòng notifications (docs/03 mục 3.7).
-        if (_notifications is not null)
-        {
-            var recipientIds = memberUserIds.Where(id => id != currentUserId).ToList();
-            if (recipientIds.Count > 0)
-            {
-                var senderName = await _db.UserProfiles
-                    .AsNoTracking()
-                    .Where(p => p.UserId == currentUserId)
-                    .Select(p => p.DisplayName)
-                    .FirstOrDefaultAsync(cancellationToken) ?? "Comink";
-                var preview = string.IsNullOrWhiteSpace(dto.Content)
-                    ? (dto.Attachments.Count > 0 ? "Ảnh" : "Tin nhắn mới")
-                    : dto.Content!;
-                await _notifications.PushToUsersAsync(
-                    recipientIds,
-                    "Tin nhắn mới",
-                    $"{senderName}: {preview}",
-                    new Dictionary<string, string>
-                    {
-                        ["type"] = "Message",
-                        ["conversationId"] = conversationId.ToString(),
-                        ["messageId"] = message.Id.ToString(),
-                        ["senderId"] = currentUserId.ToString(),
-                    },
-                    highPriority: true,
-                    cancellationToken);
-            }
-        }
+        // Người đang tắt thông báo hội thoại (muted_until) bị loại khỏi danh sách push.
+        await PushNewMessageAsync(conversationId, currentUserId, dto, cancellationToken);
 
         return OperationResult<MessageSendResult>.Success(new MessageSendResult(dto, true));
     }
@@ -509,6 +483,330 @@ public class MessageService : IMessageService
     }
 
     /// <inheritdoc />
+    public async Task<OperationResult<MessageSendResult>> ForwardAsync(
+        Guid currentUserId,
+        Guid targetConversationId,
+        ForwardMessageRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await IsMemberAsync(currentUserId, targetConversationId, cancellationToken))
+        {
+            return OperationResult<MessageSendResult>.Failure(ErrorCodes.ConversationNotFound);
+        }
+
+        // Trùng client_message_id → trả tin đã chuyển tiếp (idempotent).
+        var existingId = await _db.Messages
+            .AsNoTracking()
+            .Where(m => m.SenderId == currentUserId && m.ClientMessageId == request.ClientMessageId)
+            .Select(m => (Guid?)m.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (existingId is not null)
+        {
+            var existing = await MessageEnrichment.LoadAsync(_db, existingId.Value, currentUserId, cancellationToken);
+            return existing is null
+                ? OperationResult<MessageSendResult>.Failure(ErrorCodes.InternalError)
+                : OperationResult<MessageSendResult>.Success(new MessageSendResult(existing, false));
+        }
+
+        // Tin nguồn: phải còn hiệu lực và người gọi phải còn là thành viên hội thoại nguồn.
+        // Không phải thành viên → 404 để không lộ sự tồn tại của tin (như mọi endpoint khác).
+        var source = await _db.Messages
+            .AsNoTracking()
+            .Include(m => m.Attachments)
+            .FirstOrDefaultAsync(m => m.Id == request.SourceMessageId, cancellationToken);
+
+        if (source is null)
+        {
+            return OperationResult<MessageSendResult>.Failure(ErrorCodes.MessageNotFound);
+        }
+
+        if (!await IsMemberAsync(currentUserId, source.ConversationId, cancellationToken))
+        {
+            return OperationResult<MessageSendResult>.Failure(ErrorCodes.MessageNotFound);
+        }
+
+        if (source.DeletedAt is not null)
+        {
+            return OperationResult<MessageSendResult>.Failure(ErrorCodes.MessageAlreadyDeleted);
+        }
+
+        // Tin hệ thống/cuộc gọi không phải nội dung người dùng → không chuyển tiếp.
+        if (!MessageActionRules.IsEditableType(source.Type))
+        {
+            return OperationResult<MessageSendResult>.Failure(ErrorCodes.MessageNotEditable);
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var message = new Message
+        {
+            ConversationId = targetConversationId,
+            SenderId = currentUserId,
+            Type = source.Type,
+            Content = source.Content,
+            ClientMessageId = request.ClientMessageId,
+            ForwardedFromMessageId = source.Id,
+            CreatedAt = now
+        };
+
+        foreach (var attachment in source.Attachments.OrderBy(a => a.SortOrder))
+        {
+            message.Attachments.Add(new MessageAttachment
+            {
+                MessageId = message.Id,
+                MediaId = attachment.MediaId,
+                SortOrder = attachment.SortOrder
+            });
+        }
+
+        _db.Messages.Add(message);
+
+        var conversation = await _db.Conversations
+            .FirstOrDefaultAsync(c => c.Id == targetConversationId, cancellationToken);
+        if (conversation is null)
+        {
+            return OperationResult<MessageSendResult>.Failure(ErrorCodes.ConversationNotFound);
+        }
+
+        conversation.LastMessageId = message.Id;
+        conversation.LastMessageAt = now;
+
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        {
+            _db.ChangeTracker.Clear();
+            var concurrentId = await _db.Messages
+                .AsNoTracking()
+                .Where(m => m.SenderId == currentUserId && m.ClientMessageId == request.ClientMessageId)
+                .Select(m => (Guid?)m.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (concurrentId is null)
+            {
+                return OperationResult<MessageSendResult>.Failure(ErrorCodes.InternalError);
+            }
+
+            var concurrent = await MessageEnrichment.LoadAsync(
+                _db, concurrentId.Value, currentUserId, cancellationToken);
+            return concurrent is null
+                ? OperationResult<MessageSendResult>.Failure(ErrorCodes.InternalError)
+                : OperationResult<MessageSendResult>.Success(new MessageSendResult(concurrent, false));
+        }
+
+        var dto = await MessageEnrichment.LoadAsync(_db, message.Id, currentUserId, cancellationToken);
+        if (dto is null)
+        {
+            return OperationResult<MessageSendResult>.Failure(ErrorCodes.InternalError);
+        }
+
+        var memberUserIds = await GetMemberUserIdsAsync(targetConversationId, cancellationToken);
+        await _notifier.MessageCreatedAsync(targetConversationId, memberUserIds, dto, cancellationToken);
+        await PushNewMessageAsync(targetConversationId, currentUserId, dto, cancellationToken);
+
+        return OperationResult<MessageSendResult>.Success(new MessageSendResult(dto, true));
+    }
+
+    /// <inheritdoc />
+    public async Task<OperationResult<PagedList<MessageSearchResultDto>>> SearchAsync(
+        Guid currentUserId,
+        Guid? conversationId,
+        string query,
+        string? cursor,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        var term = (query ?? string.Empty).Trim();
+        if (term.Length < 2 || term.Length > 100)
+        {
+            return OperationResult<PagedList<MessageSearchResultDto>>.Failure(ErrorCodes.ValidationFailed);
+        }
+
+        if (conversationId is not null &&
+            !await IsMemberAsync(currentUserId, conversationId.Value, cancellationToken))
+        {
+            return OperationResult<PagedList<MessageSearchResultDto>>.Failure(ErrorCodes.ConversationNotFound);
+        }
+
+        var decoded = CursorCodec.TryDecode(cursor);
+        if (cursor is not null && decoded is null)
+        {
+            return OperationResult<PagedList<MessageSearchResultDto>>.Failure(ErrorCodes.MessageInvalidCursor);
+        }
+
+        var pageSize = Math.Clamp(limit, 1, 50);
+        // Cột đã hạ chữ thường khi tìm → mẫu cũng phải hạ chữ thường, nếu không "HOP" sẽ không khớp.
+        var pattern = $"%{term.ToLowerInvariant()}%";
+
+        // Chỉ tin trong hội thoại người dùng CÒN là thành viên (yêu cầu roadmap) và chưa thu hồi.
+        var baseQuery = from message in _db.Messages.AsNoTracking()
+                        join member in _db.ConversationMembers.AsNoTracking()
+                            on message.ConversationId equals member.ConversationId
+                        where member.UserId == currentUserId
+                              && member.LeftAt == null
+                              && message.DeletedAt == null
+                        select message;
+
+        if (conversationId is not null)
+        {
+            var id = conversationId.Value;
+            baseQuery = baseQuery.Where(message => message.ConversationId == id);
+        }
+
+        // Gõ không dấu vẫn khớp: bỏ dấu + chữ thường ở CẢ cột và mẫu (quyết định D5).
+        baseQuery = baseQuery.Where(message => EF.Functions.Like(
+            CominkDbFunctions.ImmutableUnaccent(message.Content.ToLower()),
+            CominkDbFunctions.ImmutableUnaccent(pattern)));
+
+        if (decoded is not null)
+        {
+            var cursorCreatedAt = decoded.Value.CreatedAt;
+            var cursorId = decoded.Value.Id;
+            baseQuery = baseQuery.Where(message =>
+                message.CreatedAt < cursorCreatedAt ||
+                (message.CreatedAt == cursorCreatedAt && message.Id.CompareTo(cursorId) < 0));
+        }
+
+        var rows = await baseQuery
+            .OrderByDescending(message => message.CreatedAt)
+            .ThenByDescending(message => message.Id)
+            .Take(pageSize + 1)
+            .Select(message => new
+            {
+                message.Id,
+                message.ConversationId,
+                message.SenderId,
+                message.Content,
+                message.CreatedAt,
+                SenderDisplayName = message.Sender.Profile == null
+                    ? message.Sender.UserName
+                    : message.Sender.Profile.DisplayName
+            })
+            .ToListAsync(cancellationToken);
+
+        var hasMore = rows.Count > pageSize;
+        var pageRows = hasMore ? rows.Take(pageSize).ToList() : rows;
+        var pageConversationIds = pageRows.Select(row => row.ConversationId).Distinct().ToList();
+
+        var conversationRows = await _db.Conversations
+            .AsNoTracking()
+            .Where(conversation => pageConversationIds.Contains(conversation.Id))
+            .Select(conversation => new { conversation.Id, conversation.Type, conversation.Title })
+            .ToListAsync(cancellationToken);
+
+        var peerRows = await _db.ConversationMembers
+            .AsNoTracking()
+            .Where(member => pageConversationIds.Contains(member.ConversationId) &&
+                             member.UserId != currentUserId &&
+                             member.LeftAt == null)
+            .Select(member => new
+            {
+                member.ConversationId,
+                member.User.UserName,
+                DisplayName = member.User.Profile == null ? member.User.UserName : member.User.Profile.DisplayName
+            })
+            .ToListAsync(cancellationToken);
+
+        var items = pageRows.Select(row =>
+        {
+            var conversation = conversationRows.FirstOrDefault(c => c.Id == row.ConversationId);
+            var peer = peerRows.FirstOrDefault(member => member.ConversationId == row.ConversationId);
+
+            return new MessageSearchResultDto(
+                row.Id,
+                row.ConversationId,
+                conversation?.Type == ConversationType.Group ? conversation.Title : null,
+                (conversation?.Type ?? ConversationType.Direct).ToString(),
+                conversation?.Type == ConversationType.Direct
+                    ? (peer?.DisplayName ?? peer?.UserName)
+                    : null,
+                row.SenderId,
+                row.SenderDisplayName ?? string.Empty,
+                MessagingMapping.Preview(row.Content, 200),
+                row.CreatedAt);
+        }).ToList();
+
+        var nextCursor = hasMore && pageRows.Count > 0
+            ? CursorCodec.Encode(pageRows[^1].CreatedAt, pageRows[^1].Id)
+            : null;
+
+        return OperationResult<PagedList<MessageSearchResultDto>>.Success(
+            new PagedList<MessageSearchResultDto>(items, nextCursor, hasMore));
+    }
+
+    /// <inheritdoc />
+    public async Task<OperationResult<MessageContextDto>> GetContextAsync(
+        Guid currentUserId,
+        Guid conversationId,
+        Guid messageId,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await IsMemberAsync(currentUserId, conversationId, cancellationToken))
+        {
+            return OperationResult<MessageContextDto>.Failure(ErrorCodes.ConversationNotFound);
+        }
+
+        var target = await _db.Messages
+            .AsNoTracking()
+            .Where(message => message.Id == messageId && message.ConversationId == conversationId)
+            .Select(message => new { message.Id, message.CreatedAt })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (target is null)
+        {
+            return OperationResult<MessageContextDto>.Failure(ErrorCodes.MessageNotFound);
+        }
+
+        // Cửa sổ quanh tin đích: một nửa phía trước, một nửa phía sau (tối thiểu 3, tối đa 51 tin).
+        var pageSize = Math.Clamp(limit, 3, 51);
+        var beforeCount = pageSize / 2;
+        var afterCount = pageSize - beforeCount - 1;
+
+        var before = await _db.Messages
+            .AsNoTracking()
+            .Where(message => message.ConversationId == conversationId &&
+                              (message.CreatedAt < target.CreatedAt ||
+                               (message.CreatedAt == target.CreatedAt && message.Id.CompareTo(target.Id) < 0)))
+            .OrderByDescending(message => message.CreatedAt)
+            .ThenByDescending(message => message.Id)
+            .Take(beforeCount + 1)
+            .Include(message => message.Attachments)
+            .ThenInclude(attachment => attachment.Media)
+            .ToListAsync(cancellationToken);
+
+        var hasMoreBefore = before.Count > beforeCount;
+        var beforePage = before.Take(beforeCount).Reverse().ToList();
+
+        var targetMessage = await _db.Messages
+            .AsNoTracking()
+            .Include(message => message.Attachments)
+            .ThenInclude(attachment => attachment.Media)
+            .FirstAsync(message => message.Id == messageId, cancellationToken);
+
+        var after = await _db.Messages
+            .AsNoTracking()
+            .Where(message => message.ConversationId == conversationId &&
+                              (message.CreatedAt > target.CreatedAt ||
+                               (message.CreatedAt == target.CreatedAt && message.Id.CompareTo(target.Id) > 0)))
+            .OrderBy(message => message.CreatedAt)
+            .ThenBy(message => message.Id)
+            .Take(afterCount + 1)
+            .Include(message => message.Attachments)
+            .ThenInclude(attachment => attachment.Media)
+            .ToListAsync(cancellationToken);
+
+        var hasMoreAfter = after.Count > afterCount;
+        var window = beforePage.Concat([targetMessage]).Concat(after.Take(afterCount)).ToList();
+        var items = await MessageEnrichment.EnrichAsync(_db, window, currentUserId, cancellationToken);
+
+        return OperationResult<MessageContextDto>.Success(
+            new MessageContextDto(items, hasMoreBefore, hasMoreAfter));
+    }
+
+    /// <inheritdoc />
     public async Task<OperationResult<PagedList<MessageDto>>> GetHistoryAsync(
         Guid currentUserId,
         Guid conversationId,
@@ -638,6 +936,63 @@ public class MessageService : IMessageService
         var memberUserIds = await GetMemberUserIdsAsync(conversationId, cancellationToken);
         var pinned = await PinnedMessagesLoader.LoadAsync(_db, conversationId, currentUserId, cancellationToken);
         await _notifier.PinnedMessagesChangedAsync(conversationId, memberUserIds, pinned, cancellationToken);
+    }
+
+    /// <summary>
+    /// Gửi push cho người nhận khi họ không mở app. Người đang **tắt thông báo** hội thoại
+    /// (<c>muted_until</c>) bị loại khỏi danh sách; số tin chưa đọc trên giao diện không đổi
+    /// (quyết định D7).
+    /// </summary>
+    private async Task PushNewMessageAsync(
+        Guid conversationId,
+        Guid senderId,
+        MessageDto dto,
+        CancellationToken cancellationToken)
+    {
+        if (_notifications is null)
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var members = await _db.ConversationMembers
+            .AsNoTracking()
+            .Where(m => m.ConversationId == conversationId && m.LeftAt == null && m.UserId != senderId)
+            .Select(m => new { m.UserId, m.MutedUntil })
+            .ToListAsync(cancellationToken);
+
+        var recipientIds = members
+            .Where(m => !MuteRules.IsMuted(m.MutedUntil, now))
+            .Select(m => m.UserId)
+            .ToList();
+
+        if (recipientIds.Count == 0)
+        {
+            return;
+        }
+
+        var senderName = await _db.UserProfiles
+            .AsNoTracking()
+            .Where(p => p.UserId == senderId)
+            .Select(p => p.DisplayName)
+            .FirstOrDefaultAsync(cancellationToken) ?? "Comink";
+        var preview = string.IsNullOrWhiteSpace(dto.Content)
+            ? (dto.Attachments.Count > 0 ? "Ảnh" : "Tin nhắn mới")
+            : dto.Content!;
+
+        await _notifications.PushToUsersAsync(
+            recipientIds,
+            "Tin nhắn mới",
+            $"{senderName}: {preview}",
+            new Dictionary<string, string>
+            {
+                ["type"] = "Message",
+                ["conversationId"] = conversationId.ToString(),
+                ["messageId"] = dto.Id.ToString(),
+                ["senderId"] = senderId.ToString(),
+            },
+            highPriority: true,
+            cancellationToken);
     }
 
     /// <summary>Lỗi vi phạm ràng buộc duy nhất của PostgreSQL (SqlState 23505).</summary>

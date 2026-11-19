@@ -6,6 +6,8 @@ import {
   CornerUpRight,
   MoreHorizontal,
   Pencil,
+  Pin,
+  PinOff,
   Reply,
   RotateCcw,
   SmilePlus,
@@ -20,6 +22,8 @@ const ACTION_WINDOW_MS = 24 * 60 * 60 * 1000
 interface MessageBubbleProps {
   message: ChatMessage
   isMine: boolean
+  /** Tin đang được ghim trong hội thoại (NC Ưu tiên 2). */
+  isPinned: boolean
   /** Tên người gửi — chỉ hiện trong nhóm. */
   senderName?: string
   showSender: boolean
@@ -33,6 +37,9 @@ interface MessageBubbleProps {
   onRecall: (message: ChatMessage) => void
   onReact: (message: ChatMessage, reaction: string) => void
   onJumpTo: (messageId: string) => void
+  onPin: (message: ChatMessage) => void
+  onUnpin: (message: ChatMessage) => void
+  onForward: (message: ChatMessage) => void
 }
 
 /**
@@ -42,6 +49,7 @@ interface MessageBubbleProps {
 export function MessageBubble({
   message,
   isMine,
+  isPinned,
   senderName,
   showSender,
   readStatus,
@@ -53,6 +61,9 @@ export function MessageBubble({
   onRecall,
   onReact,
   onJumpTo,
+  onPin,
+  onUnpin,
+  onForward,
 }: MessageBubbleProps) {
   const { t } = useTranslation()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -266,6 +277,26 @@ export function MessageBubble({
                       icon={<SmilePlus className="h-4 w-4" />}
                       label={t('chat.react')}
                       onClick={() => setPickerOpen(true)}
+                    />
+                    <MenuItem
+                      icon={<CornerUpRight className="h-4 w-4" />}
+                      label={t('chat.forward')}
+                      onClick={() => {
+                        onForward(message)
+                        closeMenu()
+                      }}
+                    />
+                    <MenuItem
+                      icon={isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+                      label={isPinned ? t('chat.unpin') : t('chat.pin')}
+                      onClick={() => {
+                        if (isPinned) {
+                          onUnpin(message)
+                        } else {
+                          onPin(message)
+                        }
+                        closeMenu()
+                      }}
                     />
                     {canCopy && (
                       <MenuItem

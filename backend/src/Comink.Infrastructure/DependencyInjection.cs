@@ -193,6 +193,7 @@ public static class DependencyInjection
         // --- Nhắn tin (Giai đoạn 3) ---
         services.AddScoped<IConversationService, Messaging.ConversationService>();
         services.AddScoped<IMessageService, Messaging.MessageService>();
+        services.AddScoped<IPinnedMessageService, Messaging.PinnedMessageService>();
 
         // --- Cuộc gọi (Giai đoạn 4) ---
         services.Configure<Calls.LiveKitOptions>(configuration.GetSection(Calls.LiveKitOptions.SectionName));

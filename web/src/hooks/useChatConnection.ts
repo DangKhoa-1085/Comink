@@ -5,6 +5,7 @@ import {
   type ChatMessage,
   type Conversation,
   type ConversationSummary,
+  type PinnedMessages,
   type PresenceEvent,
   type ReadReceipt,
   type TypingEvent,
@@ -16,6 +17,7 @@ import {
   MESSAGE_CREATED_EVENT,
   MESSAGE_UPDATED_EVENT,
   MESSAGES_READ_EVENT,
+  PINNED_MESSAGES_CHANGED_EVENT,
   PRESENCE_CHANGED_EVENT,
   sendPresencePing,
   setActiveChatConnection,
@@ -194,6 +196,11 @@ export function useChatConnection(enabled: boolean): ChatConnectionState {
       replaceMessageInCache(queryClient, message)
       // Danh sách hội thoại có thể đổi preview (tin cuối bị thu hồi/sửa).
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    })
+
+    // --- NC Ưu tiên 2: danh sách ghim thay đổi (ghim/bỏ ghim/thu hồi tin đang ghim) ---
+    connection.on(PINNED_MESSAGES_CHANGED_EVENT, (payload: PinnedMessages) => {
+      queryClient.setQueryData(['pinned', payload.conversationId], payload)
     })
 
     // --- Cuộc gọi: cuộc gọi đến / cập nhật / kết thúc (GĐ 4) ---

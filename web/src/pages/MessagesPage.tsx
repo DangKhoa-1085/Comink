@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { MessagesSquare, Plus, Users } from 'lucide-react'
-import { conversationsApi } from '../api/conversations'
+import { BellOff, MessagesSquare, Plus, Search, Users } from 'lucide-react'
+import { conversationsApi, type MessageSearchResult } from '../api/conversations'
 import { Avatar } from '../components/social/Avatar'
+import { MessageSearchPanel } from '../components/chat/MessageSearchPanel'
 import { PresenceDot } from '../components/chat/PresenceDot'
 import { CreateGroupDialog } from '../components/social/CreateGroupDialog'
 import { Button } from '../components/ui/Button'
@@ -15,7 +16,9 @@ import { timeAgo } from '../lib/format'
 /** Danh sách hội thoại (1–1 và nhóm), sắp theo tin mới nhất (docs/05_api_contract.md mục 8.3). */
 export function MessagesPage() {
   const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
   const [creatingGroup, setCreatingGroup] = useState(false)
+  const [searchingMessages, setSearchingMessages] = useState(false)
 
   const conversationsQuery = useInfiniteQuery({
     queryKey: ['conversations'],
@@ -42,6 +45,10 @@ export function MessagesPage() {
           <MessagesSquare className="h-5 w-5" />
           {t('chat.title')}
         </h1>
+        <Button variant="outline" size="sm" onClick={() => setSearchingMessages(true)}>
+          <Search className="h-4 w-4" />
+          {t('chat.search_all_messages')}
+        </Button>
         <Button variant="outline" size="sm" onClick={() => setCreatingGroup(true)}>
           <Plus className="h-4 w-4" />
           {t('chat.create_group')}
@@ -110,6 +117,12 @@ export function MessagesPage() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
                       {displayName}
+                      {conversation.isMuted && (
+                        <BellOff
+                          className="ml-1 inline h-3 w-3 text-slate-400"
+                          aria-label={t('chat.muted')}
+                        />
+                      )}
                       {isGroup && (
                         <span className="ml-2 text-xs font-normal text-slate-400">
                           {t('chat.member_count', { count: conversation.memberCount })}
@@ -143,6 +156,17 @@ export function MessagesPage() {
       <div ref={sentinelRef} className="h-6" />
 
       {creatingGroup && <CreateGroupDialog onClose={() => setCreatingGroup(false)} />}
+
+      {searchingMessages && (
+        <MessageSearchPanel
+          conversationId={null}
+          onClose={() => setSearchingMessages(false)}
+          onPick={(result: MessageSearchResult) => {
+            setSearchingMessages(false)
+            navigate(`/messages/${result.conversationId}?focus=${result.messageId}`)
+          }}
+        />
+      )}
     </div>
   )
 }

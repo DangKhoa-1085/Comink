@@ -103,6 +103,11 @@ public class ChatHubTests
             Guid currentUserId, Guid conversationId, Guid messageId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public Task<OperationResult<MuteStateDto>> MuteAsync(
+            Guid currentUserId, Guid conversationId, MuteConversationRequest request,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<OperationResult<ConversationOpenResult>> OpenDirectAsync(
             Guid currentUserId, Guid targetUserId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
