@@ -283,7 +283,7 @@ public class ConversationService : IConversationService
         var lastMessages = await _db.Messages
             .AsNoTracking()
             .Where(m => lastMessageIds.Contains(m.Id))
-            .Select(m => new { m.Id, m.SenderId, m.Content, m.Type, m.CreatedAt })
+            .Select(m => new { m.Id, m.SenderId, m.Content, m.Type, m.CreatedAt, m.DeletedAt })
             .ToListAsync(cancellationToken);
 
         // Trạng thái online của "người còn lại" trong chat 1–1 (một lượt hỏi Redis).
@@ -343,7 +343,8 @@ public class ConversationService : IConversationService
                         last.SenderId,
                         MessagingMapping.Preview(last.Content),
                         last.Type.ToString(),
-                        last.CreatedAt),
+                        last.CreatedAt,
+                        last.DeletedAt is not null),
                 unreadByConversation.GetValueOrDefault(row.Id),
                 memberCount);
         }).ToList();

@@ -10,7 +10,10 @@ namespace Comink.Api.IntegrationTests;
 public class PostgresFixture : IAsyncLifetime
 {
     // Dùng constructor có tham số image: constructor không tham số đã bị đánh dấu obsolete.
+    // Mỗi test tạo một database riêng → số kết nối tăng theo số test; nâng max_connections
+    // để cả bộ test chạy chung một container không chạm giới hạn mặc định 100.
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:17-alpine")
+        .WithCommand("-c", "max_connections=400")
         .Build();
 
     public string ConnectionString => _container.GetConnectionString();

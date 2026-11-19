@@ -575,6 +575,10 @@ namespace Comink.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("left_at");
 
+                    b.Property<DateTimeOffset?>("MutedUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("muted_until");
+
                     b.Property<string>("Role")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -804,6 +808,22 @@ namespace Comink.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<DateTimeOffset?>("EditedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("edited_at");
+
+                    b.Property<Guid?>("ForwardedFromMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("forwarded_from_message_id");
+
+                    b.Property<Guid?>("ReplyToMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reply_to_message_id");
+
                     b.Property<Guid>("SenderId")
                         .HasColumnType("uuid")
                         .HasColumnName("sender_id");
@@ -821,6 +841,12 @@ namespace Comink.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CallId")
                         .HasDatabaseName("ix_messages_call_id");
+
+                    b.HasIndex("ForwardedFromMessageId")
+                        .HasDatabaseName("ix_messages_forwarded_from_message_id");
+
+                    b.HasIndex("ReplyToMessageId")
+                        .HasDatabaseName("ix_messages_reply_to_message_id");
 
                     b.HasIndex("SenderId", "ClientMessageId")
                         .IsUnique()
@@ -861,6 +887,34 @@ namespace Comink.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_message_attachments_media_id");
 
                     b.ToTable("message_attachments", (string)null);
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.MessageReaction", b =>
+                {
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Emoji")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("emoji");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.HasKey("MessageId", "UserId", "Emoji")
+                        .HasName("pk_message_reactions");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_message_reactions_user_id");
+
+                    b.ToTable("message_reactions", (string)null);
                 });
 
             modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Notification", b =>
@@ -927,6 +981,40 @@ namespace Comink.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_notifications_type", "type IN ('FriendRequestReceived', 'FriendRequestAccepted', 'NewFollower', 'PostLiked', 'PostCommented', 'CommentReplied', 'PostShared', 'Mentioned', 'MissedCall', 'AddedToGroup', 'AdminAction')");
                         });
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.PinnedMessage", b =>
+                {
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<DateTimeOffset>("PinnedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("pinned_at");
+
+                    b.Property<Guid>("PinnedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pinned_by");
+
+                    b.HasKey("ConversationId", "MessageId")
+                        .HasName("pk_pinned_messages");
+
+                    b.HasIndex("MessageId")
+                        .HasDatabaseName("ix_pinned_messages_message_id");
+
+                    b.HasIndex("PinnedBy")
+                        .HasDatabaseName("ix_pinned_messages_pinned_by");
+
+                    b.HasIndex("ConversationId", "PinnedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_pinned_messages_conversation_id_pinned_at");
+
+                    b.ToTable("pinned_messages", (string)null);
                 });
 
             modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Post", b =>
@@ -1573,6 +1661,18 @@ namespace Comink.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_messages_conversations_conversation_id");
 
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.Message", "ForwardedFromMessage")
+                        .WithMany()
+                        .HasForeignKey("ForwardedFromMessageId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_messages_messages_forwarded_from_message_id");
+
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.Message", "ReplyToMessage")
+                        .WithMany()
+                        .HasForeignKey("ReplyToMessageId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_messages_messages_reply_to_message_id");
+
                     b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "Sender")
                         .WithMany()
                         .HasForeignKey("SenderId")
@@ -1583,6 +1683,10 @@ namespace Comink.Infrastructure.Persistence.Migrations
                     b.Navigation("Call");
 
                     b.Navigation("Conversation");
+
+                    b.Navigation("ForwardedFromMessage");
+
+                    b.Navigation("ReplyToMessage");
 
                     b.Navigation("Sender");
                 });
@@ -1608,6 +1712,27 @@ namespace Comink.Infrastructure.Persistence.Migrations
                     b.Navigation("Message");
                 });
 
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.MessageReaction", b =>
+                {
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.Message", "Message")
+                        .WithMany("Reactions")
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_message_reactions_messages_message_id");
+
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_message_reactions_users_user_id");
+
+                    b.Navigation("Message");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Notification", b =>
                 {
                     b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "Actor")
@@ -1626,6 +1751,36 @@ namespace Comink.Infrastructure.Persistence.Migrations
                     b.Navigation("Actor");
 
                     b.Navigation("Recipient");
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.PinnedMessage", b =>
+                {
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.Conversation", "Conversation")
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pinned_messages_conversations_conversation_id");
+
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.Message", "Message")
+                        .WithMany()
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pinned_messages_messages_message_id");
+
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "PinnedByUser")
+                        .WithMany()
+                        .HasForeignKey("PinnedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pinned_messages_asp_net_users_pinned_by");
+
+                    b.Navigation("Conversation");
+
+                    b.Navigation("Message");
+
+                    b.Navigation("PinnedByUser");
                 });
 
             modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Post", b =>
@@ -1798,6 +1953,8 @@ namespace Comink.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Message", b =>
                 {
                     b.Navigation("Attachments");
+
+                    b.Navigation("Reactions");
                 });
 
             modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Post", b =>

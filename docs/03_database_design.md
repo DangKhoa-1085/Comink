@@ -528,7 +528,7 @@ Khi chặn, backend xóa `friendships` và `follows` giữa hai người trong c
 | `left_at` | timestamptz | null = còn trong nhóm. Rời nhóm thì **giữ dòng** để còn lịch sử tin trước đó |
 | `last_read_message_id` | uuid | FK→messages `SET NULL`. Mốc **đã đọc** (xem ghi chú dưới). Có từ **M6** (NC GĐ 7) |
 | `last_read_at` | timestamptz | Cùng bộ với `last_read_message_id`; có từ **M6** (NC GĐ 7) |
-| `muted_until` | timestamptz | **[NC]** null = bật thông báo; thời điểm tương lai = đang tắt; `'infinity'` = tắt vô thời hạn |
+| `muted_until` | timestamptz | null = bật thông báo; thời điểm tương lai = đang tắt; mốc `9999-12-31T23:59:59Z` = tắt vĩnh viễn (không dùng `'infinity'` vì EF/Npgsql không đọc được vào `DateTimeOffset`). Có từ **M7** |
 
 > **Đã đọc:** lưu một mốc cho mỗi thành viên thay vì một dòng cho mỗi tin. Số tin chưa đọc = số tin có `(created_at, id)` lớn hơn tin mốc và `sender_id` khác chính người đó.
 
@@ -542,13 +542,17 @@ Khi chặn, backend xóa `friendships` và `follows` giữa hai người trong c
 | `type` | varchar(16) | NN (`Text`, `Image`, `Video`, `File`, `System`, `Call`) |
 | `content` | text | `CHECK (char_length(content) <= 4000)`. Rỗng với tin chỉ có tệp; **bị xóa (set null) khi thu hồi** |
 | `client_message_id` | uuid | NN. Client sinh, chống gửi trùng. **UQ (`sender_id`, `client_message_id`)** |
-| `reply_to_message_id` | uuid | FK→messages `SET NULL` **[NC]** |
-| `forwarded_from_message_id` | uuid | FK→messages `SET NULL` **[NC]** |
+| `reply_to_message_id` | uuid | FK→messages `SET NULL`. Có từ **M7**; xoá tin đích chỉ mất trích dẫn, tin trả lời vẫn giữ |
+| `forwarded_from_message_id` | uuid | FK→messages `SET NULL`. Có từ **M7**; tin chuyển tiếp giữ liên kết tới tin gốc |
 | `call_id` | uuid | FK→calls `SET NULL`. Dùng cho tin `type = 'Call'` (bản ghi cuộc gọi hiện trong khung chat) |
-| `content_search` | tsvector | Cột sinh tự động từ `content` **[NC]** |
 | `created_at` | timestamptz | NN |
-| `edited_at` | timestamptz | **[NC]** null = chưa sửa |
-| `deleted_at` | timestamptz | **[NC]** thu hồi tin: set thời điểm và xóa `content`, vẫn giữ dòng để khung "Tin nhắn đã bị thu hồi" hiển thị đúng chỗ |
+| `edited_at` | timestamptz | Có từ **M7**; null = chưa sửa |
+| `deleted_at` | timestamptz | Có từ **M7**: thu hồi tin — set thời điểm và xóa `content`, vẫn giữ dòng để khung "Tin nhắn đã bị thu hồi" hiển thị đúng chỗ |
+
+> **Tìm kiếm tin nhắn:** không dùng cột `content_search` `tsvector`; dùng chỉ mục GIN trigram trên
+> `immutable_unaccent(lower(content))` (mục 5.2) và luôn lọc theo hội thoại người dùng là thành viên.
+> Lý do: tìm được **một phần từ** tiếng Việt và dùng lại hàm `immutable_unaccent` đã có từ M0
+> (quyết định D5, `docs/tasks/phase7b_advanced_messaging.md` mục 2).
 
 Tệp đính kèm nằm ở `message_attachments`. Tin hệ thống (`System`) dùng cho sự kiện nhóm: "A thêm B vào nhóm", đổi tên nhóm, v.v. (nội dung tạo ở backend, đa ngôn ngữ nên 💡 lưu mã sự kiện trong `content` và client dịch).
 
@@ -560,7 +564,7 @@ Tệp đính kèm nằm ở `message_attachments`. Tin hệ thống (`System`) d
 | `media_id` | uuid | PK (2), FK→media_assets `RESTRICT` |
 | `sort_order` | smallint | NN, mặc định 0 |
 
-#### `message_reactions` **[NC]**
+#### `message_reactions` (có từ **M7**)
 
 | Cột | Kiểu | Ghi chú |
 |---|---|---|
@@ -569,7 +573,10 @@ Tệp đính kèm nằm ở `message_attachments`. Tin hệ thống (`System`) d
 | `emoji` | varchar(16) | PK (3). 💡 Một người **được thả nhiều loại emoji** lên cùng một tin, nhưng mỗi loại một lần |
 | `created_at` | timestamptz | NN |
 
-#### `pinned_messages` **[NC]**
+> API trao đổi cảm xúc bằng **khoá chữ** (`like`, `love`, `haha`, `wow`, `sad`, `angry`); server quy đổi
+> sang ký tự emoji lưu ở cột `emoji` để tránh lỗi URL-encode và lệch variation selector (quyết định D2).
+
+#### `pinned_messages` (có từ **M7**)
 
 | Cột | Kiểu | Ghi chú |
 |---|---|---|
@@ -578,7 +585,7 @@ Tệp đính kèm nằm ở `message_attachments`. Tin hệ thống (`System`) d
 | `pinned_by` | uuid | NN, FK→users `RESTRICT` |
 | `pinned_at` | timestamptz | NN |
 
-Giới hạn số tin ghim mỗi hội thoại (💡 tối đa 10) kiểm tra ở tầng ứng dụng.
+Giới hạn số tin ghim mỗi hội thoại (**tối đa 10**, đã chốt) kiểm tra ở tầng ứng dụng.
 
 ### 3.4. Module Cuộc gọi
 
@@ -819,6 +826,7 @@ $$ SELECT public.unaccent('public.unaccent', $1) $$;
 | Mục đích | Chỉ mục |
 |---|---|
 | Lịch sử tin nhắn của hội thoại | `messages (conversation_id, created_at DESC, id DESC)` |
+| Tìm kiếm tin nhắn (gõ không dấu, khớp một phần từ) | `messages USING gin (immutable_unaccent(lower(content)) gin_trgm_ops)` (M7) |
 | Danh sách hội thoại của tôi | `conversation_members (user_id) WHERE left_at IS NULL` và `conversations (last_message_at DESC)` |
 | Bài viết của một người (trang cá nhân, và là nguồn bảng tin) | `posts (author_id, created_at DESC, id DESC) WHERE deleted_at IS NULL AND status = 'Active'` |
 | Bình luận của bài | `comments (post_id, created_at, id) WHERE deleted_at IS NULL AND parent_comment_id IS NULL`; trả lời: `comments (parent_comment_id, created_at)` |
@@ -954,6 +962,7 @@ Chỉ tạo bảng khi cần, mỗi nhóm một migration riêng:
 | M4 | `user_devices`, `notifications` | Push/thông báo |
 | M5 | **FK `users.locked_by` → `users(id)` `ON DELETE SET NULL` + chỉ mục `users (locked_by)`** (migration `Admin_AddLockedByForeignKey`, GĐ 5). Cột quản trị trên `users` đã có sẵn từ M0. Khi làm NC: thêm hàng đợi kiểm duyệt `reports`, `audit_logs` | Quản trị cơ bản/nâng cao |
 | M6 | `conversation_members.last_read_message_id` (FK→`messages` `SET NULL`) + `last_read_at` + chỉ mục FK (migration `Messaging_AddReadMarkers`, GĐ 7 — Ưu tiên 1) | Nhắn tin **nâng cao**: đã gửi/đã đọc |
+| M7 | `messages.reply_to_message_id`, `forwarded_from_message_id` (FK→`messages` `SET NULL`), `edited_at`, `deleted_at`; `message_reactions`; `pinned_messages`; `conversation_members.muted_until`; chỉ mục GIN trigram cho tìm kiếm tin (migration `Messaging_AddMessageFeatures`, GĐ 7 — Ưu tiên 2) | Nhắn tin **nâng cao**: phản hồi/sửa/thu hồi/cảm xúc/ghim/chuyển tiếp/tìm kiếm/tắt thông báo |
 | N-x | Từng nhóm **nâng cao** khi làm tới: hashtags/saved_posts, reactions/pins/reply/forward/edit/search, `blocks`, albums, `daily_stats`, `banned_keywords`, cài đặt riêng tư và mute | Chỉ sau khi mức cơ bản của nhóm đó xong |
 | Cuối | `ai_conversations`, `ai_messages`, `ai_usage_logs` | Sau khi các chức năng chính ổn định |
 
@@ -992,13 +1001,13 @@ Không đổi tên cột/bảng trực tiếp trên dữ liệu thật mà khôn
 
 | # | Nội dung | Gợi ý trong tài liệu |
 |---|---|---|
-| 1 | Một người được thả nhiều emoji vào một tin, hay chỉ một | Nhiều emoji (khóa chính gồm `emoji`) |
+| 1 | Một người được thả nhiều emoji vào một tin, hay chỉ một | **Đã chốt (2026-11-20):** nhiều emoji (khóa chính gồm `emoji`), danh mục cố định 6 khoá |
 | 2 | Bình luận lồng nhau mấy cấp | 1 cấp trả lời |
 | 3 | Chia sẻ bài viết: dạng bài mới tham chiếu `shared_post_id` | Có |
-| 4 | Giới hạn số tin ghim mỗi hội thoại | 10 |
+| 4 | Giới hạn số tin ghim mỗi hội thoại | **Đã chốt (2026-11-20):** 10 |
 | 5 | Có cần tin nhắn "đã nhận" (delivered) riêng với "đã đọc" | Chưa, chỉ `đã gửi` (có dòng trong DB) và `đã đọc` (mốc đọc) |
 | 6 | Có xóa cứng tài khoản không | Không, chỉ khóa/vô hiệu hóa |
-| 7 | Dữ liệu tìm kiếm tiếng Việt không dấu | Dùng `unaccent` + `pg_trgm` như mục 5 |
+| 7 | Dữ liệu tìm kiếm tiếng Việt không dấu | **Đã chốt (2026-11-20):** dùng `unaccent` + `pg_trgm` như mục 5 (không dùng `tsvector` cho tin nhắn) |
 | 8 | Dung lượng tối đa mỗi tệp và tổng mỗi người | Chốt khi làm mục Hình ảnh/Tệp mức nâng cao; chỉ cần cấu hình, không đổi schema |
 | 9 | Tin hệ thống trong nhóm (`System`) lưu mã sự kiện hay câu chữ đã dịch | Lưu mã sự kiện, client dịch |
 

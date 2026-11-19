@@ -96,6 +96,9 @@ public class ConversationMemberConfiguration : IEntityTypeConfiguration<Conversa
             .WithMany()
             .HasForeignKey(m => m.LastReadMessageId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // Tắt thông báo từng cuộc (NC Ưu tiên 2, M7)
+        builder.Property(m => m.MutedUntil);
     }
 }
 
@@ -138,6 +141,22 @@ public class MessageConfiguration : IEntityTypeConfiguration<Message>
             .HasForeignKey(m => m.SenderId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Hai FK tự thân (NC Ưu tiên 2, M7) — khai báo TƯỜNG MINH vì cùng trỏ về messages.
+        // Xoá tin đích thì tin trả lời/chuyển tiếp vẫn giữ, chỉ mất liên kết (SET NULL).
+        builder.HasOne(m => m.ReplyToMessage)
+            .WithMany()
+            .HasForeignKey(m => m.ReplyToMessageId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(m => m.ForwardedFromMessage)
+            .WithMany()
+            .HasForeignKey(m => m.ForwardedFromMessageId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // Chỉnh sửa/thu hồi (NC Ưu tiên 2)
+        builder.Property(m => m.EditedAt);
+        builder.Property(m => m.DeletedAt);
+
         builder.HasMany(m => m.Attachments)
             .WithOne(a => a.Message)
             .HasForeignKey(a => a.MessageId)
@@ -166,5 +185,61 @@ public class MessageAttachmentConfiguration : IEntityTypeConfiguration<MessageAt
             .WithMany()
             .HasForeignKey(a => a.MediaId)
             .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public class MessageReactionConfiguration : IEntityTypeConfiguration<MessageReaction>
+{
+    public void Configure(EntityTypeBuilder<MessageReaction> builder)
+    {
+        builder.ToTable("message_reactions");
+
+        // Một người được thả NHIỀU loại cảm xúc trên cùng một tin (docs/03 mục 7 #1):
+        // khoá chính gồm cả emoji. Mỗi loại chỉ một lần/người/tin.
+        builder.HasKey(r => new { r.MessageId, r.UserId, r.Emoji });
+
+        builder.Property(r => r.Emoji).HasMaxLength(16).IsRequired();
+        builder.Property(r => r.CreatedAt).IsRequired();
+
+        builder.HasOne(r => r.Message)
+            .WithMany(m => m.Reactions)
+            .HasForeignKey(r => r.MessageId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(r => r.User)
+            .WithMany()
+            .HasForeignKey(r => r.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public class PinnedMessageConfiguration : IEntityTypeConfiguration<PinnedMessage>
+{
+    public void Configure(EntityTypeBuilder<PinnedMessage> builder)
+    {
+        builder.ToTable("pinned_messages");
+
+        builder.HasKey(p => new { p.ConversationId, p.MessageId });
+
+        builder.Property(p => p.PinnedAt).IsRequired();
+
+        builder.HasOne(p => p.Conversation)
+            .WithMany()
+            .HasForeignKey(p => p.ConversationId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Thu hồi/xoá tin thì bỏ ghim theo (xử lý tường minh ở service, cascade là lưới an toàn).
+        builder.HasOne(p => p.Message)
+            .WithMany()
+            .HasForeignKey(p => p.MessageId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(p => p.PinnedByUser)
+            .WithMany()
+            .HasForeignKey(p => p.PinnedBy)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Panel ghim sắp theo thời điểm ghim giảm dần.
+        builder.HasIndex(p => new { p.ConversationId, p.PinnedAt }).IsDescending(false, true);
     }
 }

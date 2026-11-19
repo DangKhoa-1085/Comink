@@ -204,7 +204,28 @@
     "and_more": "và {{count}} người khác",
     "sent": "Đã gửi",
     "read": "Đã đọc",
-    "unread_count": "{{count}} tin chưa đọc"
+    "unread_count": "{{count}} tin chưa đọc",
+    "reply": "Phản hồi",
+    "reply_to": "Đang trả lời",
+    "react": "Cảm xúc",
+    "reaction_like": "Thích",
+    "reaction_love": "Yêu",
+    "reaction_haha": "Haha",
+    "reaction_wow": "Ngạc nhiên",
+    "reaction_sad": "Buồn",
+    "reaction_angry": "Giận",
+    "message_actions": "Tùy chọn tin nhắn",
+    "copy": "Sao chép",
+    "copied": "Đã sao chép",
+    "edit": "Chỉnh sửa",
+    "editing": "Đang sửa tin nhắn",
+    "edit_placeholder": "Sửa tin nhắn...",
+    "save": "Lưu",
+    "edited": "đã chỉnh sửa",
+    "recall": "Thu hồi",
+    "recall_confirm": "Thu hồi tin nhắn này? Mọi người sẽ thấy “Tin nhắn đã bị thu hồi”.",
+    "recalled": "Tin nhắn đã bị thu hồi",
+    "forwarded_from": "Chuyển tiếp từ {{name}}"
   },
   "social": {
     "feed": "Bảng tin",
@@ -291,6 +312,15 @@
     "AUTH_EMAIL_ALREADY_EXISTS": "Email này đã được sử dụng.",
     "AUTH_USERNAME_ALREADY_EXISTS": "Tên đăng nhập này đã được sử dụng.",
     "USER_NOT_FOUND": "Không tìm thấy người dùng.",
-    "ADMIN_CANNOT_LOCK_SELF": "Bạn không thể tự khóa tài khoản của chính mình."
+    "ADMIN_CANNOT_LOCK_SELF": "Bạn không thể tự khóa tài khoản của chính mình.",
+    "CONVERSATION_NOT_FOUND": "Hội thoại không tồn tại hoặc bạn không còn là thành viên.",
+    "MESSAGE_NOT_FOUND": "Tin nhắn không tồn tại trong hội thoại này.",
+    "MESSAGE_NOT_OWNED": "Bạn chỉ có thể sửa hoặc thu hồi tin của chính mình.",
+    "MESSAGE_EDIT_WINDOW_EXPIRED": "Chỉ sửa được tin trong vòng 24 giờ sau khi gửi.",
+    "MESSAGE_RECALL_WINDOW_EXPIRED": "Chỉ thu hồi được tin trong vòng 24 giờ sau khi gửi.",
+    "MESSAGE_ALREADY_DELETED": "Tin nhắn này đã bị thu hồi.",
+    "MESSAGE_NOT_EDITABLE": "Không thể sửa loại tin nhắn này.",
+    "MESSAGE_PIN_LIMIT_REACHED": "Mỗi hội thoại chỉ ghim tối đa 10 tin.",
+    "MESSAGE_REACTION_INVALID": "Cảm xúc không hợp lệ."
   }
 }

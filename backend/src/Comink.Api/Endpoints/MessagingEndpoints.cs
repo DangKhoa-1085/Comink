@@ -59,6 +59,34 @@ public static class MessagingEndpoints
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        // NC Ưu tiên 2: chỉnh sửa / thu hồi tin (chỉ người gửi, trong 24 giờ).
+        conversations.MapPatch("/{id:guid}/messages/{messageId:guid}", EditMessageAsync)
+            .WithName("EditMessage")
+            .Produces<MessageDto>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        conversations.MapDelete("/{id:guid}/messages/{messageId:guid}", RecallMessageAsync)
+            .WithName("RecallMessage")
+            .Produces<MessageDto>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        // NC Ưu tiên 2: cảm xúc trên tin. Khoá cảm xúc nằm trong ReactionCatalog (domain).
+        conversations.MapPost("/{id:guid}/messages/{messageId:guid}/reactions", AddReactionAsync)
+            .WithName("AddMessageReaction")
+            .Produces<MessageDto>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        conversations.MapDelete("/{id:guid}/messages/{messageId:guid}/reactions/{reaction}", RemoveReactionAsync)
+            .WithName("RemoveMessageReaction")
+            .Produces<MessageDto>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         return app;
     }
 
@@ -244,5 +272,96 @@ public static class MessagingEndpoints
         return result.Succeeded
             ? Results.NoContent()
             : ApiResults.Problem(result.ErrorCode ?? ErrorCodes.InternalError);
+    }
+
+    private static async Task<IResult> EditMessageAsync(
+        Guid id,
+        Guid messageId,
+        EditMessageRequest request,
+        IValidator<EditMessageRequest> validator,
+        IMessageService messageService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var userId = CurrentUser.GetUserId(httpContext.User);
+        if (userId is null)
+        {
+            return ApiResults.Problem(ErrorCodes.Unauthorized);
+        }
+
+        var (isValid, errorResult, _) = await ApiResults.ValidateAsync(validator, request, cancellationToken);
+        if (!isValid)
+        {
+            return errorResult!;
+        }
+
+        var result = await messageService.EditAsync(
+            userId.Value, id, messageId, request, cancellationToken);
+
+        return ApiResults.FromResult(result, message => Results.Ok(message));
+    }
+
+    private static async Task<IResult> RecallMessageAsync(
+        Guid id,
+        Guid messageId,
+        IMessageService messageService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var userId = CurrentUser.GetUserId(httpContext.User);
+        if (userId is null)
+        {
+            return ApiResults.Problem(ErrorCodes.Unauthorized);
+        }
+
+        var result = await messageService.RecallAsync(userId.Value, id, messageId, cancellationToken);
+        return ApiResults.FromResult(result, message => Results.Ok(message));
+    }
+
+    private static async Task<IResult> AddReactionAsync(
+        Guid id,
+        Guid messageId,
+        ReactionRequest request,
+        IValidator<ReactionRequest> validator,
+        IMessageService messageService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var userId = CurrentUser.GetUserId(httpContext.User);
+        if (userId is null)
+        {
+            return ApiResults.Problem(ErrorCodes.Unauthorized);
+        }
+
+        var (isValid, errorResult, _) = await ApiResults.ValidateAsync(validator, request, cancellationToken);
+        if (!isValid)
+        {
+            return errorResult!;
+        }
+
+        var result = await messageService.AddReactionAsync(
+            userId.Value, id, messageId, request.Reaction, cancellationToken);
+
+        return ApiResults.FromResult(result, message => Results.Ok(message));
+    }
+
+    private static async Task<IResult> RemoveReactionAsync(
+        Guid id,
+        Guid messageId,
+        string reaction,
+        IMessageService messageService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var userId = CurrentUser.GetUserId(httpContext.User);
+        if (userId is null)
+        {
+            return ApiResults.Problem(ErrorCodes.Unauthorized);
+        }
+
+        var result = await messageService.RemoveReactionAsync(
+            userId.Value, id, messageId, reaction, cancellationToken);
+
+        return ApiResults.FromResult(result, message => Results.Ok(message));
     }
 }

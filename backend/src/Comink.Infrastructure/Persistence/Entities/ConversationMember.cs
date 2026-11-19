@@ -32,4 +32,10 @@ public class ConversationMember
 
     /// <summary>Thời điểm ghi mốc đọc; cùng bộ với <see cref="LastReadMessageId"/>.</summary>
     public DateTimeOffset? LastReadAt { get; set; }
+
+    /// <summary>
+    /// Tắt thông báo tới mốc này (NC Ưu tiên 2, M7): null = bật; tương lai = đang tắt;
+    /// <c>MuteRules.ForeverUntil</c> = tắt vĩnh viễn. Chỉ chặn push, không đổi số chưa đọc.
+    /// </summary>
+    public DateTimeOffset? MutedUntil { get; set; }
 }

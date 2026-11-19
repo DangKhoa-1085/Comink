@@ -26,6 +26,31 @@ export interface MessageAttachment {
   height: number | null
 }
 
+/** Ảnh chụp tin được phản hồi (NC Ưu tiên 2). */
+export interface MessageQuote {
+  messageId: string
+  senderId: string
+  senderDisplayName: string
+  contentPreview: string | null
+  type: string
+  isDeleted: boolean
+}
+
+/** Nguồn của tin chuyển tiếp (NC Ưu tiên 2). */
+export interface ForwardedFrom {
+  messageId: string
+  senderId: string
+  senderDisplayName: string
+}
+
+/** Tổng hợp một loại cảm xúc trên tin. */
+export interface ChatReaction {
+  reaction: string
+  emoji: string
+  count: number
+  reactedByMe: boolean
+}
+
 export interface ChatMessage {
   id: string
   conversationId: string
@@ -35,6 +60,12 @@ export interface ChatMessage {
   attachments: MessageAttachment[]
   clientMessageId: string
   createdAt: string
+  replyTo: MessageQuote | null
+  forwardedFrom: ForwardedFrom | null
+  editedAt: string | null
+  /** Khác null = tin đã bị thu hồi, mọi trường nội dung đã rỗng. */
+  deletedAt: string | null
+  reactions: ChatReaction[]
 }
 
 export interface ConversationLastMessage {
@@ -43,6 +74,7 @@ export interface ConversationLastMessage {
   preview: string
   type: string
   createdAt: string
+  isDeleted: boolean
 }
 
 export interface ConversationSummary {
@@ -71,6 +103,8 @@ export interface SendMessagePayload {
   clientMessageId: string
   content?: string | null
   mediaIds?: string[]
+  /** Tin được phản hồi (NC Ưu tiên 2). */
+  replyToMessageId?: string | null
 }
 
 /** Sự kiện real-time của phần nhắn tin nâng cao (khớp `ChatEvents` ở backend). */
@@ -142,6 +176,48 @@ export const conversationsApi = {
     const { data } = await http.post<ChatMessage>(
       `/api/conversations/${conversationId}/messages`,
       payload,
+    )
+    return data
+  },
+
+  /** Sửa nội dung tin của mình (trong 24 giờ) — NC Ưu tiên 2. */
+  async edit(conversationId: string, messageId: string, content: string): Promise<ChatMessage> {
+    const { data } = await http.patch<ChatMessage>(
+      `/api/conversations/${conversationId}/messages/${messageId}`,
+      { content },
+    )
+    return data
+  },
+
+  /** Thu hồi tin của mình (trong 24 giờ) — NC Ưu tiên 2. */
+  async recall(conversationId: string, messageId: string): Promise<ChatMessage> {
+    const { data } = await http.delete<ChatMessage>(
+      `/api/conversations/${conversationId}/messages/${messageId}`,
+    )
+    return data
+  },
+
+  /** Thêm một cảm xúc (idempotent) — NC Ưu tiên 2. */
+  async addReaction(
+    conversationId: string,
+    messageId: string,
+    reaction: string,
+  ): Promise<ChatMessage> {
+    const { data } = await http.post<ChatMessage>(
+      `/api/conversations/${conversationId}/messages/${messageId}/reactions`,
+      { reaction },
+    )
+    return data
+  },
+
+  /** Bỏ cảm xúc của mình (idempotent) — NC Ưu tiên 2. */
+  async removeReaction(
+    conversationId: string,
+    messageId: string,
+    reaction: string,
+  ): Promise<ChatMessage> {
+    const { data } = await http.delete<ChatMessage>(
+      `/api/conversations/${conversationId}/messages/${messageId}/reactions/${encodeURIComponent(reaction)}`,
     )
     return data
   },

@@ -59,3 +59,29 @@ public class MarkReadRequestValidator : AbstractValidator<MarkReadRequest>
         RuleFor(x => x.MessageId).NotEmpty().WithMessage("MessageId là bắt buộc.");
     }
 }
+
+/// <summary>Kiểm tra yêu cầu chỉnh sửa tin (NC Giai đoạn 7 — Ưu tiên 2).</summary>
+public class EditMessageRequestValidator : AbstractValidator<EditMessageRequest>
+{
+    public EditMessageRequestValidator()
+    {
+        // Cho phép rỗng khi tin chỉ có tệp: service kiểm tra "phải còn nội dung hoặc tệp".
+        RuleFor(x => x.Content)
+            .MaximumLength(MessageRules.MaxContentLength)
+            .WithMessage($"Nội dung tối đa {MessageRules.MaxContentLength} ký tự.");
+    }
+}
+
+/// <summary>Kiểm tra hình thức yêu cầu thả cảm xúc; danh mục hợp lệ do service kiểm tra.</summary>
+public class ReactionRequestValidator : AbstractValidator<ReactionRequest>
+{
+    public ReactionRequestValidator()
+    {
+        RuleFor(x => x.Reaction)
+            .Cascade(CascadeMode.Stop)
+            .NotEmpty()
+            .WithMessage("Reaction là bắt buộc.")
+            .MaximumLength(16)
+            .WithMessage("Reaction không hợp lệ.");
+    }
+}

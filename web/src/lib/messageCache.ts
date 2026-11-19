@@ -1,6 +1,6 @@
 /** Thao tác trên cache tin nhắn — hiển thị tin ngay, không phải chờ gọi lại API. */
 import type { InfiniteData, QueryClient } from '@tanstack/react-query'
-import { conversationsApi, type ChatMessage } from '../api/conversations'
+import { conversationsApi, type ChatMessage, type Conversation } from '../api/conversations'
 import type { PagedResult } from '../api/types'
 import { encodeCursor } from './cursor'
 
@@ -23,6 +23,58 @@ export function appendMessageToCache(queryClient: QueryClient, message: ChatMess
 
     const [first, ...rest] = old.pages
     return { ...old, pages: [{ ...first, items: [message, ...first.items] }, ...rest] }
+  })
+}
+
+/**
+ * Thay một tin đã có trong cache (sửa/thu hồi/thả cảm xúc) và cập nhật các trích dẫn
+ * đang trỏ tới tin đó — tránh phải tải lại cả trang lịch sử.
+ */
+export function replaceMessageInCache(queryClient: QueryClient, message: ChatMessage): void {
+  const updatedPreview =
+    message.deletedAt !== null
+      ? null
+      : (message.content ?? '').trim().replace(/\r?\n/g, ' ').slice(0, 120)
+
+  queryClient.setQueryData<MessagesCache>(['messages', message.conversationId], (old) => {
+    if (!old) {
+      return old
+    }
+
+    return {
+      ...old,
+      pages: old.pages.map((page) => ({
+        ...page,
+        items: page.items.map((item) => {
+          if (item.id === message.id) {
+            return message
+          }
+
+          // Tin này đang được người khác trích dẫn → cập nhật phần trích dẫn.
+          if (item.replyTo?.messageId === message.id) {
+            return {
+              ...item,
+              replyTo: {
+                ...item.replyTo,
+                isDeleted: message.deletedAt !== null,
+                contentPreview: updatedPreview,
+              },
+            }
+          }
+
+          return item
+        }),
+      })),
+    }
+  })
+
+  // Chi tiết hội thoại đang mở: tin cuối đổi nội dung/trạng thái thu hồi.
+  queryClient.setQueryData<Conversation>(['conversation', message.conversationId], (old) => {
+    if (!old || old.lastMessage?.id !== message.id) {
+      return old
+    }
+
+    return { ...old, lastMessage: message }
   })
 }
 

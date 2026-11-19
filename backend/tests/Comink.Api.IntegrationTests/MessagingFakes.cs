@@ -76,6 +76,18 @@ internal sealed class NullChatNotifier : IChatNotifier
         ReadReceiptDto receipt,
         CancellationToken cancellationToken = default) => Task.CompletedTask;
 
+    public Task MessageUpdatedAsync(
+        Guid conversationId,
+        IReadOnlyList<Guid> memberUserIds,
+        MessageDto message,
+        CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    public Task PinnedMessagesChangedAsync(
+        Guid conversationId,
+        IReadOnlyList<Guid> memberUserIds,
+        PinnedMessagesDto pinned,
+        CancellationToken cancellationToken = default) => Task.CompletedTask;
+
     public Task PresenceChangedAsync(
         IReadOnlyList<Guid> audienceUserIds,
         PresenceDto presence,
@@ -90,6 +102,10 @@ internal sealed class RecordingChatNotifier : IChatNotifier
     public List<(Guid ConversationId, IReadOnlyList<Guid> Members, ReadReceiptDto Receipt)> Reads { get; } = [];
 
     public List<(IReadOnlyList<Guid> Audience, PresenceDto Presence)> Presences { get; } = [];
+
+    public List<(Guid ConversationId, IReadOnlyList<Guid> Members, MessageDto Message)> Updates { get; } = [];
+
+    public List<(Guid ConversationId, IReadOnlyList<Guid> Members, PinnedMessagesDto Pinned)> PinnedUpdates { get; } = [];
 
     public Task MessageCreatedAsync(
         Guid conversationId,
@@ -108,6 +124,26 @@ internal sealed class RecordingChatNotifier : IChatNotifier
         CancellationToken cancellationToken = default)
     {
         Reads.Add((conversationId, memberUserIds, receipt));
+        return Task.CompletedTask;
+    }
+
+    public Task MessageUpdatedAsync(
+        Guid conversationId,
+        IReadOnlyList<Guid> memberUserIds,
+        MessageDto message,
+        CancellationToken cancellationToken = default)
+    {
+        Updates.Add((conversationId, memberUserIds, message));
+        return Task.CompletedTask;
+    }
+
+    public Task PinnedMessagesChangedAsync(
+        Guid conversationId,
+        IReadOnlyList<Guid> memberUserIds,
+        PinnedMessagesDto pinned,
+        CancellationToken cancellationToken = default)
+    {
+        PinnedUpdates.Add((conversationId, memberUserIds, pinned));
         return Task.CompletedTask;
     }
 

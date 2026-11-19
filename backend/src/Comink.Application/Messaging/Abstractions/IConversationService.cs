@@ -79,12 +79,53 @@ public interface IMessageService
 {
     /// <summary>
     /// Gửi tin nhắn. Trùng <c>ClientMessageId</c> thì trả tin đã lưu (không tạo bản ghi mới)
-    /// và <c>WasCreated = false</c>.
+    /// và <c>WasCreated = false</c>. <c>ReplyToMessageId</c> (NC Giai đoạn 7) phải là tin thuộc
+    /// cùng hội thoại và chưa bị thu hồi.
     /// </summary>
     Task<OperationResult<MessageSendResult>> SendAsync(
         Guid currentUserId,
         Guid conversationId,
         SendMessageRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sửa nội dung tin (NC Giai đoạn 7): chỉ người gửi, trong 24 giờ, tin chưa bị thu hồi và
+    /// không phải tin hệ thống/cuộc gọi. Khi sửa thật thì phát <c>MessageUpdated</c>.
+    /// </summary>
+    Task<OperationResult<MessageDto>> EditAsync(
+        Guid currentUserId,
+        Guid conversationId,
+        Guid messageId,
+        EditMessageRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Thu hồi mềm tin (NC Giai đoạn 7): chỉ người gửi, trong 24 giờ. Xoá nội dung + tệp hiển thị,
+    /// xoá cảm xúc và ghim liên quan, phát <c>MessageUpdated</c> (+ <c>PinnedMessagesChanged</c>
+    /// nếu tin đang được ghim).
+    /// </summary>
+    Task<OperationResult<MessageDto>> RecallAsync(
+        Guid currentUserId,
+        Guid conversationId,
+        Guid messageId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Thêm một cảm xúc lên tin (idempotent theo bộ ba tin/người/loại). Phát <c>MessageUpdated</c>.
+    /// </summary>
+    Task<OperationResult<MessageDto>> AddReactionAsync(
+        Guid currentUserId,
+        Guid conversationId,
+        Guid messageId,
+        string reaction,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Bỏ một cảm xúc của chính mình (idempotent). Phát <c>MessageUpdated</c> khi có thay đổi.</summary>
+    Task<OperationResult<MessageDto>> RemoveReactionAsync(
+        Guid currentUserId,
+        Guid conversationId,
+        Guid messageId,
+        string reaction,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -144,5 +185,25 @@ public interface IChatNotifier
     Task PresenceChangedAsync(
         IReadOnlyList<Guid> audienceUserIds,
         PresenceDto presence,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Phát <c>MessageUpdated</c> khi một tin vừa bị sửa/thu hồi/đổi cảm xúc (NC Giai đoạn 7).
+    /// Cùng chiến lược với <c>MessageCreated</c>: group hội thoại + <c>user:{id}</c> từng thành viên.
+    /// </summary>
+    Task MessageUpdatedAsync(
+        Guid conversationId,
+        IReadOnlyList<Guid> memberUserIds,
+        MessageDto message,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Phát <c>PinnedMessagesChanged</c> khi danh sách ghim của hội thoại thay đổi
+    /// (ghim/bỏ ghim, hoặc thu hồi một tin đang ghim).
+    /// </summary>
+    Task PinnedMessagesChangedAsync(
+        Guid conversationId,
+        IReadOnlyList<Guid> memberUserIds,
+        PinnedMessagesDto pinned,
         CancellationToken cancellationToken = default);
 }

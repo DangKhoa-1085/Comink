@@ -81,6 +81,63 @@ public class SignalRChatNotifier : IChatNotifier
     }
 
     /// <inheritdoc />
+    public async Task MessageUpdatedAsync(
+        Guid conversationId,
+        IReadOnlyList<Guid> memberUserIds,
+        MessageDto message,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Cùng chiến lược MessageCreated: group hội thoại + user:{id} của từng thành viên,
+            // để hội thoại tạo sau lúc kết nối vẫn nhận được cập nhật.
+            await _hub.Clients
+                .Group(ChatEvents.ConversationGroup(conversationId))
+                .SendAsync(ChatEvents.MessageUpdated, message, cancellationToken);
+
+            foreach (var userId in memberUserIds.Distinct())
+            {
+                await _hub.Clients
+                    .Group(ChatEvents.UserGroup(userId))
+                    .SendAsync(ChatEvents.MessageUpdated, message, cancellationToken);
+            }
+        }
+        catch (Exception exception)
+        {
+            // Thay đổi đã lưu DB; lỗi phát sóng chỉ ảnh hưởng hiển thị tạm thời.
+            _logger.LogError(exception, "Không phát được sự kiện {Event} cho hội thoại {ConversationId}",
+                ChatEvents.MessageUpdated, conversationId);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task PinnedMessagesChangedAsync(
+        Guid conversationId,
+        IReadOnlyList<Guid> memberUserIds,
+        PinnedMessagesDto pinned,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _hub.Clients
+                .Group(ChatEvents.ConversationGroup(conversationId))
+                .SendAsync(ChatEvents.PinnedMessagesChanged, pinned, cancellationToken);
+
+            foreach (var userId in memberUserIds.Distinct())
+            {
+                await _hub.Clients
+                    .Group(ChatEvents.UserGroup(userId))
+                    .SendAsync(ChatEvents.PinnedMessagesChanged, pinned, cancellationToken);
+            }
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Không phát được sự kiện {Event} cho hội thoại {ConversationId}",
+                ChatEvents.PinnedMessagesChanged, conversationId);
+        }
+    }
+
+    /// <inheritdoc />
     public async Task PresenceChangedAsync(
         IReadOnlyList<Guid> audienceUserIds,
         PresenceDto presence,

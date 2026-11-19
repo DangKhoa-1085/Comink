@@ -42,6 +42,10 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<MessageAttachment> MessageAttachments => Set<MessageAttachment>();
 
+    // --- Nhắn tin nâng cao (Giai đoạn 7 — Ưu tiên 2, M7) ---
+    public DbSet<MessageReaction> MessageReactions => Set<MessageReaction>();
+    public DbSet<PinnedMessage> PinnedMessages => Set<PinnedMessage>();
+
     // --- Cuộc gọi (Giai đoạn 4) ---
     public DbSet<Call> Calls => Set<Call>();
     public DbSet<CallParticipant> CallParticipants => Set<CallParticipant>();

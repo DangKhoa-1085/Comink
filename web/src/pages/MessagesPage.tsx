@@ -74,8 +74,10 @@ export function MessagesPage() {
             const preview =
               conversation.lastMessage === null
                 ? t('chat.no_message_yet')
-                : conversation.lastMessage.preview ||
-                  (conversation.lastMessage.type === 'Image' ? t('chat.image_preview') : '')
+                : conversation.lastMessage.isDeleted
+                  ? t('chat.recalled')
+                  : conversation.lastMessage.preview ||
+                    (conversation.lastMessage.type === 'Image' ? t('chat.image_preview') : '')
 
             return (
               <li key={conversation.id}>

@@ -481,6 +481,7 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 
 > Trạng thái: **mục 8.2–8.7 đã cài đặt ở backend và kiểm chứng bằng HTTP thật (2026-10-18)**; web đang làm. Quyết định **D1 đã chốt: chỉ bạn bè mới mở được hội thoại 1–1** (`docs/tasks/phase3_messaging.md` mục 2).
 > **Cập nhật 2026-11-17 (GĐ 7 — Ưu tiên 1):** đã bổ sung **mục 8.9–8.10** — trạng thái online, "đang nhập", đã gửi/đã đọc; `unreadCount` nay là số thật; DTO hội thoại có thêm trường presence/mốc đọc. Đã cài đặt backend + web, kiểm chứng bằng 2 client SignalR thật + HTTP (mục 8.11); app Flutter làm tiếp.
+> **Cập nhật 2026-11-20 (GĐ 7 — Ưu tiên 2, Đợt A):** đã bổ sung **mục 8.12–8.17** — phản hồi, chỉnh sửa, thu hồi, thả cảm xúc; DTO tin nhắn có `replyTo`/`forwardedFrom`/`editedAt`/`deletedAt`/`reactions`; sự kiện `MessageUpdated`. Đã cài đặt backend + web và kiểm chứng thật (HTTP + SignalR 23/23, Chrome headless 21/21).
 
 ### 8.1. Quy ước riêng
 
@@ -544,7 +545,7 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 | (không có) | 50 tin mới nhất |
 
 - Gửi cả `before` và `after` → `400 VALIDATION_FAILED`.
-- Trả `PagedList<MessageDto>`: `{ id, conversationId, senderId, type, content?, attachments: [{ mediaId, url, thumbnailUrl?, width?, height? }], clientMessageId, createdAt }`
+- Trả `PagedList<MessageDto>`: `{ id, conversationId, senderId, type, content?, attachments: [{ mediaId, url, thumbnailUrl?, width?, height? }], clientMessageId, createdAt, replyTo?, forwardedFrom?, editedAt?, deletedAt?, reactions[] }` — các trường từ `replyTo` trở đi thuộc NC Ưu tiên 2 (mục 8.12–8.16).
 
 ### 8.6. Gửi tin nhắn
 
@@ -639,6 +640,87 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 - Backend: `dotnet test` **224/224** (Domain 72 · Application 25 · Tích hợp 127, gồm `ReadReceiptTests` 6 + `ChatHubTests` 12), `dotnet build` 0 warning.
 - HTTP + **2 client SignalR thật** (script Node, 3 tài khoản): **28/28** — offline ban đầu → online khi kết nối (alice + carol cùng nhận), `TypingChanged` đúng người nhận/kể cả nhóm và **không** tới người ngoài hội thoại, `unreadCount` 2→0, `MessagesRead` real-time (1–1 và nhóm), mốc cũ không lùi/không phát lại, người ngoài `404 CONVERSATION_NOT_FOUND`, tin khác hội thoại `404 MESSAGE_NOT_FOUND`, offline có `lastSeenAt`.
 - Web: `npm run lint` 0/0, `npm run build` thành công (còn cảnh báo bundle > 1 MB — KI-09).
+
+### 8.12. Phản hồi tin nhắn (NC GĐ 7 — Ưu tiên 2)
+
+`POST /api/conversations/{id}/messages` — **thêm trường** `replyToMessageId` (uuid?, tùy chọn) vào request ở mục 8.6.
+
+| Điều kiện | Kết quả |
+|---|---|
+| Tin được trả lời không tồn tại **hoặc** thuộc hội thoại khác | `404 MESSAGE_NOT_FOUND` |
+| Tin được trả lời đã bị thu hồi | `400 MESSAGE_ALREADY_DELETED` |
+| Hợp lệ | Tạo tin bình thường; `MessageDto.replyTo` chứa ảnh chụp tin gốc |
+
+`MessageQuoteDto`: `{ messageId, senderId, senderDisplayName, contentPreview, type, isDeleted }`.
+Tin gốc bị thu hồi **sau đó** vẫn trả `replyTo` với `isDeleted = true`, `contentPreview = null` — client hiện "Tin nhắn đã bị thu hồi".
+
+### 8.13. Chỉnh sửa tin nhắn (NC GĐ 7 — Ưu tiên 2)
+
+`PATCH /api/conversations/{id}/messages/{messageId}`
+
+| Trường | Kiểu | Bắt buộc | Ghi chú |
+|---|---|---|---|
+| `content` | string? | ✔ | ≤ 4000; được rỗng **chỉ khi** tin đã có tệp đính kèm |
+
+- `200 OK` kèm `MessageDto` (có `editedAt`), phát `MessageUpdated` tới mọi thành viên còn hiệu lực.
+- Chỉ **người gửi**, trong **24 giờ** kể từ `createdAt`; tin `System`/`Call` không sửa được.
+- Lỗi: `CONVERSATION_NOT_FOUND` (404), `MESSAGE_NOT_FOUND` (404), `MESSAGE_NOT_OWNED` (403), `MESSAGE_EDIT_WINDOW_EXPIRED` (403 — quá 24 giờ), `MESSAGE_ALREADY_DELETED` (400), `MESSAGE_NOT_EDITABLE` (400 — loại tin), `MESSAGE_CONTENT_REQUIRED` (400 — sửa thành rỗng khi không có tệp), `VALIDATION_FAILED` (400 — quá dài).
+
+### 8.14. Thu hồi tin nhắn (NC GĐ 7 — Ưu tiên 2)
+
+`DELETE /api/conversations/{id}/messages/{messageId}` → `200 OK` kèm `MessageDto` đã thu hồi.
+
+- Chỉ **người gửi**, trong **24 giờ**; tin `System`/`Call` không thu hồi được.
+- Thu hồi **mềm**: đặt `deletedAt`, xoá `content`; API trả `attachments = []`, `reactions = []`, `replyTo = null`,
+  `forwardedFrom = null`; dòng tin vẫn giữ để hiện khung "Tin nhắn đã bị thu hồi".
+- Cảm xúc của tin bị xoá; nếu tin đang ghim thì **tự bỏ ghim** và phát `PinnedMessagesChanged`.
+- Thu hồi **lặp lại** → `200` với cùng `deletedAt`, **không** phát lại sự kiện (idempotent).
+- Lỗi: `CONVERSATION_NOT_FOUND` (404), `MESSAGE_NOT_FOUND` (404), `MESSAGE_NOT_OWNED` (403), `MESSAGE_RECALL_WINDOW_EXPIRED` (403), `MESSAGE_NOT_EDITABLE` (400).
+
+### 8.15. Thả cảm xúc (NC GĐ 7 — Ưu tiên 2)
+
+| Method | Đường dẫn | Body | Kết quả |
+|---|---|---|---|
+| `POST` | `/api/conversations/{id}/messages/{messageId}/reactions` | `{ "reaction": "like" }` | `200 MessageDto` |
+| `DELETE` | `/api/conversations/{id}/messages/{messageId}/reactions/{reaction}` | — | `200 MessageDto` |
+
+- Danh mục cố định 6 khoá: `like` 👍, `love` ❤️, `haha` 😂, `wow` 😮, `sad` 😢, `angry` 😡.
+  API dùng **khoá chữ**; server quy đổi sang emoji lưu DB (quyết định D2).
+- Một người được thả **nhiều loại** trên cùng một tin, mỗi loại một lần; thêm/bỏ lặp lại là idempotent
+  (không phát lại sự kiện khi không có thay đổi).
+- Mọi thành viên còn hiệu lực đều thả được; tin đã thu hồi → `400 MESSAGE_ALREADY_DELETED`.
+- Lỗi khác: `CONVERSATION_NOT_FOUND` (404), `MESSAGE_NOT_FOUND` (404), `MESSAGE_REACTION_INVALID` (400 — khoá ngoài danh mục).
+
+### 8.16. Sự kiện real-time và DTO bổ sung (NC GĐ 7 — Ưu tiên 2)
+
+**Trường bổ sung trong DTO**
+
+| DTO | Trường mới | Ý nghĩa |
+|---|---|---|
+| `MessageDto` | `replyTo`, `forwardedFrom`, `editedAt`, `deletedAt`, `reactions[]` | Dữ liệu hiển thị của NC Ưu tiên 2 |
+| `ReactionSummaryDto` | `{ reaction, emoji, count, reactedByMe }` | Một dòng cho mỗi loại cảm xúc đang có |
+| `ConversationLastMessageDto` | `isDeleted` | Tin cuối đã bị thu hồi — client hiện "Tin nhắn đã bị thu hồi" thay vì nội dung rỗng |
+
+**SignalR** — hub `/hub/chat`, không thêm method client → server:
+
+| Hướng | Tên | Payload | Gửi cho |
+|---|---|---|---|
+| Server → client | `MessageUpdated` | `MessageDto` đầy đủ | group `conversation:{id}` + `user:{id}` từng thành viên còn hiệu lực |
+| Server → client | `PinnedMessagesChanged` | `{ conversationId, pinned: PinnedMessageDto[] }` | như trên (dùng từ Đợt B — ghim) |
+
+- Client thay tin theo `id` trong cache; không cần tải lại trang. Sửa/thu hồi/cảm xúc **không** tạo push.
+
+### 8.17. Mã lỗi mới (NC GĐ 7 — Ưu tiên 2, Đợt A)
+
+| Mã | HTTP | Ý nghĩa |
+|---|---|---|
+| `MESSAGE_NOT_OWNED` | 403 | Không phải người gửi nên không sửa/thu hồi được |
+| `MESSAGE_EDIT_WINDOW_EXPIRED` | 403 | Quá 24 giờ kể từ khi gửi |
+| `MESSAGE_RECALL_WINDOW_EXPIRED` | 403 | Quá 24 giờ kể từ khi gửi |
+| `MESSAGE_ALREADY_DELETED` | 400 | Tin đã bị thu hồi |
+| `MESSAGE_NOT_EDITABLE` | 400 | Tin `System`/`Call` không sửa/thu hồi được |
+| `MESSAGE_REACTION_INVALID` | 400 | Khoá cảm xúc không thuộc danh mục |
+| `MESSAGE_PIN_LIMIT_REACHED` | 400 | Đã ghim đủ 10 tin (dùng từ Đợt B) |
 
 ---
 

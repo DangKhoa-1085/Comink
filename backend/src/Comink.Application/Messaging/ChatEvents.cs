@@ -17,6 +17,17 @@ public static class ChatEvents
     /// <summary>Server → client: một người bắt đầu/ngừng gõ trong hội thoại (NC Giai đoạn 7).</summary>
     public const string TypingChanged = "TypingChanged";
 
+    /// <summary>
+    /// Server → client: một tin vừa bị sửa/thu hồi/đổi cảm xúc (NC Giai đoạn 7 — Ưu tiên 2).
+    /// Payload là <c>MessageDto</c> đầy đủ để client thay thế nguyên tử trong cache.
+    /// </summary>
+    public const string MessageUpdated = "MessageUpdated";
+
+    /// <summary>
+    /// Server → client: danh sách tin ghim của hội thoại vừa thay đổi (ghim/bỏ ghim/thu hồi).
+    /// </summary>
+    public const string PinnedMessagesChanged = "PinnedMessagesChanged";
+
     /// <summary>Group theo hội thoại: <c>conversation:{id}</c>.</summary>
     public static string ConversationGroup(Guid conversationId) => $"conversation:{conversationId}";
 

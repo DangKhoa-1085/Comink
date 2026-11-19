@@ -208,11 +208,11 @@ Phần này nối trực tiếp với các nhóm tính năng trong `COMINK_SPEC.
 | Trạng thái online | Redis (key có TTL) + sự kiện qua SignalR |
 | Đang nhập | Tín hiệu qua Hub, không lưu DB, có throttle phía client |
 | Đã gửi/đã đọc | `lastReadMessageId` mỗi thành viên; phát sự kiện khi cập nhật |
-| Phản hồi, chuyển tiếp, ghim | Cột `ReplyToMessageId`, `ForwardedFromMessageId`, bảng/cờ ghim theo hội thoại |
-| Thu hồi và chỉnh sửa | **Soft delete** (đánh dấu thu hồi, giữ khung), lưu `EditedAt`; phát sự kiện cập nhật |
-| Cảm xúc | Bảng `MessageReaction` (mỗi người một cảm xúc/tin hoặc theo quy tắc nhóm chọn) |
-| Tìm kiếm tin nhắn | PostgreSQL full-text search, **luôn lọc theo hội thoại mà người dùng là thành viên** |
-| Tắt thông báo từng cuộc | Cột `MutedUntil` trong `ConversationMember` |
+| Phản hồi, chuyển tiếp, ghim | Cột `reply_to_message_id`, `forwarded_from_message_id`, bảng `pinned_messages` theo hội thoại (tối đa 10 tin) |
+| Thu hồi và chỉnh sửa | **Soft delete** (đánh dấu thu hồi, giữ khung), lưu `edited_at`; chỉ người gửi, trong 24 giờ; phát `MessageUpdated` |
+| Cảm xúc | Bảng `message_reactions` — một người được thả **nhiều loại** trên một tin (khoá chính gồm `emoji`), danh mục cố định 6 khoá |
+| Tìm kiếm tin nhắn | `pg_trgm` + `immutable_unaccent` (tìm được một phần từ, gõ không dấu), **luôn lọc theo hội thoại mà người dùng là thành viên** |
+| Tắt thông báo từng cuộc | Cột `muted_until` trong `ConversationMember`; chỉ chặn push, không đổi số tin chưa đọc |
 
 ### 3.3. Gọi trực tuyến
 | Nhu cầu | Giải pháp |

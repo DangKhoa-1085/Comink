@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, ImagePlus, Loader2, Phone, Send, Users, Video, X } from 'lucide-react'
+import { ArrowLeft, ImagePlus, Loader2, Pencil, Phone, Reply, Send, Users, Video, X } from 'lucide-react'
 import { callsApi, type CallType } from '../api/calls'
 import { conversationsApi, type ChatMessage } from '../api/conversations'
 import { mediaApi } from '../api/media'
 import { Avatar } from '../components/social/Avatar'
+import { MessageBubble } from '../components/chat/MessageBubble'
 import { PresenceDot } from '../components/chat/PresenceDot'
 import { Button } from '../components/ui/Button'
 import { Alert, Spinner } from '../components/ui/Feedback'
@@ -14,7 +15,7 @@ import { toast } from '../stores/toastStore'
 import { ApiError } from '../lib/http'
 import { translateErrorCode } from '../lib/errorMessages'
 import { timeAgo } from '../lib/format'
-import { appendMessageToCache } from '../lib/messageCache'
+import { appendMessageToCache, replaceMessageInCache } from '../lib/messageCache'
 import { sendTyping } from '../lib/chatConnection'
 import { useAuthStore } from '../stores/authStore'
 import { EMPTY_TYPING_IDS, useTypingStore } from '../stores/typingStore'
@@ -22,8 +23,20 @@ import { EMPTY_TYPING_IDS, useTypingStore } from '../stores/typingStore'
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
+/** Đồng hồ cho throttle "đang nhập" — tách ngoài component để không bị coi là gọi trong render. */
+function currentTimeMs(): number {
+  return Date.now()
+}
+
 /** Khung chat 1–1: lịch sử (cuộn lên tải thêm), gửi chữ và ảnh (docs/05_api_contract.md mục 8.5–8.6). */
 export function ChatPage() {
+  const { conversationId } = useParams<{ conversationId: string }>()
+
+  // Đổi hội thoại → remount để xoá trạng thái soạn thảo (trả lời/sửa/nháp) của hội thoại cũ.
+  return <ChatPageView key={conversationId} />
+}
+
+function ChatPageView() {
   const { t, i18n } = useTranslation()
   const { conversationId } = useParams<{ conversationId: string }>()
   const navigate = useNavigate()
@@ -43,7 +56,12 @@ export function ChatPage() {
   const [draft, setDraft] = useState('')
   const [pendingImage, setPendingImage] = useState<{ id: string; url: string } | null>(null)
   const [uploading, setUploading] = useState(false)
+  // NC Ưu tiên 2: đang trả lời tin nào / đang sửa tin nào / tin đang được làm nổi bật khi nhảy tới.
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null)
+  const [editing, setEditing] = useState<ChatMessage | null>(null)
+  const [highlightedId, setHighlightedId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const draftInputRef = useRef<HTMLInputElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
 
   const conversationQuery = useQuery({
@@ -106,7 +124,7 @@ export function ChatPage() {
       return
     }
 
-    const now = Date.now()
+    const now = currentTimeMs()
     if (now - lastTypingSentAtRef.current > 3000) {
       lastTypingSentAtRef.current = now
       void sendTyping(conversationId, true)
@@ -179,10 +197,10 @@ export function ChatPage() {
     return () => document.removeEventListener('visibilitychange', onVisibilityChange)
   }, [markRead])
 
-  // Đổi hội thoại → cho phép đánh dấu lại từ đầu ở hội thoại mới.
-  useEffect(() => {
-    lastMarkedReadRef.current = null
-  }, [conversationId])
+  // Chi tiết hội thoại đang mở: chỉ giữ trạng thái "đang sửa" khi tin còn tồn tại và chưa bị thu hồi.
+  const activeEditing = editing
+    ? (messages.find((message) => message.id === editing.id && message.deletedAt === null) ?? null)
+    : null
 
   const sendMutation = useMutation({
     mutationFn: (payload: { content: string; mediaIds: string[] }) =>
@@ -191,10 +209,12 @@ export function ChatPage() {
         clientMessageId: crypto.randomUUID(),
         content: payload.content.length > 0 ? payload.content : null,
         mediaIds: payload.mediaIds,
+        replyToMessageId: replyTo?.id ?? null,
       }),
     onSuccess: (message) => {
       setDraft('')
       setPendingImage(null)
+      setReplyTo(null)
       // Hiện tin của chính mình ngay lập tức (không phụ thuộc lần tải lại danh sách),
       // rồi đồng bộ lại để lấy dữ liệu chuẩn từ server.
       appendMessageToCache(queryClient, message)
@@ -205,6 +225,56 @@ export function ChatPage() {
       const code = error instanceof ApiError ? error.code : 'INTERNAL_ERROR'
       toast.error(translateErrorCode(t, code))
     },
+  })
+
+  // --- NC Ưu tiên 2: sửa / thu hồi / cảm xúc ---
+  const showError = (error: unknown) => {
+    const code = error instanceof ApiError ? error.code : 'INTERNAL_ERROR'
+    toast.error(translateErrorCode(t, code))
+  }
+
+  const editMutation = useMutation({
+    mutationFn: (payload: { message: ChatMessage; content: string }) =>
+      conversationsApi.edit(conversationId!, payload.message.id, payload.content),
+    onSuccess: (updated) => {
+      replaceMessageInCache(queryClient, updated)
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      setDraft('')
+      setEditing(null)
+    },
+    onError: showError,
+  })
+
+  const recallMutation = useMutation({
+    mutationFn: (message: ChatMessage) => conversationsApi.recall(conversationId!, message.id),
+    onSuccess: (updated) => {
+      replaceMessageInCache(queryClient, updated)
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      // Huỷ trạng thái soạn thảo nếu đang trả lời/sửa chính tin vừa thu hồi.
+      if (replyTo?.id === updated.id) {
+        setReplyTo(null)
+      }
+      if (editing?.id === updated.id) {
+        setEditing(null)
+        setDraft('')
+      }
+    },
+    onError: showError,
+  })
+
+  const reactionMutation = useMutation({
+    mutationFn: (payload: { message: ChatMessage; reaction: string }) => {
+      const mine = payload.message.reactions.some(
+        (reaction) => reaction.reaction === payload.reaction && reaction.reactedByMe,
+      )
+      return mine
+        ? conversationsApi.removeReaction(conversationId!, payload.message.id, payload.reaction)
+        : conversationsApi.addReaction(conversationId!, payload.message.id, payload.reaction)
+    },
+    onSuccess: (updated) => {
+      replaceMessageInCache(queryClient, updated)
+    },
+    onError: showError,
   })
 
   const handleImage = async (files: FileList | null) => {
@@ -246,6 +316,64 @@ export function ChatPage() {
     }
   }
 
+  /** Bắt đầu phản hồi / sửa; huỷ trạng thái soạn thảo. */
+  const startReply = (message: ChatMessage) => {
+    setEditing(null)
+    setReplyTo(message)
+    draftInputRef.current?.focus()
+  }
+
+  const startEdit = (message: ChatMessage) => {
+    setReplyTo(null)
+    setEditing(message)
+    setDraft(message.content ?? '')
+    draftInputRef.current?.focus()
+  }
+
+  const cancelComposerAction = () => {
+    setReplyTo(null)
+    if (editing) {
+      setEditing(null)
+      setDraft('')
+    }
+  }
+
+  const confirmRecall = (message: ChatMessage) => {
+    if (window.confirm(t('chat.recall_confirm'))) {
+      recallMutation.mutate(message)
+    }
+  }
+
+  /**
+   * Nhảy tới một tin (từ trích dẫn): cuộn nếu đã có trong DOM, ngược lại tải thêm tin cũ
+   * (tối đa 10 trang) rồi cuộn. Không tìm thấy thì thôi, không làm hỏng khung chat.
+   */
+  const jumpToMessage = async (messageId: string) => {
+    const scrollTo = () => {
+      const element = document.getElementById(`message-${messageId}`)
+      if (!element) {
+        return false
+      }
+
+      element.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      setHighlightedId(messageId)
+      window.setTimeout(() => setHighlightedId(null), 2500)
+      return true
+    }
+
+    if (scrollTo()) {
+      return
+    }
+
+    for (let attempt = 0; attempt < 10 && messagesQuery.hasNextPage; attempt++) {
+      await messagesQuery.fetchNextPage()
+      await new Promise((resolve) => window.setTimeout(resolve, 80))
+      if (scrollTo()) {
+        return
+      }
+    }
+  }
+
   const submit = () => {
     const content = draft.trim()
     const mediaIds = pendingImage ? [pendingImage.id] : []
@@ -256,6 +384,13 @@ export function ChatPage() {
 
     // Gửi xong thì không còn "đang nhập" nữa.
     stopTyping()
+
+    // Đang sửa: chỉ đổi nội dung, không tạo tin mới (NC Ưu tiên 2).
+    if (activeEditing) {
+      editMutation.mutate({ message: activeEditing, content })
+      return
+    }
+
     sendMutation.mutate({ content, mediaIds })
   }
 
@@ -453,57 +588,25 @@ export function ChatPage() {
                 const sender = isGroup
                   ? conversation.members.find((member) => member.userId === message.senderId)
                   : undefined
+                const isLastOwn = mine && message.id === lastOwnMessage?.id
 
                 return (
-                  <li key={message.id} className={mine ? 'flex justify-end' : 'flex justify-start'}>
-                    <div
-                      className={
-                        mine
-                          ? 'flex max-w-[75%] flex-col items-end'
-                          : 'flex max-w-[75%] flex-col items-start'
-                      }
-                    >
-                      {!mine && sender && (
-                        <span className="mb-0.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                          {sender.displayName || sender.userName}
-                        </span>
-                      )}
-                      <div
-                        className={
-                          mine
-                            ? 'rounded-2xl rounded-br-sm bg-indigo-600 px-3 py-2 text-sm text-white'
-                            : 'rounded-2xl rounded-bl-sm bg-slate-100 px-3 py-2 text-sm text-slate-800 dark:bg-slate-800 dark:text-slate-100'
-                        }
-                      >
-                      {message.attachments.length > 0 && (
-                        <div className="mb-1 space-y-1">
-                          {message.attachments.map((attachment) => (
-                            <img
-                              key={attachment.mediaId}
-                              src={attachment.thumbnailUrl ?? attachment.url}
-                              alt=""
-                              className="max-h-60 rounded-lg object-cover"
-                            />
-                          ))}
-                        </div>
-                      )}
-                      {message.content && (
-                        <p className="whitespace-pre-wrap break-words">{message.content}</p>
-                      )}
-                      <span className={mine ? 'mt-1 block text-[10px] text-indigo-200' : 'mt-1 block text-[10px] text-slate-400'}>
-                        {timeAgo(message.createdAt, i18n.language)}
-                      </span>
-                      {mine && lastOwnStatus && message.id === lastOwnMessage?.id && (
-                        <span
-                          className="mt-0.5 block max-w-full truncate text-[10px] text-indigo-100"
-                          title={lastOwnStatusTitle}
-                        >
-                          {lastOwnStatus}
-                        </span>
-                      )}
-                      </div>
-                    </div>
-                  </li>
+                  <MessageBubble
+                    key={message.id}
+                    message={message}
+                    isMine={mine}
+                    senderName={sender?.displayName || sender?.userName}
+                    showSender={isGroup && !mine}
+                    readStatus={isLastOwn ? lastOwnStatus ?? undefined : undefined}
+                    readStatusTitle={isLastOwn ? lastOwnStatusTitle : undefined}
+                    highlighted={highlightedId === message.id}
+                    language={i18n.language}
+                    onReply={startReply}
+                    onEdit={startEdit}
+                    onRecall={confirmRecall}
+                    onReact={(target, reaction) => reactionMutation.mutate({ message: target, reaction })}
+                    onJumpTo={(messageId) => void jumpToMessage(messageId)}
+                  />
                 )
               })}
             </ul>
@@ -513,6 +616,33 @@ export function ChatPage() {
       </div>
 
       <footer className="border-t border-slate-200 p-3 dark:border-slate-800">
+        {(replyTo || activeEditing) && (
+          <div className="mb-2 flex items-start gap-2 rounded-lg border-l-2 border-indigo-400 bg-slate-50 px-2 py-1 dark:bg-slate-950">
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-1 text-xs font-semibold text-indigo-600 dark:text-indigo-300">
+                {activeEditing ? <Pencil className="h-3 w-3" /> : <Reply className="h-3 w-3" />}
+                {activeEditing
+                  ? t('chat.editing')
+                  : `${t('chat.reply_to')} ${
+                      conversation.members.find((member) => member.userId === replyTo?.senderId)
+                        ?.displayName ?? ''
+                    }`}
+              </p>
+              <p className="line-clamp-1 text-xs text-slate-500 dark:text-slate-400">
+                {(activeEditing ?? replyTo)?.content || t('chat.image_preview')}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={cancelComposerAction}
+              className="rounded-full p-1 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800"
+              aria-label={t('chat.cancel')}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        )}
+
         {/*
           "Đang nhập" ngay trên khung nhập (theo yêu cầu 2026-11-17). Giữ chiều cao cố định
           để ô nhập không bị giật lên/xuống khi có/không có người gõ.
@@ -524,7 +654,7 @@ export function ChatPage() {
           {typingText}
         </p>
 
-        {pendingImage && (
+        {pendingImage && !activeEditing && (
           <div className="mb-2 flex items-center gap-2">
             <img src={pendingImage.url} alt="" className="h-14 w-14 rounded-lg object-cover" />
             <button
@@ -550,20 +680,21 @@ export function ChatPage() {
             variant="ghost"
             size="sm"
             onClick={() => fileInputRef.current?.click()}
-            disabled={uploading || sendMutation.isPending}
+            disabled={uploading || sendMutation.isPending || activeEditing !== null}
             aria-label={t('chat.add_image')}
           >
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
           </Button>
 
           <input
+            ref={draftInputRef}
             value={draft}
             onChange={(event) => {
               setDraft(event.target.value)
-              if (event.target.value.trim().length > 0) {
+              if (event.target.value.trim().length > 0 && !activeEditing) {
                 notifyTyping()
               } else {
-                // Xoá hết nội dung → không còn "đang nhập".
+                // Xoá hết nội dung (hoặc đang sửa) → không còn "đang nhập".
                 stopTyping()
               }
             }}
@@ -573,7 +704,7 @@ export function ChatPage() {
                 submit()
               }
             }}
-            placeholder={t('chat.placeholder')}
+            placeholder={activeEditing ? t('chat.edit_placeholder') : t('chat.placeholder')}
             maxLength={4000}
             className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
           />
@@ -581,10 +712,19 @@ export function ChatPage() {
           <Button
             size="sm"
             onClick={submit}
-            disabled={sendMutation.isPending || uploading || (draft.trim().length === 0 && !pendingImage)}
+            disabled={
+              sendMutation.isPending ||
+              editMutation.isPending ||
+              uploading ||
+              (draft.trim().length === 0 && !pendingImage)
+            }
           >
-            {sendMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            {t('chat.send')}
+            {sendMutation.isPending || editMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+            {activeEditing ? t('chat.save') : t('chat.send')}
           </Button>
         </div>
       </footer>

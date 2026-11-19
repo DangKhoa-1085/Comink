@@ -205,7 +205,28 @@
     "and_more": "and {{count}} more",
     "sent": "Sent",
     "read": "Read",
-    "unread_count": "{{count}} unread messages"
+    "unread_count": "{{count}} unread messages",
+    "reply": "Reply",
+    "reply_to": "Replying to",
+    "react": "React",
+    "reaction_like": "Like",
+    "reaction_love": "Love",
+    "reaction_haha": "Haha",
+    "reaction_wow": "Wow",
+    "reaction_sad": "Sad",
+    "reaction_angry": "Angry",
+    "message_actions": "Message actions",
+    "copy": "Copy",
+    "copied": "Copied",
+    "edit": "Edit",
+    "editing": "Editing message",
+    "edit_placeholder": "Edit message...",
+    "save": "Save",
+    "edited": "edited",
+    "recall": "Recall",
+    "recall_confirm": "Recall this message? Everyone will see “Message recalled”.",
+    "recalled": "Message recalled",
+    "forwarded_from": "Forwarded from {{name}}"
   },
   "social": {
     "feed": "Feed",
@@ -293,6 +314,15 @@
     "AUTH_EMAIL_ALREADY_EXISTS": "This email is already in use.",
     "AUTH_USERNAME_ALREADY_EXISTS": "This username is already in use.",
     "USER_NOT_FOUND": "User not found.",
-    "ADMIN_CANNOT_LOCK_SELF": "You cannot lock your own account."
+    "ADMIN_CANNOT_LOCK_SELF": "You cannot lock your own account.",
+    "CONVERSATION_NOT_FOUND": "This conversation does not exist or you are no longer a member.",
+    "MESSAGE_NOT_FOUND": "This message does not exist in the conversation.",
+    "MESSAGE_NOT_OWNED": "You can only edit or recall your own messages.",
+    "MESSAGE_EDIT_WINDOW_EXPIRED": "Messages can only be edited within 24 hours.",
+    "MESSAGE_RECALL_WINDOW_EXPIRED": "Messages can only be recalled within 24 hours.",
+    "MESSAGE_ALREADY_DELETED": "This message has already been recalled.",
+    "MESSAGE_NOT_EDITABLE": "This message type cannot be edited.",
+    "MESSAGE_PIN_LIMIT_REACHED": "You can pin up to 10 messages per conversation.",
+    "MESSAGE_REACTION_INVALID": "Invalid reaction."
   }
 }

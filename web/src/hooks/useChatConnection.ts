@@ -14,13 +14,14 @@ import type { CallDto } from '../api/calls'
 import {
   createChatConnection,
   MESSAGE_CREATED_EVENT,
+  MESSAGE_UPDATED_EVENT,
   MESSAGES_READ_EVENT,
   PRESENCE_CHANGED_EVENT,
   sendPresencePing,
   setActiveChatConnection,
   TYPING_CHANGED_EVENT,
 } from '../lib/chatConnection'
-import { appendMessageToCache, syncMissedMessages } from '../lib/messageCache'
+import { appendMessageToCache, replaceMessageInCache, syncMissedMessages } from '../lib/messageCache'
 import i18n from '../lib/i18n'
 import { useAuthStore } from '../stores/authStore'
 import { useCallStore } from '../stores/callStore'
@@ -164,8 +165,7 @@ export function useChatConnection(enabled: boolean): ChatConnectionState {
     })
 
     // --- NC GĐ 7: đã đọc ---
-    connection.on(MESSAGES_READ_EVENT, (receipt: ReadReceipt) => {
-      queryClient.setQueriesData<Conversation>({ queryKey: ['conversation'] }, (old) => {
+    connection.on(MESSAGES_READ_EVENT, (receipt: ReadReceipt) => {      queryClient.setQueriesData<Conversation>({ queryKey: ['conversation'] }, (old) => {
         if (!old || old.id !== receipt.conversationId) {
           return old
         }
@@ -185,6 +185,14 @@ export function useChatConnection(enabled: boolean): ChatConnectionState {
       })
 
       // Số tin chưa đọc (badge) thay đổi với mọi tab của người vừa đọc.
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    })
+
+    // --- NC Ưu tiên 2: tin bị sửa / thu hồi / đổi cảm xúc ---
+    connection.on(MESSAGE_UPDATED_EVENT, (message: ChatMessage) => {
+      // Thay nguyên tử trong cache lịch sử + cập nhật trích dẫn đang trỏ tới tin này.
+      replaceMessageInCache(queryClient, message)
+      // Danh sách hội thoại có thể đổi preview (tin cuối bị thu hồi/sửa).
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
     })
 

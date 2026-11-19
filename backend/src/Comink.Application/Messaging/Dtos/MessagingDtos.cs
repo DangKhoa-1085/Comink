@@ -10,8 +10,21 @@ public record CreateDirectConversationRequest(Guid UserId);
 /// </summary>
 public record CreateGroupConversationRequest(string Name, IReadOnlyList<Guid> ParticipantIds);
 
-/// <summary>Yêu cầu gửi tin nhắn. <c>ClientMessageId</c> do client sinh để chống gửi trùng.</summary>
-public record SendMessageRequest(Guid ClientMessageId, string? Content, IReadOnlyList<Guid>? MediaIds);
+/// <summary>
+/// Yêu cầu gửi tin nhắn. <c>ClientMessageId</c> do client sinh để chống gửi trùng.
+/// <c>ReplyToMessageId</c> (NC Giai đoạn 7) trỏ tới tin được phản hồi trong cùng hội thoại.
+/// </summary>
+public record SendMessageRequest(
+    Guid ClientMessageId,
+    string? Content,
+    IReadOnlyList<Guid>? MediaIds,
+    Guid? ReplyToMessageId = null);
+
+/// <summary>Yêu cầu chỉnh sửa nội dung tin nhắn (NC Giai đoạn 7 — 24 giờ, chỉ người gửi).</summary>
+public record EditMessageRequest(string? Content);
+
+/// <summary>Yêu cầu thả một cảm xúc lên tin nhắn. <c>Reaction</c> là khoá trong <c>ReactionCatalog</c>.</summary>
+public record ReactionRequest(string Reaction);
 
 /// <summary>
 /// Yêu cầu đánh dấu đã đọc tới một tin (NC Giai đoạn 7). Server chỉ **tiến** mốc,
@@ -47,6 +60,22 @@ public record ConversationMemberDto(
 /// <summary>Tệp đính kèm của tin nhắn.</summary>
 public record MessageAttachmentDto(Guid MediaId, string Url, string? ThumbnailUrl, int? Width, int? Height);
 
+/// <summary>Ảnh chụp tối thiểu của tin được phản hồi, hiển thị trong bong bóng trích dẫn.</summary>
+/// <param name="IsDeleted">Tin gốc đã bị thu hồi — client hiện "Tin nhắn đã bị thu hồi".</param>
+public record MessageQuoteDto(
+    Guid MessageId,
+    Guid SenderId,
+    string SenderDisplayName,
+    string? ContentPreview,
+    string Type,
+    bool IsDeleted);
+
+/// <summary>Nguồn của một tin chuyển tiếp (tên người gửi gốc, không lộ nội dung cũ).</summary>
+public record ForwardedFromDto(Guid MessageId, Guid SenderId, string SenderDisplayName);
+
+/// <summary>Tổng hợp cảm xúc của một tin: một dòng cho mỗi loại đang có.</summary>
+public record ReactionSummaryDto(string Reaction, string Emoji, int Count, bool ReactedByMe);
+
 /// <summary>Một tin nhắn trả về client.</summary>
 public record MessageDto(
     Guid Id,
@@ -56,7 +85,12 @@ public record MessageDto(
     string? Content,
     IReadOnlyList<MessageAttachmentDto> Attachments,
     Guid ClientMessageId,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    MessageQuoteDto? ReplyTo,
+    ForwardedFromDto? ForwardedFrom,
+    DateTimeOffset? EditedAt,
+    DateTimeOffset? DeletedAt,
+    IReadOnlyList<ReactionSummaryDto> Reactions);
 
 /// <summary>Hội thoại đầy đủ (chi tiết).</summary>
 public record ConversationDto(
@@ -79,7 +113,24 @@ public record ConversationPeerDto(
     DateTimeOffset? LastSeenAt);
 
 /// <summary>Xem trước tin cuối trong danh sách hội thoại.</summary>
-public record ConversationLastMessageDto(Guid Id, Guid SenderId, string Preview, string Type, DateTimeOffset CreatedAt);
+/// <param name="IsDeleted">Tin cuối đã bị thu hồi — client hiện "Tin nhắn đã bị thu hồi".</param>
+public record ConversationLastMessageDto(
+    Guid Id,
+    Guid SenderId,
+    string Preview,
+    string Type,
+    DateTimeOffset CreatedAt,
+    bool IsDeleted);
+
+/// <summary>Một tin đang được ghim trong hội thoại.</summary>
+public record PinnedMessageDto(
+    MessageDto Message,
+    Guid PinnedByUserId,
+    string PinnedByDisplayName,
+    DateTimeOffset PinnedAt);
+
+/// <summary>Danh sách ghim hiện tại của hội thoại (payload sự kiện <c>PinnedMessagesChanged</c>).</summary>
+public record PinnedMessagesDto(Guid ConversationId, IReadOnlyList<PinnedMessageDto> Pinned);
 
 /// <summary>Một dòng trong danh sách hội thoại. <c>Peer</c> chỉ có với chat 1–1; nhóm dùng <c>Title</c>.</summary>
 public record ConversationSummaryDto(

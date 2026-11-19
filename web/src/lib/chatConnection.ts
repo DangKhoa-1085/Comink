@@ -20,6 +20,10 @@ export const MESSAGE_CREATED_EVENT = 'MessageCreated'
 export const PRESENCE_CHANGED_EVENT = 'PresenceChanged'
 export const TYPING_CHANGED_EVENT = 'TypingChanged'
 export const MESSAGES_READ_EVENT = 'MessagesRead'
+/** Tin vừa bị sửa/thu hồi/đổi cảm xúc (NC Ưu tiên 2). */
+export const MESSAGE_UPDATED_EVENT = 'MessageUpdated'
+/** Danh sách ghim của hội thoại vừa thay đổi (NC Ưu tiên 2). */
+export const PINNED_MESSAGES_CHANGED_EVENT = 'PinnedMessagesChanged'
 
 export function createChatConnection(): HubConnection {
   return new HubConnectionBuilder()

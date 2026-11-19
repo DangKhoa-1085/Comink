@@ -59,6 +59,28 @@ public static class ErrorCodes
     // --- Nhắn tin: NC đã gửi/đã đọc (Giai đoạn 7) ---
     public const string MessageNotFound = "MESSAGE_NOT_FOUND";
 
+    // --- Nhắn tin: NC Ưu tiên 2 (Giai đoạn 7) — docs/05_api_contract.md mục 8.16 ---
+    /// <summary>Không phải người gửi nên không sửa/thu hồi được.</summary>
+    public const string MessageNotOwned = "MESSAGE_NOT_OWNED";
+
+    /// <summary>Đã quá 24 giờ kể từ khi gửi nên không sửa được.</summary>
+    public const string MessageEditWindowExpired = "MESSAGE_EDIT_WINDOW_EXPIRED";
+
+    /// <summary>Đã quá 24 giờ kể từ khi gửi nên không thu hồi được.</summary>
+    public const string MessageRecallWindowExpired = "MESSAGE_RECALL_WINDOW_EXPIRED";
+
+    /// <summary>Tin đã bị thu hồi — không sửa/react/ghim/chuyển tiếp được.</summary>
+    public const string MessageAlreadyDeleted = "MESSAGE_ALREADY_DELETED";
+
+    /// <summary>Tin hệ thống/cuộc gọi không sửa/thu hồi được.</summary>
+    public const string MessageNotEditable = "MESSAGE_NOT_EDITABLE";
+
+    /// <summary>Hội thoại đã ghim đủ số tin tối đa.</summary>
+    public const string MessagePinLimitReached = "MESSAGE_PIN_LIMIT_REACHED";
+
+    /// <summary>Khoá cảm xúc không thuộc danh mục cho phép.</summary>
+    public const string MessageReactionInvalid = "MESSAGE_REACTION_INVALID";
+
     // --- Cuộc gọi (Giai đoạn 4) — docs/05_api_contract.md mục 9.7 ---
     public const string CallNotFound = "CALL_NOT_FOUND";
     public const string CallAlreadyActive = "CALL_ALREADY_ACTIVE";
