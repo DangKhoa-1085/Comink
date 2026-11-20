@@ -134,7 +134,7 @@
 - [x] Model/API/realtime: quote, reaction, edited/deleted, pinned, search, mute (`chat_models.dart`, `ApiClient.put`, `chat_realtime.dart`)
 - [x] `chat_page.dart`: menu dài (bottom sheet), thanh trả lời/sửa, chip cảm xúc, panel ghim, tìm kiếm trong hội thoại + toàn bộ, sheet tắt thông báo, chế độ ngữ cảnh
 - [x] i18n vi/en (~40 khoá mới); `flutter analyze` 0 issue; `flutter test` **23/23**; `flutter build apk --debug` thành công
-- [ ] Bấm thử trên máy thật (Samsung A50) theo mục 5 — chờ người dùng xác nhận
+- [x] Bấm thử trên máy thật (Samsung A50) theo mục 5 — chờ người dùng xác nhận
 - [x] Rà lại tài liệu; OpenAPI không đổi trong đợt này; ghi kết quả vào mục 8
 
 ---
@@ -272,3 +272,24 @@
 1. **Bấm thử trên máy thật** (Samsung A50/Android) theo kịch bản mục 5 — cần thiết bị + backend LAN; chưa thể tự động hoá trong phiên này.
 2. Cân nhắc thêm **widget test** cho menu thao tác/panel ghim nếu còn thời gian; hiện đã có test model + toàn bộ nghiệp vụ phía backend.
 3. Nếu demo bằng web + app cùng lúc: nhớ **bật thông báo lại** cho hội thoại đã tắt khi thử push (mute chỉ chặn push).
+
+### 8.4. Điều chỉnh UX sau khi người dùng test app (2026-11-20)
+
+**1. Khung emoji hiện đủ 6 cảm xúc**
+
+- Web: menu cảm xúc trước đây bị giới hạn `w-48` nên cảm xúc thứ 6 bị cắt → khi mở picker dùng `w-max` + nút cố định `h-9 w-9`, đủ 6 nút.
+- App: hàng emoji đổi `Row` → `Wrap` với ô 44×44, không bị cắt trên màn hình hẹp (nếu quá hẹp sẽ xuống dòng thay vì mất emoji).
+
+**2. Bấm kết quả tìm kiếm → đúng tin + tô sáng từ khoá**
+
+- Thêm helper tô sáng không dấu/không phân biệt hoa-thường:
+  `web/src/lib/highlight.ts` và `mobile/lib/core/utils/highlight.dart`
+  (dùng bảng bỏ dấu tiếng Việt; gõ `khay` vẫn tô sáng `khầy`).
+- Web: kết quả tìm kiếm trả kèm từ khoá; mở hội thoại với `?focus=&q=`; tin đích được cuộn tới và từ khoá tô nền vàng; "Back to latest" xoá tô sáng.
+- App: `MessageSearchSelection` (tin + từ khoá) → ChatPage nạp cửa sổ ngữ cảnh, dựng **toàn bộ** 31 tin (để `GlobalKey` của tin đích tồn tại), `Scrollable.ensureVisible` cuộn tới và `Text.rich` tô sáng từ khoá; thanh "Về tin mới nhất" xoá ngữ cảnh + tô sáng.
+- Lý do dựng toàn bộ ở chế độ ngữ cảnh: `ListView.builder` chỉ dựng item đang nhìn thấy nên `GlobalKey` của tin đích có thể chưa tồn tại → không cuộn được.
+
+**Kiểm chứng**
+
+- Web (Chrome headless + CDP): **9/9 PASS** — picker đủ 6 nút không tràn, tìm `khay` → mở đúng tin, cuộn tới trong màn hình, `<mark>` chứa `khầy`; tìm toàn bộ giữ `?q=` và tô sáng sau khi mở hội thoại.
+- App: `flutter analyze` 0 issue, `flutter test` **27/27** (thêm 4 test cho helper tô sáng). Máy thật đang **không kết nối ADB** lúc kiểm chứng lại nên phần hiển thị trên thiết bị cần bạn bấm thử lại.

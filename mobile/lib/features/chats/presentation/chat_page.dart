@@ -9,6 +9,7 @@ import '../../../core/i18n/app_localizations.dart';
 import '../../../core/models/paged_result.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/providers.dart';
+import '../../../core/utils/highlight.dart';
 import '../../../core/utils/uuid.dart';
 import '../../../core/widgets/states.dart';
 import '../../auth/data/session_controller.dart';
@@ -38,12 +39,20 @@ const chatReactionCatalog = <ChatReactionOption>[
 
 /// Khung chat: lịch sử tin nhắn + gửi tin văn bản (real-time sẽ bổ sung sau).
 class ChatPage extends ConsumerStatefulWidget {
-  const ChatPage({super.key, required this.conversationId, this.focusMessageId});
+  const ChatPage({
+    super.key,
+    required this.conversationId,
+    this.focusMessageId,
+    this.focusTerm,
+  });
 
   final String conversationId;
 
   /// Tin cần mở ngay (từ kết quả tìm kiếm) — nạp cửa sổ ngữ cảnh quanh tin này.
   final String? focusMessageId;
+
+  /// Từ khoá đã tìm — tô sáng trong nội dung tin khi mở từ kết quả tìm kiếm.
+  final String? focusTerm;
 
   @override
   ConsumerState<ChatPage> createState() => _ChatPageState();
@@ -56,10 +65,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   bool _sending = false;
   bool _uploading = false;
 
-  // NC Ưu tiên 2: trả lời / sửa / chế độ ngữ cảnh quanh một tin.
+  // NC Ưu tiên 2: trả lời / sửa / chế độ ngữ cảnh quanh một tin / tô sáng từ khoá tìm kiếm.
   ChatMessage? _replyTo;
   ChatMessage? _editing;
   List<ChatMessage>? _contextMessages;
+  String? _highlightTerm;
+  String? _highlightMessageId;
+  final GlobalKey _targetMessageKey = GlobalKey();
 
   final List<ChatMessage> _olderMessages = [];
   String? _olderCursor;
@@ -97,7 +109,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     if (focus != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          unawaited(_loadContext(focus));
+          unawaited(_loadContext(focus, term: widget.focusTerm));
         }
       });
     }
@@ -227,7 +239,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
   }
 
-  Future<void> _loadContext(String messageId) async {
+  /// Nạp cửa sổ ngữ cảnh quanh `messageId` rồi cuộn tới tin đó; nếu có `term` thì tô sáng từ khoá.
+  Future<void> _loadContext(String messageId, {String? term}) async {
     try {
       final data = await ref.read(apiClientProvider).get(
             '/api/conversations/${widget.conversationId}/messages/$messageId/context',
@@ -242,11 +255,60 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           .map((item) => ChatMessage.fromJson(item.cast<String, dynamic>()))
           .toList(growable: false);
       if (mounted) {
-        setState(() => _contextMessages = items);
+        setState(() {
+          _contextMessages = items;
+          _highlightMessageId = messageId;
+          if (term != null && term.trim().isNotEmpty) {
+            _highlightTerm = term.trim();
+          }
+        });
+        _scrollToTarget();
       }
     } on ApiException {
       // Tin không còn hoặc mất mạng: giữ khung chat hiện tại.
     }
+  }
+
+  /// Cuộn tới tin đang được tô sáng sau khi danh sách đã dựng xong.
+  void _scrollToTarget() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final targetContext = _targetMessageKey.currentContext;
+      if (targetContext == null) {
+        return;
+      }
+
+      unawaited(
+        Scrollable.ensureVisible(
+          targetContext,
+          alignment: 0.4,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        ),
+      );
+    });
+  }
+
+  /// Nhảy tới một tin: đã có trong khung thì cuộn + tô sáng, chưa có thì nạp ngữ cảnh.
+  Future<void> _jumpToMessage(String messageId, {String? term}) async {
+    final history = ref.read(messagesProvider(widget.conversationId)).asData?.value;
+    final loadedIds = <String>{
+      if (_contextMessages != null) ..._contextMessages!.map((message) => message.id),
+      ..._olderMessages.map((message) => message.id),
+      if (history != null) ...history.messages.map((message) => message.id),
+    };
+
+    if (loadedIds.contains(messageId)) {
+      setState(() {
+        _highlightMessageId = messageId;
+        if (term != null && term.trim().isNotEmpty) {
+          _highlightTerm = term.trim();
+        }
+      });
+      _scrollToTarget();
+      return;
+    }
+
+    await _loadContext(messageId, term: term);
   }
 
   void _startReply(ChatMessage message) {
@@ -459,13 +521,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Future<void> _openSearch() async {
-    final result = await Navigator.of(context).push<MessageSearchResult>(
+    final selection = await Navigator.of(context).push<MessageSearchSelection>(
       MaterialPageRoute(
         builder: (_) => MessageSearchPage(conversationId: widget.conversationId),
       ),
     );
-    if (result != null) {
-      await _loadContext(result.messageId);
+    if (selection != null) {
+      // Luôn dùng cửa sổ ngữ cảnh cho kết quả tìm kiếm: đảm bảo tin đích được dựng để cuộn tới
+      // (ListView thường chỉ dựng item đang nhìn thấy).
+      await _loadContext(selection.result.messageId, term: selection.query);
     }
   }
 
@@ -514,7 +578,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                               ),
                               onTap: () {
                                 Navigator.of(sheetContext).pop();
-                                unawaited(_loadContext(item.message.id));
+                                unawaited(_jumpToMessage(item.message.id));
                               },
                             ),
                         ],
@@ -590,9 +654,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           children: [
             if (!message.isDeleted)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                // Wrap để 6 cảm xúc luôn hiện đủ, không bị cắt trên màn hình hẹp.
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 4,
+                  runSpacing: 4,
                   children: [
                     for (final reaction in chatReactionCatalog)
                       InkWell(
@@ -601,8 +668,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                           Navigator.of(sheetContext).pop();
                           unawaited(_react(message, reaction.key));
                         },
-                        child: Padding(
-                          padding: const EdgeInsets.all(6),
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          alignment: Alignment.center,
                           child: Text(reaction.emoji, style: const TextStyle(fontSize: 24)),
                         ),
                       ),
@@ -1042,7 +1111,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     ),
                   ),
                   TextButton(
-                    onPressed: () => setState(() => _contextMessages = null),
+                    onPressed: () => setState(() {
+                      _contextMessages = null;
+                      _highlightTerm = null;
+                      _highlightMessageId = null;
+                    }),
                     child: Text(l10n.t('chat_context_latest')),
                   ),
                 ],
@@ -1105,6 +1178,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                         },
                         onLongPress: (message) => unawaited(_showMessageActions(message)),
                         onReact: (message, reaction) => unawaited(_react(message, reaction)),
+                        highlightMessageId: _highlightMessageId,
+                        highlightTerm: _highlightTerm,
+                        targetMessageKey: _targetMessageKey,
+                        contextMode: _contextMessages != null,
                       );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -1284,6 +1361,10 @@ class _MessageList extends StatelessWidget {
     required this.pinnedMessageIds,
     required this.onLongPress,
     required this.onReact,
+    required this.highlightMessageId,
+    required this.highlightTerm,
+    required this.targetMessageKey,
+    required this.contextMode,
     this.lastOwnMessageId,
     this.readLabel,
   });
@@ -1298,6 +1379,10 @@ class _MessageList extends StatelessWidget {
   final Set<String> pinnedMessageIds;
   final ValueChanged<ChatMessage> onLongPress;
   final void Function(ChatMessage message, String reaction) onReact;
+  final String? highlightMessageId;
+  final String? highlightTerm;
+  final GlobalKey targetMessageKey;
+  final bool contextMode;
   final String? lastOwnMessageId;
   final String? readLabel;
 
@@ -1306,6 +1391,31 @@ class _MessageList extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final reversed = messages.reversed.toList(growable: false);
     final itemCount = reversed.length + (hasMore ? 1 : 0);
+
+    Widget buildMessage(ChatMessage message) {
+      final isTarget = message.id == highlightMessageId;
+      return _MessageBubble(
+        key: isTarget ? targetMessageKey : null,
+        message: message,
+        isMine: message.senderId == currentUserId,
+        isPinned: pinnedMessageIds.contains(message.id),
+        senderName: showSenderName ? memberNames[message.senderId] ?? '' : '',
+        statusLabel: message.id == lastOwnMessageId ? readLabel : null,
+        highlightTerm: highlightTerm,
+        onLongPress: () => onLongPress(message),
+        onReact: (reaction) => onReact(message, reaction),
+      );
+    }
+
+    // Chế độ ngữ cảnh chỉ có ~31 tin: dựng hết để `GlobalKey` của tin đích tồn tại
+    // và `Scrollable.ensureVisible` cuộn tới được (ListView.builder chỉ dựng item đang thấy).
+    if (contextMode) {
+      return ListView(
+        reverse: true,
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        children: [for (final message in reversed) buildMessage(message)],
+      );
+    }
 
     return ListView.builder(
       reverse: true,
@@ -1330,16 +1440,7 @@ class _MessageList extends StatelessWidget {
           );
         }
 
-        final message = reversed[index];
-        return _MessageBubble(
-          message: message,
-          isMine: message.senderId == currentUserId,
-          isPinned: pinnedMessageIds.contains(message.id),
-          senderName: showSenderName ? memberNames[message.senderId] ?? '' : '',
-          statusLabel: message.id == lastOwnMessageId ? readLabel : null,
-          onLongPress: () => onLongPress(message),
-          onReact: (reaction) => onReact(message, reaction),
-        );
+        return buildMessage(reversed[index]);
       },
     );
   }
@@ -1347,6 +1448,7 @@ class _MessageList extends StatelessWidget {
 
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({
+    super.key,
     required this.message,
     required this.isMine,
     required this.isPinned,
@@ -1354,6 +1456,7 @@ class _MessageBubble extends StatelessWidget {
     required this.onLongPress,
     required this.onReact,
     this.statusLabel,
+    this.highlightTerm,
   });
 
   final ChatMessage message;
@@ -1363,6 +1466,7 @@ class _MessageBubble extends StatelessWidget {
   final VoidCallback onLongPress;
   final ValueChanged<String> onReact;
   final String? statusLabel;
+  final String? highlightTerm;
 
   @override
   Widget build(BuildContext context) {
@@ -1471,10 +1575,32 @@ class _MessageBubble extends StatelessWidget {
                           ),
                         ),
                     if (message.content != null)
-                      Text(
-                        message.type == 'Call' ? l10n.t('chat_call') : message.content!,
-                        style: TextStyle(color: textColor, fontSize: 15),
-                      ),
+                      message.type == 'Call'
+                          ? Text(
+                              l10n.t('chat_call'),
+                              style: TextStyle(color: textColor, fontSize: 15),
+                            )
+                          : Text.rich(
+                              TextSpan(
+                                children: [
+                                  for (final segment in splitHighlight(
+                                    message.content!,
+                                    highlightTerm,
+                                  ))
+                                    TextSpan(
+                                      text: segment.text,
+                                      style: segment.match
+                                          ? const TextStyle(
+                                              backgroundColor: Color(0xFFFFE082),
+                                              color: Colors.black,
+                                              fontWeight: FontWeight.w600,
+                                            )
+                                          : null,
+                                    ),
+                                ],
+                              ),
+                              style: TextStyle(color: textColor, fontSize: 15),
+                            ),
                   ],
                   const SizedBox(height: 3),
                   Row(

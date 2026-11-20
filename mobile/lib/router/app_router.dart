@@ -85,6 +85,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => ChatPage(
           conversationId: state.pathParameters['id'] ?? '',
           focusMessageId: state.uri.queryParameters['focus'],
+          focusTerm: state.uri.queryParameters['q'],
         ),
       ),
       GoRoute(

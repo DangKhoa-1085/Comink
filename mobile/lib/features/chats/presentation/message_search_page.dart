@@ -8,6 +8,14 @@ import '../../../core/network/providers.dart';
 import '../../../core/widgets/states.dart';
 import '../domain/chat_models.dart';
 
+/// Kết quả người dùng chọn từ trang tìm kiếm: tin + từ khoá đã tìm (để tô sáng).
+class MessageSearchSelection {
+  const MessageSearchSelection({required this.result, required this.query});
+
+  final MessageSearchResult result;
+  final String query;
+}
+
 /// Tìm tin nhắn (NC Ưu tiên 2). `conversationId == null` → tìm trong mọi hội thoại
 /// người dùng còn là thành viên; backend tự lọc quyền và gõ không dấu vẫn khớp.
 class MessageSearchPage extends ConsumerStatefulWidget {
@@ -178,7 +186,12 @@ class _MessageSearchPageState extends ConsumerState<MessageSearchPage> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              onTap: () => Navigator.of(context).pop(result),
+                              onTap: () => Navigator.of(context).pop(
+                                MessageSearchSelection(
+                                  result: result,
+                                  query: _submitted,
+                                ),
+                              ),
                             );
                           },
                         ),

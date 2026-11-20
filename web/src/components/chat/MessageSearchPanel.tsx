@@ -11,7 +11,8 @@ interface MessageSearchPanelProps {
   /** null = tìm trong mọi hội thoại tôi là thành viên. */
   conversationId: string | null
   onClose: () => void
-  onPick: (result: MessageSearchResult) => void
+  /** `query` là từ khoá đã tìm — dùng để tô sáng trong tin khi mở tới. */
+  onPick: (result: MessageSearchResult, query: string) => void
 }
 
 /**
@@ -114,7 +115,7 @@ export function MessageSearchPanel({ conversationId, onClose, onPick }: MessageS
                 <li key={result.messageId}>
                   <button
                     type="button"
-                    onClick={() => onPick(result)}
+                    onClick={() => onPick(result, submitted)}
                     className="w-full rounded-lg p-2 text-left transition hover:bg-slate-100 dark:hover:bg-slate-800"
                   >
                     <span className="flex items-center justify-between gap-2 text-[11px] text-slate-400">

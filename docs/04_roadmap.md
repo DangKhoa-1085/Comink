@@ -214,7 +214,7 @@ Mỗi tính năng NC khi làm xong cần: chạy đúng trên web, có kiểm tr
 | Ưu tiên | Nhóm | Tính năng NC | Hoàn thành khi |
 |---|---|---|---|
 | 1 | Nhắn tin | Chat nhóm, trạng thái online, đang nhập, đã gửi/đã đọc | - [x] Chat nhóm hoạt động<br>- [x] Hiển thị online/offline đúng<br>- [x] "Đang nhập" hiện và tự tắt<br>- [x] Đã đọc cập nhật real-time |
-| 2 | Nhắn tin | Phản hồi, thu hồi, chỉnh sửa, thả cảm xúc, ghim, chuyển tiếp, tìm kiếm tin, tắt thông báo từng cuộc | - [ ] Từng tính năng chạy trên web và app<br>- [ ] Tìm kiếm chỉ trong hội thoại người dùng là thành viên |
+| 2 | Nhắn tin | Phản hồi, thu hồi, chỉnh sửa, thả cảm xúc, ghim, chuyển tiếp, tìm kiếm tin, tắt thông báo từng cuộc | - [x] Từng tính năng chạy trên web và app<br>- [x] Tìm kiếm chỉ trong hội thoại người dùng là thành viên |
 | 3 | Gọi | Cuộc gọi đến chấp nhận/từ chối, tắt mic, thời lượng, cuộc gọi nhỡ, lịch sử cuộc gọi | - [ ] Nhận/từ chối hoạt động<br>- [ ] Cuộc gọi nhỡ có thông báo<br>- [ ] Lịch sử và thời lượng đúng |
 | 4 | Bảo mật | Xác minh email, đặt lại mật khẩu, chặn người dùng, quản lý phiên, giới hạn tần suất, chống spam, quyền riêng tư | - [ ] Email thật gửi được (Mailpit khi dev)<br>- [ ] Chặn người dùng áp dụng ở bảng tin, nhắn, gọi<br>- [ ] Rate limit chặn đúng đăng nhập, gửi tin, kết bạn<br>- [ ] Xem/thu hồi được các phiên đăng nhập |
 | 5 | Mạng xã hội | Hashtag, lưu bài viết, gợi ý bạn bè | - [ ] Mỗi tính năng chạy đúng và có trang xem tương ứng |

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import type { ChatMessage } from '../../api/conversations'
 import { timeAgo } from '../../lib/format'
+import { splitHighlight } from '../../lib/highlight'
 import { REACTIONS } from '../../lib/reactions'
 
 /** Cửa sổ sửa/thu hồi — phải khớp `MessageActionRules.ActionWindowHours` ở backend. */
@@ -31,6 +32,8 @@ interface MessageBubbleProps {
   readStatus?: string
   readStatusTitle?: string
   highlighted: boolean
+  /** Từ khoá tìm kiếm cần tô sáng trong nội dung tin (NC Ưu tiên 2). */
+  highlightTerm?: string
   language: string
   onReply: (message: ChatMessage) => void
   onEdit: (message: ChatMessage) => void
@@ -55,6 +58,7 @@ export function MessageBubble({
   readStatus,
   readStatusTitle,
   highlighted,
+  highlightTerm,
   language,
   onReply,
   onEdit,
@@ -207,7 +211,20 @@ export function MessageBubble({
                   </div>
                 )}
                 {message.content && (
-                  <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                  <p className="whitespace-pre-wrap break-words">
+                    {splitHighlight(message.content, highlightTerm).map((segment, index) =>
+                      segment.match ? (
+                        <mark
+                          key={index}
+                          className="rounded-sm bg-amber-300 px-0.5 font-medium text-slate-900"
+                        >
+                          {segment.text}
+                        </mark>
+                      ) : (
+                        <span key={index}>{segment.text}</span>
+                      ),
+                    )}
+                  </p>
                 )}
               </>
             )}
@@ -242,12 +259,12 @@ export function MessageBubble({
             {menuOpen && canInteract && (
               <div
                 role="menu"
-                className={`absolute bottom-full z-30 mb-1 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 text-sm text-slate-700 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 ${
-                  isMine ? 'right-0' : 'left-0'
-                }`}
+                className={`absolute bottom-full z-30 mb-1 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 text-sm text-slate-700 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 ${
+                  pickerOpen ? 'w-max' : 'w-48'
+                } ${isMine ? 'right-0' : 'left-0'}`}
               >
                 {pickerOpen ? (
-                  <div className="flex items-center justify-between gap-0.5 px-1 py-1">
+                  <div className="flex items-center gap-1 px-1 py-1">
                     {REACTIONS.map((reaction) => (
                       <button
                         key={reaction.key}
@@ -257,7 +274,7 @@ export function MessageBubble({
                           closeMenu()
                         }}
                         aria-label={t(`chat.reaction_${reaction.key}`)}
-                        className="rounded-full p-1 text-lg transition hover:scale-110 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg transition hover:scale-110 hover:bg-slate-100 dark:hover:bg-slate-800"
                       >
                         {reaction.emoji}
                       </button>

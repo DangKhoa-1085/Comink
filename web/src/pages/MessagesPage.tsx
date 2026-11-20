@@ -161,9 +161,11 @@ export function MessagesPage() {
         <MessageSearchPanel
           conversationId={null}
           onClose={() => setSearchingMessages(false)}
-          onPick={(result: MessageSearchResult) => {
+          onPick={(result: MessageSearchResult, query: string) => {
             setSearchingMessages(false)
-            navigate(`/messages/${result.conversationId}?focus=${result.messageId}`)
+            navigate(
+              `/messages/${result.conversationId}?focus=${result.messageId}&q=${encodeURIComponent(query)}`,
+            )
           }}
         />
       )}

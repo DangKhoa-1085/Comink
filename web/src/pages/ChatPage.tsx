@@ -106,6 +106,8 @@ function ChatPageView() {
   const [pinnedOpen, setPinnedOpen] = useState(false)
   const [muteOpen, setMuteOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  /** Từ khoá đang được tô sáng trong nội dung tin (sau khi mở từ kết quả tìm kiếm). */
+  const [searchTerm, setSearchTerm] = useState('')
   const [forwarding, setForwarding] = useState<ChatMessage | null>(null)
   const [context, setContext] = useState<{ targetId: string; data: MessageContext } | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -159,9 +161,10 @@ function ChatPageView() {
     onError: showError,
   })
 
-  // Mở khung chat từ kết quả tìm kiếm toàn bộ (`/messages/{id}?focus={messageId}`).
+  // Mở khung chat từ kết quả tìm kiếm toàn bộ (`/messages/{id}?focus={messageId}&q={query}`).
   useEffect(() => {
     const focus = searchParams.get('focus')
+    const term = searchParams.get('q') ?? ''
     // Mỗi tin chỉ nạp ngữ cảnh một lần; KHÔNG xoá `focus` khỏi URL trong lúc fetch vì cleanup
     // của effect sẽ huỷ kết quả (lỗi thật gặp khi kiểm chứng 2026-11-20).
     if (!focus || !conversationId || loadedFocusRef.current === focus) {
@@ -177,6 +180,8 @@ function ChatPageView() {
         const data = await conversationsApi.context(conversationId, focus, 31)
         setContext({ targetId: focus, data })
         setHighlightedId(focus)
+        // Tô sáng đúng từ khoá người dùng đã tìm (không phân biệt dấu/hoa-thường).
+        setSearchTerm(term)
         window.setTimeout(() => {
           document.getElementById(`message-${focus}`)?.scrollIntoView({ block: 'center' })
         }, 120)
@@ -482,14 +487,17 @@ function ChatPageView() {
     }
   }
 
-  const pickSearchResult = (result: MessageSearchResult) => {
+  const pickSearchResult = (result: MessageSearchResult, query: string) => {
     setSearchOpen(false)
+    setSearchTerm(query)
     if (result.conversationId === conversationId) {
       void jumpToMessage(result.messageId)
       return
     }
 
-    navigate(`/messages/${result.conversationId}?focus=${result.messageId}`)
+    navigate(
+      `/messages/${result.conversationId}?focus=${result.messageId}&q=${encodeURIComponent(query)}`,
+    )
   }
 
   const submit = () => {
@@ -762,7 +770,10 @@ function ChatPageView() {
                 <span>{t('chat.context_banner')}</span>
                 <button
                   type="button"
-                  onClick={() => setContext(null)}
+                  onClick={() => {
+                    setContext(null)
+                    setSearchTerm('')
+                  }}
                   className="shrink-0 font-semibold underline"
                 >
                   {t('chat.context_latest')}
@@ -803,6 +814,7 @@ function ChatPageView() {
                     readStatus={isLastOwn ? lastOwnStatus ?? undefined : undefined}
                     readStatusTitle={isLastOwn ? lastOwnStatusTitle : undefined}
                     highlighted={highlightedId === message.id}
+                    highlightTerm={searchTerm || undefined}
                     language={i18n.language}
                     onReply={startReply}
                     onEdit={startEdit}

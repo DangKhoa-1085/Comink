@@ -27,11 +27,15 @@ class ChatsPage extends ConsumerWidget {
           IconButton(
             tooltip: l10n.t('chat_search_all_messages'),
             onPressed: () async {
-              final result = await Navigator.of(context).push<MessageSearchResult>(
+              final selection = await Navigator.of(context).push<MessageSearchSelection>(
                 MaterialPageRoute(builder: (_) => const MessageSearchPage()),
               );
-              if (result != null && context.mounted) {
-                context.push('/chats/${result.conversationId}?focus=${result.messageId}');
+              if (selection != null && context.mounted) {
+                context.push(
+                  '/chats/${selection.result.conversationId}'
+                  '?focus=${selection.result.messageId}'
+                  '&q=${Uri.encodeQueryComponent(selection.query)}',
+                );
               }
             },
             icon: const Icon(Icons.search),
