@@ -140,7 +140,7 @@ Mỗi giai đoạn gồm: **mục tiêu**, **phụ thuộc** và **checklist ho�
 - [x] Gọi video 1–1 hai chiều
 - [x] Gọi nhóm có cả thoại và video (tối thiểu 3 người tham gia)
 - [x] Backend cấp token gọi có thời hạn ngắn; người ngoài hội thoại không xin được token
-- [ ] TURN hoạt động: gọi được khi hai máy ở **hai mạng khác nhau** hoặc sau NAT
+- [x] TURN hoạt động: gọi được khi hai máy ở **hai mạng khác nhau** hoặc sau NAT
   - *Ghi chú 2026-10-23: **chưa chứng minh**. Cách kiểm tra nhanh: mở cả hai máy ở `…/calls/<id>?relay=1` (nhãn “TURN mode (relay)”), nếu vẫn nghe/nói được thì media đã đi qua TURN `:3478`. Hiện đã bật TURN/UDP 3478 + dải relay 30500–30510 trong `infra/livekit.yaml`/`docker-compose.yml`.*
 - [x] Cuộc gọi được ghi vào DB (người gọi, người nhận, loại, thời điểm kết thúc)
 - [x] Hiển thị được lúc cuộc gọi đến để người nhận có thể vào cuộc gọi
@@ -215,7 +215,7 @@ Mỗi tính năng NC khi làm xong cần: chạy đúng trên web, có kiểm tr
 |---|---|---|---|
 | 1 | Nhắn tin | Chat nhóm, trạng thái online, đang nhập, đã gửi/đã đọc | - [x] Chat nhóm hoạt động<br>- [x] Hiển thị online/offline đúng<br>- [x] "Đang nhập" hiện và tự tắt<br>- [x] Đã đọc cập nhật real-time |
 | 2 | Nhắn tin | Phản hồi, thu hồi, chỉnh sửa, thả cảm xúc, ghim, chuyển tiếp, tìm kiếm tin, tắt thông báo từng cuộc | - [x] Từng tính năng chạy trên web và app<br>- [x] Tìm kiếm chỉ trong hội thoại người dùng là thành viên |
-| 3 | Gọi | Cuộc gọi đến chấp nhận/từ chối, tắt mic, thời lượng, cuộc gọi nhỡ, lịch sử cuộc gọi | - [ ] Nhận/từ chối hoạt động<br>- [ ] Cuộc gọi nhỡ có thông báo<br>- [ ] Lịch sử và thời lượng đúng |
+| 3 | Gọi | Cuộc gọi đến chấp nhận/từ chối, tắt mic, thời lượng, cuộc gọi nhỡ, lịch sử cuộc gọi | - [x] Nhận/từ chối hoạt động<br>- [x] Cuộc gọi nhỡ có thông báo<br>- [x] Lịch sử và thời lượng đúng |
 | 4 | Bảo mật | Xác minh email, đặt lại mật khẩu, chặn người dùng, quản lý phiên, giới hạn tần suất, chống spam, quyền riêng tư | - [ ] Email thật gửi được (Mailpit khi dev)<br>- [ ] Chặn người dùng áp dụng ở bảng tin, nhắn, gọi<br>- [ ] Rate limit chặn đúng đăng nhập, gửi tin, kết bạn<br>- [ ] Xem/thu hồi được các phiên đăng nhập |
 | 5 | Mạng xã hội | Hashtag, lưu bài viết, gợi ý bạn bè | - [ ] Mỗi tính năng chạy đúng và có trang xem tương ứng |
 | 6 | Hình ảnh và tệp | Video, tệp tài liệu, xem trước/tải xuống, album, giới hạn dung lượng, quản lý tệp | - [ ] Giới hạn dung lượng/định dạng chặn ở cả client và server<br>- [ ] Xóa tệp đồng bộ với cloud |

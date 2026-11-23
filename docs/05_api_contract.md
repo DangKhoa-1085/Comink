@@ -835,7 +835,7 @@ Tin gốc bị thu hồi **sau đó** vẫn trả `replyTo` với `isDeleted = t
 | `POST` | `/api/calls/{id}/decline` | participant `Declined`; nếu mọi người từ chối → `Declined` + `end_reason=Declined` |
 | `POST` | `/api/calls/{id}/end` | `Completed`/`Cancelled`, `ended_at`, `duration_seconds`, gọi `EndRoomAsync`, ghi tin `Call`, phát `CallEnded` |
 | `GET` | `/api/calls/{id}` | `CallDto` (chỉ thành viên) |
-| `GET` | `/api/calls?cursor=&limit=` | `PagedList<CallSummaryDto>` — lịch sử của tôi, sắp `invited_at DESC` |
+| `GET` | `/api/calls?filter=&cursor=&limit=` | `PagedList<CallSummaryDto>` — lịch sử của tôi, sắp `invited_at DESC`; `filter` = `all` (mặc định) hoặc `missed` (xem 9.8) |
 
 ### 9.5. Webhook LiveKit
 
@@ -847,7 +847,7 @@ Tin gốc bị thu hồi **sau đó** vẫn trả `replyTo` với `isDeleted = t
 | Sự kiện | Xử lý |
 |---|---|
 | `room_started` | đặt `answered_at` nếu chưa có |
-| `participant_joined` / `participant_left` | cập nhật `call_participants.status`, `joined_at`/`left_at` |
+| `participant_joined` / `participant_left` | cập nhật `call_participants.status`, `joined_at`/`left_at`; **chỉ người không phải người gọi** vào room mới đặt `answered_at`/`InProgress` (D1, 9.8) |
 | `room_finished` | đặt `ended_at` + `duration_seconds`, `EndRoomAsync` (chống room treo), phát `CallEnded` |
 
 ### 9.6. SignalR (hub `/hub/chat`)
@@ -869,6 +869,64 @@ Tin gốc bị thu hồi **sau đó** vẫn trả `replyTo` với `isDeleted = t
 | `CALL_ALREADY_ENDED` | 409 | Cuộc gọi đã kết thúc |
 | `CALL_NOT_RINGING` | 409 | Thao tác chỉ hợp lệ khi đang đổ chuông |
 | `CALL_PROVIDER_UNAVAILABLE` | 503 | Không kết nối được LiveKit |
+
+### 9.8. Lịch sử cuộc gọi và cuộc gọi nhỡ (NC GĐ 7 — Ưu tiên 3)
+
+> Quyết định đã chốt với người dùng (2026-11-21): **D1** chỉ người không phải người gọi vào room mới tính "đã nghe"; **D3** cuộc gọi nhỡ tạo notification `MissedCall` + push; **D5** lịch sử ở trang/tab "Cuộc gọi" riêng; **D6** DTO chỉ thêm trường.
+
+#### Lịch sử
+
+`GET /api/calls?filter=all|missed&cursor=&limit=`
+
+| Tham số | Kiểu | Ghi chú |
+|---|---|---|
+| `filter` | `all` \| `missed` | Mặc định `all`; `missed` chỉ trả cuộc gọi mà **tôi** có `call_participants.status = Missed`; giá trị khác → `400 VALIDATION_FAILED` |
+| `cursor`, `limit` | | Như 9.4; `limit` 1–50 |
+
+`CallSummaryDto` (giữ nguyên trường cũ, thêm các trường sau):
+
+```json
+{
+  "id": "uuid",
+  "conversationId": "uuid",
+  "type": "Audio",
+  "status": "Missed",
+  "endReason": "NoAnswer",
+  "createdAt": "2026-11-21T10:00:00Z",
+  "durationSeconds": null,
+  "initiatedBy": "uuid",
+  "iWasInitiator": false,
+  "myStatus": "Missed",
+  "isMissed": true,
+  "conversationType": "Direct",
+  "conversationTitle": null,
+  "peer": { "userId": "uuid", "displayName": "Alice", "avatarUrl": null },
+  "initiatorDisplayName": "Alice",
+  "answeredAt": null,
+  "endedAt": "2026-11-21T10:00:30Z"
+}
+```
+
+- `peer` chỉ có với hội thoại `Direct`; nhóm dùng `conversationTitle`.
+- `isMissed` = `myStatus == "Missed"` — dòng lịch sử hiển thị màu đỏ.
+- `durationSeconds` tính từ `answeredAt` (người **không phải** người gọi vào room) đến `endedAt`; `null` khi không có ai nghe.
+
+#### Cuộc gọi nhỡ có thông báo
+
+- Quá **30 giây** mà chưa có người không phải người gọi vào room → `status=Missed`, `end_reason=NoAnswer`; kể cả khi người gọi đang chờ trong room.
+- Các participant còn `Invited` (trừ người gọi) được đánh dấu `Missed`.
+- Với mỗi người bị gỡ, backend tạo dòng `notifications`:
+
+| Trường | Giá trị |
+|---|---|
+| `type` | `MissedCall` |
+| `actorId` | người gọi |
+| `entityType` / `entityId` | `Call` / `call.id` |
+| `data` | `{"type":"CallMissed","callId","conversationId","callType"}` |
+
+- Push FCM kèm data như trên (xem 10.3); chống tạo trùng theo `(recipient, type=MissedCall, entity_id=call_id)`.
+- Client đang mở nhận `CallEnded` với `status=Missed` → hiện toast "Bạn đã bỏ lỡ cuộc gọi từ X" (web) hoặc màn hình "Cuộc gọi nhỡ" (app).
+- **Không** tạo thông báo cho người gọi, người đã vào phòng, hoặc người đã bấm từ chối.
 
 ---
 
@@ -914,8 +972,9 @@ Tin gốc bị thu hồi **sau đó** vẫn trả `replyTo` với `isDeleted = t
 - Push được gửi khi:
   - có tin nhắn mới (không tạo dòng `notifications`, data `type=Message`, `conversationId`, `messageId`);
   - lời mời kết bạn / chấp nhận (`FriendRequestReceived`/`FriendRequestAccepted`, có dòng `notifications`, data `type=FriendRequest`/`FriendAccepted`);
-  - cuộc gọi đến (`type=CallIncoming`, `callId`, `conversationId`, `callType`; ưu tiên cao).
-- App Flutter đăng ký token khi đăng nhập, xin quyền thông báo, bấm notification để mở chat/cuộc gọi. FCM là kênh **bổ sung** cho SignalR; quyền mic/camera vẫn xin khi vào cuộc gọi.
+  - cuộc gọi đến (`type=CallIncoming`, `callId`, `conversationId`, `callType`; ưu tiên cao);
+  - **cuộc gọi nhỡ** (`type=CallMissed`, `callId`, `conversationId`, `callType`; có dòng `notifications` loại `MissedCall`).
+- App Flutter đăng ký token khi đăng nhập, xin quyền thông báo, bấm notification để mở chat/cuộc gọi/lịch sử cuộc gọi. FCM là kênh **bổ sung** cho SignalR; quyền mic/camera vẫn xin khi vào cuộc gọi.
 
 ---
 
@@ -940,3 +999,4 @@ Tin gốc bị thu hồi **sau đó** vẫn trả `replyTo` với `isDeleted = t
 | 2026-10-27 | **Mốc A:** thêm security scheme **Bearer JWT** vào OpenAPI (chỉ endpoint cần đăng nhập), chốt bản máy đọc `docs/openapi/comink.v1.json` (45 path); không đổi endpoint/DTO |
 | 2026-10-27 | **GĐ 6:** thêm mục 10 — `POST/DELETE /api/devices`, `GET /api/notifications`, `POST /api/notifications/{id}/read`; push FCM cho tin nhắn/lời mời/cuộc gọi; migration `20261027_Notifications_InitialCreate` |
 | 2026-11-17 | **GĐ 7 — Ưu tiên 1:** thêm `POST /api/conversations/{id}/read`; DTO hội thoại có `isOnline`/`lastSeenAt`/`lastReadMessageId`/`lastReadAt`; `unreadCount` là số thật; sự kiện `PresenceChanged`/`TypingChanged`/`MessagesRead` + hub method `Typing`/`Ping`; mã lỗi `MESSAGE_NOT_FOUND`; migration **M6** `Messaging_AddReadMarkers`. Đã kiểm chứng 28/28 bằng HTTP + 2 client SignalR |
+| 2026-11-21 | **GĐ 7 — Ưu tiên 3:** `GET /api/calls?filter=all|missed`; `CallSummaryDto` thêm `myStatus`/`isMissed`/`conversationType`/`conversationTitle`/`peer`/`initiatorDisplayName`/`answeredAt`/`endedAt`; "đã nghe" chỉ tính người **không phải** người gọi vào room; cuộc gọi nhỡ tạo notification `MissedCall` + push `type=CallMissed`; không đổi schema |

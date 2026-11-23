@@ -3284,6 +3284,13 @@
               "format": "int32",
               "default": 20
             }
+          },
+          {
+            "name": "filter",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3926,6 +3933,29 @@
           }
         }
       },
+      "CallPeerDto": {
+        "required": [
+          "userId",
+          "displayName",
+          "avatarUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "CallSummaryDto": {
         "required": [
           "id",
@@ -3936,7 +3966,15 @@
           "createdAt",
           "durationSeconds",
           "initiatedBy",
-          "iWasInitiator"
+          "iWasInitiator",
+          "myStatus",
+          "isMissed",
+          "conversationType",
+          "conversationTitle",
+          "peer",
+          "initiatorDisplayName",
+          "answeredAt",
+          "endedAt"
         ],
         "type": "object",
         "properties": {
@@ -3979,6 +4017,48 @@
           },
           "iWasInitiator": {
             "type": "boolean"
+          },
+          "myStatus": {
+            "type": "string"
+          },
+          "isMissed": {
+            "type": "boolean"
+          },
+          "conversationType": {
+            "type": "string"
+          },
+          "conversationTitle": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "peer": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CallPeerDto"
+              }
+            ]
+          },
+          "initiatorDisplayName": {
+            "type": "string"
+          },
+          "answeredAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
