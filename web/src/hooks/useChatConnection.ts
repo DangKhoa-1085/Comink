@@ -228,14 +228,31 @@ export function useChatConnection(enabled: boolean): ChatConnectionState {
       }
     })
 
-    connection.on(CALL_ENDED_EVENT, (ended: { callId: string }) => {
-      if (useCallStore.getState().incoming?.id === ended.callId) {
-        useCallStore.getState().clearIncoming()
-      }
+    connection.on(
+      CALL_ENDED_EVENT,
+      (ended: { callId: string; status?: string; endReason?: string }) => {
+        const incoming = useCallStore.getState().incoming
+        if (incoming?.id === ended.callId) {
+          useCallStore.getState().clearIncoming()
 
-      queryClient.invalidateQueries({ queryKey: ['call', ended.callId] })
-      queryClient.invalidateQueries({ queryKey: ['calls'] })
-    })
+          // Người bị gỡ thấy thông báo ngay cả khi đang mở web; app đóng nhận push
+          // `MissedCall` từ backend (quyết định D3 — Ưu tiên 3).
+          if (ended.status === 'Missed') {
+            const caller = incoming.participants.find(
+              (participant) => participant.userId === incoming.initiatedBy,
+            )
+            toast.info(
+              i18n.t('call.missed_toast', {
+                name: caller?.displayName ?? i18n.t('call.unknown_caller'),
+              }),
+            )
+          }
+        }
+
+        queryClient.invalidateQueries({ queryKey: ['call', ended.callId] })
+        queryClient.invalidateQueries({ queryKey: ['calls'] })
+      },
+    )
 
     // --- Quản trị (GĐ 5): tài khoản vừa bị khóa ---
     // Server đã thu hồi mọi refresh token và sẽ ngắt kết nối SignalR; client chủ động xóa phiên

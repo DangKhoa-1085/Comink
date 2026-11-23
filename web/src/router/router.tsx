@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { Navigate, createBrowserRouter } from 'react-router-dom'
 import { AppLayout } from '../components/layout/AppLayout'
 import { ProtectedRoute, RequireRole } from '../components/layout/ProtectedRoute'
 import { HomePage } from '../pages/HomePage'
@@ -40,6 +40,8 @@ export const router = createBrowserRouter([
           { path: 'feed', element: <FeedPage /> },
           { path: 'messages', element: <MessagesPage /> },
           { path: 'messages/:conversationId', element: <ChatPage /> },
+          // Lịch sử cuộc gọi đã được ẩn; link cũ quay về Tin nhắn. Trang đang gọi vẫn ở bên dưới.
+          { path: 'calls', element: <Navigate to="/messages" replace /> },
           { path: 'calls/:callId', element: <CallPage /> },
         ],
       },

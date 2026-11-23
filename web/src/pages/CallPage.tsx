@@ -2,11 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Mic, MicOff, PhoneOff, Video, VideoOff } from 'lucide-react'
+import { Mic, MicOff, PhoneOff, RefreshCw, Video, VideoOff } from 'lucide-react'
 import { RoomEvent, Track, type Room, type RemoteTrack } from 'livekit-client'
 import { callsApi } from '../api/calls'
 import { Button } from '../components/ui/Button'
 import { Alert, Spinner } from '../components/ui/Feedback'
+import { formatCallDuration } from '../lib/callFormat'
+import { initialsOf } from '../lib/format'
 import { RELAY_ONLY, createCallRoom, normalizeLiveKitUrl } from '../lib/livekitRoom'
 import { ApiError } from '../lib/http'
 import { translateErrorCode } from '../lib/errorMessages'
@@ -28,6 +30,12 @@ export function CallPage() {
   const [micOn, setMicOn] = useState(true)
   const [camOn, setCamOn] = useState(true)
   const [durationSeconds, setDurationSeconds] = useState(0)
+  /** Tăng lên khi người dùng bấm "Thử lại" — chạy lại effect kết nối. */
+  const [connectionAttempt, setConnectionAttempt] = useState(0)
+  /** Những người khác đã thực sự vào phòng — dùng để bỏ dòng "đang chờ". */
+  const [remoteUserIds, setRemoteUserIds] = useState<string[]>([])
+  /** Đã có video của người khác chưa; nếu chưa thì hiện avatar thay vì ô trống. */
+  const [hasRemoteVideo, setHasRemoteVideo] = useState(false)
 
   const roomRef = useRef<Room | null>(null)
   const remoteMediaRef = useRef<HTMLDivElement | null>(null)
@@ -42,6 +50,13 @@ export function CallPage() {
   })
 
   const isTerminal = callQuery.data ? TERMINAL_STATUSES.includes(callQuery.data.status) : false
+  const remotePeople = remoteUserIds.map((userId) => ({
+    userId,
+    displayName:
+      callQuery.data?.participants.find((participant) => participant.userId === userId)
+        ?.displayName ?? t('call.unknown_caller')
+  }))
+  const isWaiting = remotePeople.length === 0
 
   // Kết nối room một lần cho mỗi cuộc gọi.
   useEffect(() => {
@@ -53,7 +68,29 @@ export function CallPage() {
     const room = createCallRoom()
     roomRef.current = room
 
+    const hasSubscribedVideo = () =>
+      [...room.remoteParticipants.values()].some((participant) =>
+        [...participant.videoTrackPublications.values()].some((publication) => Boolean(publication.track)),
+      )
+
+    const syncRemoteParticipants = () => {
+      if (disposed) {
+        return
+      }
+      const ids = [...room.remoteParticipants.keys()]
+      setRemoteUserIds(ids)
+      if (ids.length === 0) {
+        setHasRemoteVideo(false)
+      }
+    }
+
     const attachRemote = (track: RemoteTrack) => {
+      if (disposed) {
+        return
+      }
+      if (track.kind === Track.Kind.Video) {
+        setHasRemoteVideo(true)
+      }
       const element = track.attach()
       element.style.width = '100%'
       element.style.maxHeight = '60vh'
@@ -62,26 +99,50 @@ export function CallPage() {
       remoteMediaRef.current?.appendChild(element)
     }
 
+    const detachRemote = (track: RemoteTrack) => {
+      track.detach().forEach((element) => element.remove())
+      if (track.kind === Track.Kind.Video) {
+        setHasRemoteVideo(hasSubscribedVideo())
+      }
+    }
+
     room.on(RoomEvent.TrackSubscribed, attachRemote)
-    room.on(RoomEvent.TrackUnsubscribed, (track) => track.detach().forEach((element) => element.remove()))
+    room.on(RoomEvent.TrackUnsubscribed, detachRemote)
+    room.on(RoomEvent.ParticipantConnected, syncRemoteParticipants)
+    room.on(RoomEvent.ParticipantDisconnected, syncRemoteParticipants)
 
     void (async () => {
       try {
         const details = await callsApi.get(callId)
 
+        // React StrictMode chạy effect hai lần ở dev: nếu cleanup đã chạy trong lúc chờ API
+        // thì dừng ngay, tránh mở hai kết nối LiveKit cùng identity (DUPLICATE_IDENTITY).
+        if (disposed) {
+          return
+        }
+
         // Người nhận phải "trả lời" trước khi vào room; người gọi thì không.
         if (details.status === 'Ringing' && details.initiatedBy !== me.id) {
           await callsApi.answer(callId)
+          if (disposed) {
+            return
+          }
         }
 
         // Token ngắn hạn (10 phút) — xin ngay trước khi kết nối.
         const token = await callsApi.token(callId)
+        if (disposed) {
+          return
+        }
+
         await room.connect(normalizeLiveKitUrl(token.url), token.token)
 
         if (disposed) {
           await room.disconnect()
           return
         }
+
+        syncRemoteParticipants()
 
         await room.localParticipant.setMicrophoneEnabled(true)
         if (details.type === 'Video') {
@@ -122,10 +183,18 @@ export function CallPage() {
 
     return () => {
       disposed = true
+      room.off(RoomEvent.TrackSubscribed, attachRemote)
+      room.off(RoomEvent.TrackUnsubscribed, detachRemote)
+      room.off(RoomEvent.ParticipantConnected, syncRemoteParticipants)
+      room.off(RoomEvent.ParticipantDisconnected, syncRemoteParticipants)
       void room.disconnect()
-      roomRef.current = null
+      // Chỉ xoá nếu vẫn là room của effect này — tránh cleanup cũ xoá room mới khi StrictMode
+      // hoặc khi bấm "Thử lại" tạo effect mới.
+      if (roomRef.current === room) {
+        roomRef.current = null
+      }
     }
-  }, [callId, me?.id])
+  }, [callId, me?.id, connectionAttempt])
 
   // Đồng hồ thời lượng tính từ lúc có người trả lời.
   useEffect(() => {
@@ -207,13 +276,14 @@ export function CallPage() {
   }
 
   if (isTerminal) {
+    const endReason = callQuery.data.endReason ?? 'Completed'
     return (
       <div className="mx-auto max-w-md space-y-4 rounded-2xl border border-slate-200 p-6 text-center dark:border-slate-800">
         <p className="text-lg font-semibold">{t('call.ended')}</p>
         <p className="text-sm text-slate-500">
           {t('call.ended_detail', {
-            duration: callQuery.data.durationSeconds ?? 0,
-            reason: callQuery.data.endReason ?? 'Completed'
+            duration: formatCallDuration(callQuery.data.durationSeconds ?? 0, t),
+            reason: t(`call.reason_${endReason.toLowerCase()}`, { defaultValue: endReason })
           })}
         </p>
         <Button onClick={() => navigate(-1)}>{t('call.back')}</Button>
@@ -242,22 +312,55 @@ export function CallPage() {
       </div>
 
       {connectionState === 'error' ? (
-        <Alert variant="error">
-          <p>{errorCode ? translateErrorCode(t, errorCode) : t('call.error')}</p>
-          {errorDetail && <p className="mt-1 text-xs opacity-80">{errorDetail}</p>}
-        </Alert>
+        <div>
+          <Alert variant="error">
+            <p>{errorCode ? translateErrorCode(t, errorCode) : t('call.error')}</p>
+            {errorDetail && <p className="mt-1 text-xs opacity-80">{errorDetail}</p>}
+          </Alert>
+          <Button
+            variant="outline"
+            className="mt-3"
+            onClick={() => {
+              // Đặt lại trạng thái trong sự kiện (không setState đồng bộ trong effect).
+              setConnectionState('connecting')
+              setErrorCode(null)
+              setErrorDetail(null)
+              setRemoteUserIds([])
+              setHasRemoteVideo(false)
+              setConnectionAttempt((value) => value + 1)
+            }}
+          >
+            <RefreshCw className="h-4 w-4" />
+            {t('call.retry')}
+          </Button>
+        </div>
       ) : (
         <>
           <div
             ref={remoteMediaRef}
             className="mb-3 flex min-h-[240px] flex-col items-center justify-center gap-2 rounded-2xl bg-slate-900 p-3"
           >
-            {connectionState === 'connecting' && (
+            {connectionState === 'connecting' && isWaiting && (
               <span className="flex items-center gap-2 text-sm text-slate-300">
                 <Spinner /> {t('call.connecting')}
               </span>
             )}
-            <span className="text-xs text-slate-500">{t('call.remote_hint')}</span>
+            {isWaiting ? (
+              <span className="text-xs text-slate-500">{t('call.remote_hint')}</span>
+            ) : !hasRemoteVideo ? (
+              <div className="flex flex-wrap items-center justify-center gap-6">
+                {remotePeople.map((person) => (
+                  <div key={person.userId} className="flex flex-col items-center gap-2">
+                    <span className="flex h-20 w-20 items-center justify-center rounded-full bg-indigo-500/20 text-2xl font-bold text-indigo-200">
+                      {initialsOf(person.displayName)}
+                    </span>
+                    <span className="max-w-40 truncate text-sm font-medium text-slate-200">
+                      {person.displayName}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           <div className={camOn ? 'mb-3' : 'mb-3 hidden'}>

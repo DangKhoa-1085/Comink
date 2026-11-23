@@ -54,17 +54,25 @@ function IncomingCallDialog({ call }: { call: CallDto }) {
     onSettled: () => clearIncoming()
   })
 
-  // Đếm ngược 30 giây rồi tự từ chối (giống điện thoại thật).
+  // Đếm ngược 30 giây. Quyết định D8 (Ưu tiên 3): KHÔNG tự gọi `decline` khi hết giờ —
+  // nếu không cuộc gọi bị ghi "Declined" thay vì "Missed" và người bị gỡ không nhận được
+  // thông báo nhỡ. Server (`CallRingTimeoutService`) sẽ đóng cuộc gọi và phát `CallEnded`.
   useEffect(() => {
-    const timer = setInterval(() => setSecondsLeft((value) => value - 1), 1000)
+    const timer = setInterval(() => setSecondsLeft((value) => (value <= 0 ? 0 : value - 1)), 1000)
     return () => clearInterval(timer)
   }, [])
 
+  const expired = secondsLeft <= 0
+
+  // Dự phòng khi sự kiện `CallEnded` bị mất: đóng UI sau vài giây, không đổi trạng thái server.
   useEffect(() => {
-    if (secondsLeft <= 0 && !declineMutation.isPending) {
-      declineMutation.mutate()
+    if (!expired) {
+      return
     }
-  }, [secondsLeft, declineMutation])
+
+    const timer = setTimeout(() => clearIncoming(), 8000)
+    return () => clearTimeout(timer)
+  }, [expired, clearIncoming])
 
   const caller = call.participants.find((participant) => participant.userId === call.initiatedBy)
   const isVideo = call.type === 'Video'
@@ -85,15 +93,21 @@ function IncomingCallDialog({ call }: { call: CallDto }) {
         </p>
         <p className="mt-1 text-lg font-bold">{caller?.displayName ?? t('call.unknown_caller')}</p>
         <p className="mt-1 text-xs text-slate-500">
-          {t('call.ringing_seconds', { seconds: Math.max(secondsLeft, 0) })}
+          {expired
+            ? t('call.ring_timeout')
+            : t('call.ringing_seconds', { seconds: Math.max(secondsLeft, 0) })}
         </p>
 
         <div className="mt-6 flex items-center justify-center gap-3">
-          <Button variant="outline" onClick={() => declineMutation.mutate()} disabled={declineMutation.isPending}>
+          <Button
+            variant="outline"
+            onClick={() => declineMutation.mutate()}
+            disabled={declineMutation.isPending || expired}
+          >
             <PhoneOff className="h-4 w-4" />
             {t('call.decline')}
           </Button>
-          <Button onClick={() => answerMutation.mutate()} disabled={answerMutation.isPending}>
+          <Button onClick={() => answerMutation.mutate()} disabled={answerMutation.isPending || expired}>
             <Phone className="h-4 w-4" />
             {t('call.answer')}
           </Button>

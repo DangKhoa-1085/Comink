@@ -6,13 +6,16 @@ import {
   CornerUpRight,
   MoreHorizontal,
   Pencil,
+  Phone,
   Pin,
   PinOff,
   Reply,
   RotateCcw,
   SmilePlus,
+  Video,
 } from 'lucide-react'
 import type { ChatMessage } from '../../api/conversations'
+import { formatCallMessage } from '../../lib/callFormat'
 import { timeAgo } from '../../lib/format'
 import { splitHighlight } from '../../lib/highlight'
 import { REACTIONS } from '../../lib/reactions'
@@ -81,7 +84,8 @@ export function MessageBubble({
   const withinWindow = mountedAt - Date.parse(message.createdAt) <= ACTION_WINDOW_MS
   const isUserContent = message.type !== 'System' && message.type !== 'Call'
   const canModify = isMine && !isDeleted && withinWindow && isUserContent
-  const canInteract = !isDeleted && message.type !== 'System'
+  // Tin cuộc gọi là bản ghi hệ thống, không phản hồi/ghim/thả cảm xúc được.
+  const canInteract = !isDeleted && message.type !== 'System' && message.type !== 'Call'
   const canCopy = !isDeleted && (message.content ?? '').length > 0
   const replyTo = message.replyTo
 
@@ -210,21 +214,32 @@ export function MessageBubble({
                     ))}
                   </div>
                 )}
-                {message.content && (
-                  <p className="whitespace-pre-wrap break-words">
-                    {splitHighlight(message.content, highlightTerm).map((segment, index) =>
-                      segment.match ? (
-                        <mark
-                          key={index}
-                          className="rounded-sm bg-amber-300 px-0.5 font-medium text-slate-900"
-                        >
-                          {segment.text}
-                        </mark>
-                      ) : (
-                        <span key={index}>{segment.text}</span>
-                      ),
+                {message.type === 'Call' ? (
+                  <p className="flex items-center gap-1.5 whitespace-pre-wrap break-words">
+                    {message.content?.startsWith('call:Video:') ? (
+                      <Video className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    ) : (
+                      <Phone className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     )}
+                    <span>{formatCallMessage(message.content, t)}</span>
                   </p>
+                ) : (
+                  message.content && (
+                    <p className="whitespace-pre-wrap break-words">
+                      {splitHighlight(message.content, highlightTerm).map((segment, index) =>
+                        segment.match ? (
+                          <mark
+                            key={index}
+                            className="rounded-sm bg-amber-300 px-0.5 font-medium text-slate-900"
+                          >
+                            {segment.text}
+                          </mark>
+                        ) : (
+                          <span key={index}>{segment.text}</span>
+                        ),
+                      )}
+                    </p>
+                  )
                 )}
               </>
             )}

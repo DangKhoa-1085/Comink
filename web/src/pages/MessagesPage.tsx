@@ -11,6 +11,7 @@ import { CreateGroupDialog } from '../components/social/CreateGroupDialog'
 import { Button } from '../components/ui/Button'
 import { Alert, Spinner } from '../components/ui/Feedback'
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll'
+import { formatCallMessage } from '../lib/callFormat'
 import { timeAgo } from '../lib/format'
 
 /** Danh sách hội thoại (1–1 và nhóm), sắp theo tin mới nhất (docs/05_api_contract.md mục 8.3). */
@@ -83,8 +84,10 @@ export function MessagesPage() {
                 ? t('chat.no_message_yet')
                 : conversation.lastMessage.isDeleted
                   ? t('chat.recalled')
-                  : conversation.lastMessage.preview ||
-                    (conversation.lastMessage.type === 'Image' ? t('chat.image_preview') : '')
+                  : conversation.lastMessage.type === 'Call'
+                    ? formatCallMessage(conversation.lastMessage.preview, t)
+                    : conversation.lastMessage.preview ||
+                      (conversation.lastMessage.type === 'Image' ? t('chat.image_preview') : '')
 
             return (
               <li key={conversation.id}>

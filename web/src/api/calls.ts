@@ -33,6 +33,15 @@ export interface CallToken {
   expiresAt: string
 }
 
+export type CallConversationType = 'Direct' | 'Group'
+
+/** Người còn lại trong hội thoại 1–1 (lịch sử cuộc gọi). */
+export interface CallPeer {
+  userId: string
+  displayName: string
+  avatarUrl: string | null
+}
+
 export interface CallSummary {
   id: string
   conversationId: string
@@ -43,6 +52,14 @@ export interface CallSummary {
   durationSeconds: number | null
   initiatedBy: string
   iWasInitiator: boolean
+  myStatus: string
+  isMissed: boolean
+  conversationType: CallConversationType
+  conversationTitle: string | null
+  peer: CallPeer | null
+  initiatorDisplayName: string
+  answeredAt: string | null
+  endedAt: string | null
 }
 
 export interface StartCallPayload {
@@ -84,9 +101,12 @@ export const callsApi = {
     return data
   },
 
-  async history(cursor?: string | null): Promise<PagedResult<CallSummary>> {
+  async history(
+    cursor?: string | null,
+    filter: 'all' | 'missed' = 'all',
+  ): Promise<PagedResult<CallSummary>> {
     const { data } = await http.get<PagedResult<CallSummary>>('/api/calls', {
-      params: cursor ? { cursor } : {},
+      params: { filter, ...(cursor ? { cursor } : {}) },
     })
     return data
   },
