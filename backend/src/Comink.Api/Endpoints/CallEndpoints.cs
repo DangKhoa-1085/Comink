@@ -85,7 +85,8 @@ public static class CallEndpoints
         HttpContext httpContext,
         CancellationToken cancellationToken,
         string? cursor = null,
-        int limit = 20)
+        int limit = 20,
+        string? filter = null)
     {
         var userId = CurrentUser.GetUserId(httpContext.User);
         if (userId is null)
@@ -93,7 +94,12 @@ public static class CallEndpoints
             return ApiResults.Problem(ErrorCodes.Unauthorized);
         }
 
-        var result = await callService.GetHistoryAsync(userId.Value, cursor, limit, cancellationToken);
+        var result = await callService.GetHistoryAsync(
+            userId.Value,
+            cursor,
+            limit,
+            filter,
+            cancellationToken);
         return ApiResults.FromResult(result, page => Results.Ok(page));
     }
 

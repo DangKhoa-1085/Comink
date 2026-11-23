@@ -31,7 +31,15 @@ public record CallDto(
 /// <summary>Token ngắn hạn để client vào room LiveKit.</summary>
 public record CallTokenDto(string Url, string Token, string RoomName, DateTimeOffset ExpiresAt);
 
-/// <summary>Một dòng lịch sử cuộc gọi của tôi.</summary>
+/// <summary>Người còn lại trong hội thoại 1–1 (dùng cho lịch sử cuộc gọi).</summary>
+public record CallPeerDto(Guid UserId, string DisplayName, string? AvatarUrl);
+
+/// <summary>
+/// Một dòng lịch sử cuộc gọi của tôi.
+/// <para>
+/// Quyết định D6 (2026-11-21): chỉ **thêm** trường so với bản GĐ 4 để client cũ không vỡ.
+/// </para>
+/// </summary>
 public record CallSummaryDto(
     Guid Id,
     Guid ConversationId,
@@ -41,7 +49,15 @@ public record CallSummaryDto(
     DateTimeOffset CreatedAt,
     int? DurationSeconds,
     Guid InitiatedBy,
-    bool IWasInitiator);
+    bool IWasInitiator,
+    string MyStatus,
+    bool IsMissed,
+    string ConversationType,
+    string? ConversationTitle,
+    CallPeerDto? Peer,
+    string InitiatorDisplayName,
+    DateTimeOffset? AnsweredAt,
+    DateTimeOffset? EndedAt);
 
 /// <summary>Dữ liệu phát kèm sự kiện kết thúc cuộc gọi.</summary>
 public record CallEndedDto(Guid CallId, string Status, string? EndReason, int? DurationSeconds);

@@ -58,11 +58,15 @@ public interface ICallService
         Guid callId,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Lịch sử cuộc gọi của tôi.</summary>
+    /// <summary>
+    /// Lịch sử cuộc gọi của tôi. <paramref name="filter"/> là <c>all</c> (mặc định) hoặc
+    /// <c>missed</c> (chỉ các cuộc gọi mà tôi đã bỏ lỡ).
+    /// </summary>
     Task<OperationResult<PagedList<CallSummaryDto>>> GetHistoryAsync(
         Guid currentUserId,
         string? cursor,
         int limit,
+        string? filter = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>Xử lý sự kiện từ nhà cung cấp (webhook): đóng cuộc gọi treo, cập nhật người vào/rời.</summary>

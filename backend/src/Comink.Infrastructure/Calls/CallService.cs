@@ -313,8 +313,7 @@ public class CallService : ICallService
             return OperationResult<CallDto>.Success(await ToDtoAsync(call.Id, cancellationToken));
         }
 
-        var anyoneJoined = call.AnsweredAt is not null ||
-                           call.Participants.Any(p => p.Status is CallParticipantStatus.Joined or CallParticipantStatus.Left);
+        var anyoneJoined = HasNonInitiatorAnswered(call);
         var cancelledByInitiator = !anyoneJoined && call.InitiatorId == currentUserId;
 
         var (status, reason) = CallRules.ResolveEnd(
@@ -343,8 +342,15 @@ public class CallService : ICallService
         Guid currentUserId,
         string? cursor,
         int limit,
+        string? filter = null,
         CancellationToken cancellationToken = default)
     {
+        var normalizedFilter = string.IsNullOrWhiteSpace(filter) ? "all" : filter.Trim().ToLowerInvariant();
+        if (normalizedFilter is not ("all" or "missed"))
+        {
+            return OperationResult<PagedList<CallSummaryDto>>.Failure(ErrorCodes.ValidationFailed);
+        }
+
         var pageSize = Math.Clamp(limit, 1, 50);
         var decoded = CursorCodec.TryDecode(cursor);
         if (cursor is not null && decoded is null)
@@ -355,6 +361,12 @@ public class CallService : ICallService
         var query = _db.CallParticipants
             .AsNoTracking()
             .Where(p => p.UserId == currentUserId);
+
+        // Lọc "bị lỡ" phía server để phân trang vẫn đúng (không lọc trên một trang đã tải).
+        if (normalizedFilter == "missed")
+        {
+            query = query.Where(p => p.Status == CallParticipantStatus.Missed);
+        }
 
         if (decoded is not null)
         {
@@ -373,30 +385,83 @@ public class CallService : ICallService
             {
                 p.CallId,
                 p.InvitedAt,
+                MyStatus = p.Status,
                 p.Call.ConversationId,
+                ConversationType = p.Call.Conversation.Type,
+                ConversationTitle = p.Call.Conversation.Title,
                 p.Call.Type,
                 p.Call.Status,
                 p.Call.EndReason,
                 p.Call.CreatedAt,
+                p.Call.AnsweredAt,
+                p.Call.EndedAt,
                 p.Call.DurationSeconds,
-                p.Call.InitiatorId
+                p.Call.InitiatorId,
+                InitiatorDisplayName = p.Call.Initiator.Profile != null
+                    ? p.Call.Initiator.Profile.DisplayName
+                    : p.Call.Initiator.UserName
             })
             .ToListAsync(cancellationToken);
 
         var hasMore = rows.Count > pageSize;
         var pageRows = hasMore ? rows.Take(pageSize).ToList() : rows;
 
+        // Người còn lại của hội thoại 1–1: gom một truy vấn cho cả trang (không N+1).
+        var directConversationIds = pageRows
+            .Where(row => row.ConversationType == ConversationType.Direct)
+            .Select(row => row.ConversationId)
+            .Distinct()
+            .ToList();
+
+        var peersByConversation = new Dictionary<Guid, CallPeerDto>();
+        if (directConversationIds.Count > 0)
+        {
+            var peerRows = await _db.ConversationMembers
+                .AsNoTracking()
+                .Where(m => directConversationIds.Contains(m.ConversationId) &&
+                            m.UserId != currentUserId)
+                .Select(m => new
+                {
+                    m.ConversationId,
+                    m.UserId,
+                    DisplayName = m.User.Profile != null ? m.User.Profile.DisplayName : m.User.UserName,
+                    AvatarUrl = m.User.Profile != null ? m.User.Profile.AvatarUrl : null
+                })
+                .ToListAsync(cancellationToken);
+
+            foreach (var group in peerRows.GroupBy(row => row.ConversationId))
+            {
+                var peer = group.First();
+                peersByConversation[group.Key] = new CallPeerDto(
+                    peer.UserId,
+                    peer.DisplayName ?? string.Empty,
+                    peer.AvatarUrl);
+            }
+        }
+
         var items = pageRows
-            .Select(row => new CallSummaryDto(
-                row.CallId,
-                row.ConversationId,
-                row.Type.ToString(),
-                row.Status.ToString(),
-                row.EndReason?.ToString(),
-                row.CreatedAt,
-                row.DurationSeconds,
-                row.InitiatorId,
-                row.InitiatorId == currentUserId))
+            .Select(row =>
+            {
+                peersByConversation.TryGetValue(row.ConversationId, out var peer);
+                return new CallSummaryDto(
+                    row.CallId,
+                    row.ConversationId,
+                    row.Type.ToString(),
+                    row.Status.ToString(),
+                    row.EndReason?.ToString(),
+                    row.CreatedAt,
+                    row.DurationSeconds,
+                    row.InitiatorId,
+                    row.InitiatorId == currentUserId,
+                    row.MyStatus.ToString(),
+                    row.MyStatus == CallParticipantStatus.Missed,
+                    row.ConversationType.ToString(),
+                    row.ConversationTitle,
+                    peer,
+                    row.InitiatorDisplayName ?? string.Empty,
+                    row.AnsweredAt,
+                    row.EndedAt);
+            })
             .ToList();
 
         var nextCursor = hasMore && pageRows.Count > 0
@@ -421,9 +486,9 @@ public class CallService : ICallService
 
         foreach (var call in expiredCalls)
         {
-            // Ai đó đã vào room trước khi hết giờ → không phải "không ai nghe".
-            if (call.AnsweredAt is not null ||
-                call.Participants.Any(p => p.Status is CallParticipantStatus.Joined or CallParticipantStatus.Left))
+            // Chỉ người KHÔNG phải người gọi vào room mới tính là "có người nghe".
+            // (Người gọi thường vào room ngay để chờ máy — xem quyết định D1.)
+            if (HasNonInitiatorAnswered(call))
             {
                 continue;
             }
@@ -441,12 +506,85 @@ public class CallService : ICallService
         return finished;
     }
 
-    /// <summary>Đánh dấu những người chưa trả lời là <c>Missed</c>.</summary>
+    /// <summary>Đánh dấu những người được mời nhưng chưa trả lời là <c>Missed</c> (trừ người gọi).</summary>
     private static void MarkInvitedAsMissed(Call call)
     {
-        foreach (var participant in call.Participants.Where(p => p.Status == CallParticipantStatus.Invited))
+        foreach (var participant in call.Participants.Where(p =>
+                     p.UserId != call.InitiatorId && p.Status == CallParticipantStatus.Invited))
         {
             participant.Status = CallParticipantStatus.Missed;
+        }
+    }
+
+    /// <summary>
+    /// Đã có người nghe chưa? Chỉ tính người **không phải người gọi** đã vào room — quyết định D1
+    /// (Ưu tiên 3). Người gọi vào room trước để chờ máy không làm cuộc gọi thành <c>InProgress</c>.
+    /// </summary>
+    private static bool HasNonInitiatorAnswered(Call call) =>
+        call.AnsweredAt is not null ||
+        call.Participants.Any(p =>
+            p.UserId != call.InitiatorId &&
+            p.Status is CallParticipantStatus.Joined or CallParticipantStatus.Left);
+
+    /// <summary>
+    /// Tạo thông báo + push <see cref="NotificationType.MissedCall"/> cho những người đã bỏ lỡ
+    /// cuộc gọi (quyết định D3, Ưu tiên 3). Kiểm tra <c>entity_id = call_id</c> để không tạo trùng
+    /// khi webhook và client cùng kết thúc cuộc gọi.
+    /// </summary>
+    private async Task NotifyMissedParticipantsAsync(Call call, CancellationToken cancellationToken)
+    {
+        if (_notifications is null)
+        {
+            return;
+        }
+
+        var missedUserIds = call.Participants
+            .Where(p => p.UserId != call.InitiatorId && p.Status == CallParticipantStatus.Missed)
+            .Select(p => p.UserId)
+            .Distinct()
+            .ToList();
+
+        if (missedUserIds.Count == 0)
+        {
+            return;
+        }
+
+        var alreadyNotified = await _db.Notifications
+            .AsNoTracking()
+            .Where(n => n.Type == NotificationType.MissedCall &&
+                        n.EntityId == call.Id &&
+                        missedUserIds.Contains(n.RecipientId))
+            .Select(n => n.RecipientId)
+            .ToListAsync(cancellationToken);
+
+        var targets = missedUserIds.Except(alreadyNotified).ToList();
+        if (targets.Count == 0)
+        {
+            return;
+        }
+
+        var initiatorName = await GetDisplayNameAsync(call.InitiatorId, cancellationToken);
+        var callKind = call.Type == CallType.Video ? "video" : "thoại";
+        var body = $"{initiatorName} đã gọi {callKind} cho bạn";
+
+        foreach (var userId in targets)
+        {
+            await _notifications.CreateAndPushAsync(
+                userId,
+                call.InitiatorId,
+                NotificationType.MissedCall,
+                "Call",
+                call.Id,
+                "Cuộc gọi nhỡ",
+                body,
+                new Dictionary<string, string>
+                {
+                    ["type"] = "CallMissed",
+                    ["callId"] = call.Id.ToString(),
+                    ["conversationId"] = call.ConversationId.ToString(),
+                    ["callType"] = call.Type.ToString(),
+                },
+                cancellationToken);
         }
     }
 
@@ -476,8 +614,15 @@ public class CallService : ICallService
                 break;
 
             case CallProviderEventType.ParticipantJoined:
+            {
+                var parsed = Guid.TryParse(providerEvent.ParticipantIdentity, out var joinedUserId);
                 MarkParticipant(call, providerEvent.ParticipantIdentity, joined: true);
-                if (!CallRules.IsTerminal(call.Status))
+
+                // Quyết định D1 (Ưu tiên 3): người gọi vào room trước để chờ máy KHÔNG có nghĩa
+                // là cuộc gọi đã được nghe. Chỉ khi một người KHÁC người gọi tham gia mới đặt
+                // answered_at / InProgress — nếu không, mọi cuộc gọi sẽ thành InProgress ngay khi
+                // bắt đầu và không bao giờ hết giờ đổ chuông (Missed), đồng hồ thời lượng cũng sai.
+                if (parsed && joinedUserId != call.InitiatorId && !CallRules.IsTerminal(call.Status))
                 {
                     call.AnsweredAt ??= DateTimeOffset.UtcNow;
                     call.Status = CallStatus.InProgress;
@@ -485,6 +630,7 @@ public class CallService : ICallService
 
                 await _db.SaveChangesAsync(cancellationToken);
                 break;
+            }
 
             case CallProviderEventType.ParticipantLeft:
                 MarkParticipant(call, providerEvent.ParticipantIdentity, joined: false);
@@ -494,9 +640,7 @@ public class CallService : ICallService
             case CallProviderEventType.RoomFinished:
                 if (!CallRules.IsTerminal(call.Status))
                 {
-                    var anyoneJoined = call.AnsweredAt is not null ||
-                                       call.Participants.Any(p =>
-                                           p.Status is CallParticipantStatus.Joined or CallParticipantStatus.Left);
+                    var anyoneJoined = HasNonInitiatorAnswered(call);
                     var (status, reason) = CallRules.ResolveEnd(
                         anyoneJoined,
                         cancelledByInitiator: false,
@@ -527,12 +671,24 @@ public class CallService : ICallService
         call.EndedAt = now;
         call.DurationSeconds = CallRules.ComputeDurationSeconds(call.AnsweredAt, now);
 
+        // Cuộc gọi nhỡ: người gọi không phải "người bị nhỡ". Đánh dấu ở đây để mọi nhánh kết
+        // thúc (timeout, webhook room_finished, answer quá giờ) có cùng trạng thái participant.
+        if (status == CallStatus.Missed)
+        {
+            MarkInvitedAsMissed(call);
+        }
+
         await _db.SaveChangesAsync(cancellationToken);
 
         // Room có thể đã tự xoá; EndRoomAsync không ném ra ngoài.
         await _provider.EndRoomAsync(call.RoomName, cancellationToken);
 
         await WriteCallMessageAsync(call, cancellationToken);
+
+        if (status == CallStatus.Missed)
+        {
+            await NotifyMissedParticipantsAsync(call, cancellationToken);
+        }
 
         var dto = await ToDtoAsync(call.Id, cancellationToken);
 

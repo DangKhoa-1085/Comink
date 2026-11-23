@@ -442,6 +442,176 @@ public class CallServiceTests : IntegrationTestBase
         Assert.NotEmpty(notifier.Ended);
     }
 
+    /// <summary>
+    /// Quyết định D1 (Ưu tiên 3): người gọi vào room để chờ máy KHÔNG làm cuộc gọi thành InProgress.
+    /// </summary>
+    [Fact]
+    public async Task ProviderParticipantJoined_ForInitiator_KeepsCallRinging()
+    {
+        var (db, alice, _, conversation) = await CreateDirectPairAsync();
+        var service = NewService(db, new FakeCallProvider(), new RecordingCallNotifier());
+        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, "Audio"));
+
+        // Người gọi vào LiveKit room ngay sau khi bấm gọi (luồng thật của CallPage).
+        await service.HandleProviderEventAsync(
+            new CallProviderEvent(
+                CallProviderEventType.ParticipantJoined,
+                call.Value!.RoomName,
+                alice.Id.ToString()));
+
+        var reloaded = await db.Calls.FindAsync(call.Value.Id);
+        Assert.Equal(CallStatus.Ringing, reloaded!.Status);
+        Assert.Null(reloaded.AnsweredAt);
+
+        var initiator = db.CallParticipants.Single(
+            p => p.CallId == call.Value.Id && p.UserId == alice.Id);
+        Assert.Equal(CallParticipantStatus.Joined, initiator.Status);
+        Assert.NotNull(initiator.JoinedAt);
+    }
+
+    /// <summary>
+    /// Hết 30 giây mà chỉ người gọi ở trong room: phải đóng Missed và báo cho người bị gỡ.
+    /// </summary>
+    [Fact]
+    public async Task TimeoutRinging_WhenOnlyInitiatorJoined_EndsMissedAndNotifiesInvitee()
+    {
+        var (db, alice, bob, conversation) = await CreateDirectPairAsync();
+        var push = new FakeNotificationService();
+        var notifier = new RecordingCallNotifier();
+        var service = NewService(
+            db,
+            new FakeCallProvider(),
+            notifier,
+            notifications: push);
+        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, "Video"));
+
+        await service.HandleProviderEventAsync(
+            new CallProviderEvent(
+                CallProviderEventType.ParticipantJoined,
+                call.Value!.RoomName,
+                alice.Id.ToString()));
+
+        var stored = await db.Calls.FindAsync(call.Value.Id);
+        stored!.CreatedAt = DateTimeOffset.UtcNow.AddSeconds(-31);
+        await db.SaveChangesAsync();
+
+        var finished = await service.TimeoutRingingCallsAsync();
+
+        Assert.Equal(1, finished);
+        var reloaded = await db.Calls.FindAsync(call.Value.Id);
+        Assert.Equal(CallStatus.Missed, reloaded!.Status);
+        Assert.Equal(CallEndReason.NoAnswer, reloaded.EndReason);
+
+        var invitee = db.CallParticipants.Single(
+            p => p.CallId == call.Value.Id && p.UserId == bob.Id);
+        Assert.Equal(CallParticipantStatus.Missed, invitee.Status);
+
+        var initiator = db.CallParticipants.Single(
+            p => p.CallId == call.Value.Id && p.UserId == alice.Id);
+        Assert.NotEqual(CallParticipantStatus.Missed, initiator.Status);
+
+        // Chỉ người bị gỡ nhận thông báo; người gọi không nhận.
+        var created = Assert.Single(push.Creates);
+        Assert.Equal(bob.Id, created.RecipientId);
+        Assert.Equal(alice.Id, created.ActorId);
+        Assert.Equal(NotificationType.MissedCall, created.Type);
+        Assert.Equal("Call", created.EntityType);
+        Assert.Equal(call.Value.Id, created.EntityId);
+        Assert.Contains(
+            push.Pushes,
+            record => record.Data is not null &&
+                      record.Data["type"] == "CallMissed" &&
+                      record.UserIds.Contains(bob.Id));
+
+        Assert.NotEmpty(notifier.Ended);
+    }
+
+    /// <summary>Huỷ trước khi có ai nghe phải là Cancelled (không phải Completed 0 giây).</summary>
+    [Fact]
+    public async Task End_WhenOnlyInitiatorJoined_IsCancelled()
+    {
+        var (db, alice, _, conversation) = await CreateDirectPairAsync();
+        var service = NewService(db, new FakeCallProvider(), new RecordingCallNotifier());
+        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, "Audio"));
+
+        await service.HandleProviderEventAsync(
+            new CallProviderEvent(
+                CallProviderEventType.ParticipantJoined,
+                call.Value!.RoomName,
+                alice.Id.ToString()));
+
+        var ended = await service.EndAsync(alice.Id, call.Value.Id);
+
+        Assert.True(ended.Succeeded);
+        Assert.Equal("Cancelled", ended.Value!.Status);
+        Assert.Equal("Cancelled", ended.Value.EndReason);
+        Assert.Null(ended.Value.DurationSeconds);
+
+        var message = db.Messages.Single(m => m.CallId == call.Value.Id);
+        Assert.EndsWith(":Cancelled", message.Content);
+    }
+
+    /// <summary>Lịch sử nạp tên người còn lại + trạng thái participant của tôi, không N+1.</summary>
+    [Fact]
+    public async Task GetHistory_IncludesPeerAndMyStatus()
+    {
+        var (db, alice, bob, conversation) = await CreateDirectPairAsync();
+        var service = NewService(db, new FakeCallProvider(), new RecordingCallNotifier());
+        var call = await service.StartAsync(alice.Id, new StartCallRequest(conversation.Id, "Audio"));
+
+        var history = await service.GetHistoryAsync(alice.Id, null, 20);
+
+        Assert.True(history.Succeeded);
+        var summary = Assert.Single(history.Value!.Items);
+        Assert.Equal(call.Value!.Id, summary.Id);
+        Assert.Equal("Direct", summary.ConversationType);
+        Assert.Null(summary.ConversationTitle);
+        Assert.NotNull(summary.Peer);
+        Assert.Equal(bob.Id, summary.Peer!.UserId);
+        Assert.Equal("Bob", summary.Peer.DisplayName);
+        Assert.Equal("Alice", summary.InitiatorDisplayName);
+        Assert.Equal("Invited", summary.MyStatus);
+        Assert.False(summary.IsMissed);
+        Assert.True(summary.IWasInitiator);
+    }
+
+    /// <summary>Lọc `missed` chỉ trả cuộc gọi tôi đã bỏ lỡ; filter lạ bị từ chối.</summary>
+    [Fact]
+    public async Task GetHistory_MissedFilter_ReturnsOnlyMissedCalls()
+    {
+        var (db, alice, bob, conversation) = await CreateDirectPairAsync();
+        var service = NewService(db, new FakeCallProvider(), new RecordingCallNotifier());
+
+        var missedCall = await service.StartAsync(
+            alice.Id,
+            new StartCallRequest(conversation.Id, "Audio"));
+        var stored = await db.Calls.FindAsync(missedCall.Value!.Id);
+        stored!.CreatedAt = DateTimeOffset.UtcNow.AddSeconds(-31);
+        await db.SaveChangesAsync();
+        await service.TimeoutRingingCallsAsync();
+
+        // Cuộc gọi thứ hai: người gọi huỷ trước khi ai nghe → Cancelled, không nằm trong "missed".
+        var cancelledCall = await service.StartAsync(
+            alice.Id,
+            new StartCallRequest(conversation.Id, "Video"));
+        await service.EndAsync(alice.Id, cancelledCall.Value!.Id);
+
+        var all = await service.GetHistoryAsync(bob.Id, null, 20);
+        var missed = await service.GetHistoryAsync(bob.Id, null, 20, "missed");
+
+        Assert.True(all.Succeeded);
+        Assert.Equal(2, all.Value!.Items.Count);
+        Assert.True(missed.Succeeded);
+        var onlyMissed = Assert.Single(missed.Value!.Items);
+        Assert.Equal(missedCall.Value.Id, onlyMissed.Id);
+        Assert.True(onlyMissed.IsMissed);
+        Assert.Equal("Missed", onlyMissed.MyStatus);
+
+        var invalid = await service.GetHistoryAsync(bob.Id, null, 20, "bogus");
+        Assert.False(invalid.Succeeded);
+        Assert.Equal(ErrorCodes.ValidationFailed, invalid.ErrorCode);
+    }
+
     /// <summary>Người nhận bấm nghe sau khi hết giờ đổ chuông → CALL_ALREADY_ENDED, không vào room.</summary>
     [Fact]
     public async Task Answer_AfterRingTimeout_IsRejected()
