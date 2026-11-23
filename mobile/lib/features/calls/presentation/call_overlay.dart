@@ -6,6 +6,7 @@ import 'package:livekit_client/livekit_client.dart';
 
 import '../../../core/i18n/app_localizations.dart';
 import '../../../core/widgets/app_avatar.dart';
+import '../../auth/data/session_controller.dart';
 import '../data/call_controller.dart';
 import '../domain/call_models.dart';
 
@@ -128,9 +129,10 @@ class _ActiveView extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final room = ref.read(callControllerProvider.notifier).room;
     final call = state.call;
+    final remoteParticipants = <Participant>[...?room?.remoteParticipants.values];
     final participants = <Participant>[
       if (room?.localParticipant != null) room!.localParticipant!,
-      ...?room?.remoteParticipants.values,
+      ...remoteParticipants,
     ];
     final isVideo = call?.isVideo == true;
 
@@ -168,18 +170,36 @@ class _ActiveView extends ConsumerWidget {
           ),
         ),
         Expanded(
-          child: participants.isEmpty
-              ? Center(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (participants.isEmpty)
+                Center(
                   child: Text(
                     l10n.t('call_waiting_others'),
                     style: const TextStyle(color: Colors.white54),
                   ),
                 )
-              : _ParticipantGrid(
+              else
+                _ParticipantGrid(
                   participants: participants,
                   call: call,
                   isVideo: isVideo,
                 ),
+              // Chỉ hiện "đang chờ" khi chưa có NGƯỜI KHÁC vào phòng; có người rồi thì ẩn.
+              if (remoteParticipants.isEmpty && participants.isNotEmpty)
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      l10n.t('call_waiting_others'),
+                      style: const TextStyle(color: Colors.white54, fontSize: 12),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
@@ -330,18 +350,31 @@ class _EndedView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final controller = ref.read(callControllerProvider.notifier);
+    final me = ref.watch(sessionControllerProvider).user?.id;
+    final endedReason = state.endedReason;
+    final missed = state.errorCode == null &&
+        (endedReason == 'NoAnswer' || endedReason == 'Missed') &&
+        state.call?.initiatedBy != me;
 
     return Column(
       children: [
         const Spacer(),
         Icon(
-          state.errorCode == null ? Icons.call_end : Icons.error_outline,
+          state.errorCode != null
+              ? Icons.error_outline
+              : missed
+                  ? Icons.call_missed
+                  : Icons.call_end,
           size: 54,
           color: state.errorCode == null ? Colors.white70 : Colors.redAccent,
         ),
         const SizedBox(height: 16),
         Text(
-          state.errorCode == null ? l10n.t('call_ended_title') : l10n.t('call_error'),
+          state.errorCode != null
+              ? l10n.t('call_error')
+              : missed
+                  ? l10n.t('call_missed_title')
+                  : l10n.t('call_ended_title'),
           style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
         ),
         if (state.errorCode != null)

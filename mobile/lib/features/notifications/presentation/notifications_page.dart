@@ -90,6 +90,7 @@ class NotificationsPage extends ConsumerWidget {
       case 'FriendRequestAccepted':
         context.go('/friends');
       case 'MissedCall':
+        // Không còn màn hình lịch sử; mở hội thoại để xem bong bóng cuộc gọi.
         final conversationId = notification.conversationId;
         if (conversationId != null) {
           context.push('/chats/$conversationId');

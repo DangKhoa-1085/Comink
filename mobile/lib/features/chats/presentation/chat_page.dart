@@ -14,6 +14,7 @@ import '../../../core/utils/uuid.dart';
 import '../../../core/widgets/states.dart';
 import '../../auth/data/session_controller.dart';
 import '../../calls/data/call_controller.dart';
+import '../../calls/domain/call_format.dart';
 import '../../media/data/media_service.dart';
 import '../data/chat_providers.dart';
 import '../data/chat_realtime.dart';
@@ -1576,9 +1577,24 @@ class _MessageBubble extends StatelessWidget {
                         ),
                     if (message.content != null)
                       message.type == 'Call'
-                          ? Text(
-                              l10n.t('chat_call'),
-                              style: TextStyle(color: textColor, fontSize: 15),
+                          ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  message.content!.startsWith('call:Video:')
+                                      ? Icons.videocam
+                                      : Icons.call,
+                                  size: 16,
+                                  color: textColor,
+                                ),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    formatCallMessage(message.content, l10n),
+                                    style: TextStyle(color: textColor, fontSize: 15),
+                                  ),
+                                ),
+                              ],
                             )
                           : Text.rich(
                               TextSpan(

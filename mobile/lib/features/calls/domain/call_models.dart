@@ -66,6 +66,97 @@ class CallInfo {
       );
 }
 
+/// Người còn lại trong hội thoại 1–1 (lịch sử cuộc gọi — Ưu tiên 3).
+class CallPeer {
+  const CallPeer({
+    required this.userId,
+    required this.displayName,
+    this.avatarUrl,
+  });
+
+  final String userId;
+  final String displayName;
+  final String? avatarUrl;
+
+  factory CallPeer.fromJson(Map<String, dynamic> json) => CallPeer(
+        userId: (json['userId'] ?? '').toString(),
+        displayName: (json['displayName'] ?? '').toString(),
+        avatarUrl: json['avatarUrl']?.toString(),
+      );
+}
+
+/// Một dòng lịch sử cuộc gọi — khớp `CallSummaryDto` (docs/05 mục 9.8).
+class CallSummary {
+  const CallSummary({
+    required this.id,
+    required this.conversationId,
+    required this.type,
+    required this.status,
+    required this.createdAt,
+    required this.initiatedBy,
+    required this.iWasInitiator,
+    required this.myStatus,
+    required this.isMissed,
+    required this.conversationType,
+    required this.initiatorDisplayName,
+    this.endReason,
+    this.durationSeconds,
+    this.conversationTitle,
+    this.peer,
+    this.answeredAt,
+    this.endedAt,
+  });
+
+  final String id;
+  final String conversationId;
+  final String type;
+  final String status;
+  final String? endReason;
+  final DateTime createdAt;
+  final int? durationSeconds;
+  final String initiatedBy;
+  final bool iWasInitiator;
+  final String myStatus;
+  final bool isMissed;
+  final String conversationType;
+  final String? conversationTitle;
+  final CallPeer? peer;
+  final String initiatorDisplayName;
+  final DateTime? answeredAt;
+  final DateTime? endedAt;
+
+  bool get isVideo => type == 'Video';
+  bool get isGroup => conversationType == 'Group';
+
+  factory CallSummary.fromJson(Map<String, dynamic> json) => CallSummary(
+        id: (json['id'] ?? '').toString(),
+        conversationId: (json['conversationId'] ?? '').toString(),
+        type: (json['type'] ?? 'Audio').toString(),
+        status: (json['status'] ?? '').toString(),
+        endReason: json['endReason']?.toString(),
+        createdAt:
+            DateTime.tryParse((json['createdAt'] ?? '').toString())?.toLocal() ??
+                DateTime.fromMillisecondsSinceEpoch(0),
+        durationSeconds:
+            json['durationSeconds'] is int ? json['durationSeconds'] as int : null,
+        initiatedBy: (json['initiatedBy'] ?? '').toString(),
+        iWasInitiator: json['iWasInitiator'] == true,
+        myStatus: (json['myStatus'] ?? '').toString(),
+        isMissed: json['isMissed'] == true,
+        conversationType: (json['conversationType'] ?? 'Direct').toString(),
+        conversationTitle: json['conversationTitle']?.toString(),
+        peer: json['peer'] is Map
+            ? CallPeer.fromJson(
+                (json['peer'] as Map).cast<String, dynamic>(),
+              )
+            : null,
+        initiatorDisplayName: (json['initiatorDisplayName'] ?? '').toString(),
+        answeredAt:
+            DateTime.tryParse((json['answeredAt'] ?? '').toString())?.toLocal(),
+        endedAt: DateTime.tryParse((json['endedAt'] ?? '').toString())?.toLocal(),
+      );
+}
+
 class CallToken {
   const CallToken({required this.url, required this.token, required this.roomName});
 

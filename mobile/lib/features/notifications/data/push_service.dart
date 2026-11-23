@@ -238,6 +238,14 @@ class PushService {
       case 'FriendRequest':
       case 'FriendAccepted':
         _ref.read(routerProvider).go('/friends');
+      case 'CallMissed':
+        // Không còn màn hình lịch sử; mở hội thoại để xem bong bóng cuộc gọi nhỡ.
+        final conversationId = data['conversationId'];
+        _ref.read(routerProvider).go(
+          conversationId == null
+              ? '/notifications'
+              : '/chats/$conversationId',
+        );
       case 'CallIncoming':
         final callId = data['callId'];
         if (callId != null) {

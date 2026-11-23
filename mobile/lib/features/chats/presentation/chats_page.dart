@@ -6,6 +6,7 @@ import '../../../core/i18n/app_localizations.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/widgets/app_avatar.dart';
 import '../../../core/widgets/states.dart';
+import '../../calls/domain/call_format.dart';
 import '../data/chat_providers.dart';
 import '../domain/chat_models.dart';
 import 'create_group_dialog.dart';
@@ -117,7 +118,7 @@ class _ConversationTile extends StatelessWidget {
             : lastMessage.type == 'Image'
                 ? l10n.t('chat_image')
                 : lastMessage.type == 'Call'
-                    ? l10n.t('chat_call')
+                    ? formatCallMessage(lastMessage.preview, l10n)
                     : lastMessage.preview);
 
     return ListTile(

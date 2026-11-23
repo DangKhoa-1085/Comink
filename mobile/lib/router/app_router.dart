@@ -75,6 +75,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const ChatsPage(),
           ),
           GoRoute(
+            path: '/calls',
+            // Lịch sử cuộc gọi đã được ẩn; link cũ quay về Tin nhắn.
+            redirect: (context, state) => '/chats',
+          ),
+          GoRoute(
             path: '/profile',
             builder: (context, state) => const ProfilePage(),
           ),
