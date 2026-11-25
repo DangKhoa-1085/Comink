@@ -17,7 +17,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
       POSTGRES_DB: ${POSTGRES_DB:-comink}
     ports:
-      - "5432:5432"
+      # Chỉ mở trên loopback: mật khẩu dev nằm trong repo nên không được để máy
+      # khác trong cùng mạng LAN kết nối tới PostgreSQL của môi trường dev.
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -41,7 +43,8 @@ services:
       --save 60 1
       --loglevel warning
     ports:
-      - "6379:6379"
+      # Chỉ mở trên loopback (xem giải thích ở service postgres).
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -74,8 +77,8 @@ services:
   # -------------------------------------------------
   # LiveKit — Media server cho gọi thoại/video (chế độ dev)
   # API/WS: localhost:7880
-  # TURN/TCP: localhost:7881
-  # TURN/UDP: localhost:7882
+  # RTC/TCP: localhost:7881 · RTC/UDP: localhost:7882
+  # TURN (GĐ 4): UDP 3478 + TLS 5349 — dùng IP LAN khai báo trong livekit.yaml
   # -------------------------------------------------
   livekit:
     image: livekit/livekit-server:latest
@@ -84,8 +87,10 @@ services:
     command: --config /etc/livekit/livekit.yaml
     ports:
       - "7880:7880"   # HTTP API + WebSocket
-      - "7881:7881"   # TURN/TCP
-      - "7882:7882/udp" # TURN/UDP
+      - "7881:7881"   # RTC over TCP
+      - "7882:7882/udp" # RTC over UDP
+      - "3478:3478/udp" # TURN/UDP (GĐ 4)
+      - "30500-30510:30500-30510/udp" # Dải relay của TURN (khớp relay_range_start/end trong livekit.yaml)
     volumes:
       - ./livekit.yaml:/etc/livekit/livekit.yaml:ro
     networks:

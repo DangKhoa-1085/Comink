@@ -1,5 +1,6 @@
 // ApplicationDbContext — EF Core DbContext chính
 using Comink.Infrastructure.Identity;
+using Comink.Infrastructure.Persistence.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -24,12 +25,46 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<UserSettings> UserSettings => Set<UserSettings>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    // --- Mạng xã hội (Giai đoạn 2) ---
+    public DbSet<Friendship> Friendships => Set<Friendship>();
+    public DbSet<Follow> Follows => Set<Follow>();
+    public DbSet<Post> Posts => Set<Post>();
+    public DbSet<PostMedia> PostMediaLinks => Set<PostMedia>();
+    public DbSet<PostLike> PostLikes => Set<PostLike>();
+    public DbSet<Comment> Comments => Set<Comment>();
+
+    // --- Hình ảnh và tệp (Giai đoạn 2) ---
+    public DbSet<MediaAsset> MediaAssets => Set<MediaAsset>();
+
+    // --- Nhắn tin (Giai đoạn 3) ---
+    public DbSet<Conversation> Conversations => Set<Conversation>();
+    public DbSet<ConversationMember> ConversationMembers => Set<ConversationMember>();
+    public DbSet<Message> Messages => Set<Message>();
+    public DbSet<MessageAttachment> MessageAttachments => Set<MessageAttachment>();
+
+    // --- Nhắn tin nâng cao (Giai đoạn 7 — Ưu tiên 2, M7) ---
+    public DbSet<MessageReaction> MessageReactions => Set<MessageReaction>();
+    public DbSet<PinnedMessage> PinnedMessages => Set<PinnedMessage>();
+
+    // --- Cuộc gọi (Giai đoạn 4) ---
+    public DbSet<Call> Calls => Set<Call>();
+    public DbSet<CallParticipant> CallParticipants => Set<CallParticipant>();
+
+    // --- Thông báo / push (Giai đoạn 6) ---
+    public DbSet<UserDevice> UserDevices => Set<UserDevice>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
 
         // Áp dụng tất cả IEntityTypeConfiguration<T> từ cùng assembly
         builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+
+        // Ánh xạ hàm PostgreSQL tuỳ biến để gọi được từ LINQ (tìm kiếm không dấu).
+        builder.HasDbFunction(typeof(CominkDbFunctions).GetMethod(nameof(CominkDbFunctions.ImmutableUnaccent))!)
+            .HasName("immutable_unaccent")
+            .HasSchema("public");
 
         // Đổi tên bảng Identity sang snake_case (EFCore.NamingConventions đã xử lý cột,
         // nhưng tên bảng Identity cần đổi thủ công vì chúng được đặt tên cứng)

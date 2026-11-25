@@ -1,10 +1,29 @@
 // DI registration cho Infrastructure layer
+using System.Security.Claims;
+using System.Text;
+using Comink.Application.Admin;
+using Comink.Application.Admin.Abstractions;
+using Comink.Application.Common.Interfaces;
+using Comink.Application.Identity;
+using Comink.Application.Identity.Abstractions;
+using Comink.Application.Messaging.Abstractions;
+using Comink.Application.Calls.Abstractions;
+using Comink.Application.Notifications.Abstractions;
+using Comink.Application.Social;
+using Comink.Application.Social.Abstractions;
+using Comink.Domain.Admin;
 using Comink.Infrastructure.Identity;
+using Comink.Infrastructure.Media;
+using Comink.Infrastructure.Notifications;
 using Comink.Infrastructure.Persistence;
+using Comink.Infrastructure.Social;
+using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
 using StackExchange.Redis;
 
 namespace Comink.Infrastructure;
@@ -19,6 +38,9 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        // --- Thời gian (cho phép test thay thế đồng hồ) ---
+        services.TryAddTimeProvider();
+
         // --- PostgreSQL + EF Core ---
         services.AddDbContext<ApplicationDbContext>(options =>
         {
@@ -55,6 +77,145 @@ public static class DependencyInjection
         .AddEntityFrameworkStores<ApplicationDbContext>()
         .AddDefaultTokenProviders();
 
+        // --- JWT ---
+        services.AddOptions<JwtOptions>()
+            .Bind(configuration.GetSection(JwtOptions.SectionName))
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.Secret) && options.Secret.Length >= 32,
+                "Jwt:Secret phải được cấu hình và dài tối thiểu 32 ký tự.")
+            .ValidateOnStart();
+
+        var jwtSection = configuration.GetSection(JwtOptions.SectionName);
+        var jwtIssuer = jwtSection["Issuer"] ?? "comink-api";
+        var jwtAudience = jwtSection["Audience"] ?? "comink-clients";
+        var jwtSecret = jwtSection["Secret"];
+        if (string.IsNullOrWhiteSpace(jwtSecret))
+        {
+            throw new InvalidOperationException(
+                "Jwt:Secret chưa được cấu hình. Đặt trong .env (Jwt__Secret) hoặc dotnet user-secrets.");
+        }
+
+        services
+            .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(options =>
+            {
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidIssuer = jwtIssuer,
+                    ValidateAudience = true,
+                    ValidAudience = jwtAudience,
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+                    ValidateLifetime = true,
+                    // Mặc định .NET cho phép lệch 5 phút; đặt 30 giây để token hết hạn đúng hơn.
+                    ClockSkew = TimeSpan.FromSeconds(30),
+                    // Hub SignalR lấy Context.UserIdentifier từ claim này để đưa client vào nhóm user:{id}.
+                    NameClaimType = System.Security.Claims.ClaimTypes.NameIdentifier
+                };
+
+                // SignalR: trình duyệt không gửi được header Authorization qua WebSocket,
+                // nên chấp nhận access token qua query string `access_token`.
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.Request.Query["access_token"];
+                        var path = context.HttpContext.Request.Path;
+                        if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hub"))
+                        {
+                            context.Token = accessToken;
+                        }
+
+                        return Task.CompletedTask;
+                    },
+
+                    // Giai đoạn 5 (D1): access token không thu hồi được nên phải kiểm tra lại trạng thái
+                    // tài khoản ở MỌI request. Thiếu bước này thì tài khoản vừa bị khóa vẫn dùng được
+                    // access token cũ tới khi hết hạn (15 phút).
+                    OnTokenValidated = async context =>
+                    {
+                        var rawUserId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+                        if (!Guid.TryParse(rawUserId, out var userId))
+                        {
+                            context.Fail("Access token thiếu định danh người dùng hợp lệ.");
+                            return;
+                        }
+
+                        var identityService = context.HttpContext.RequestServices
+                            .GetRequiredService<IIdentityService>();
+                        var accountStatus = await identityService.GetAccountStatusAsync(
+                            userId,
+                            context.HttpContext.RequestAborted);
+
+                        if (!AdminUserRules.IsActive(accountStatus))
+                        {
+                            context.Fail("Tài khoản đã bị khóa.");
+                        }
+                    }
+                };
+            });
+
+        // AddIdentity ở trên đăng ký cookie scheme và đặt nó làm mặc định.
+        // API này xác thực bằng JWT nên phải ghi đè cả ba scheme mặc định;
+        // nếu không, request thiếu token sẽ bị chuyển hướng 302 tới /Account/Login
+        // thay vì trả 401/403 theo hợp đồng (docs/05_api_contract.md mục 5).
+        services.AddAuthentication(options =>
+        {
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultForbidScheme = JwtBearerDefaults.AuthenticationScheme;
+        });
+
+        // --- Phân quyền theo role ---
+        services.AddAuthorizationBuilder()
+            .AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"))
+            .AddPolicy("Authenticated", policy => policy.RequireAuthenticatedUser());
+
+        // --- Cổng và dịch vụ nghiệp vụ ---
+        services.AddScoped<IIdentityService, IdentityService>();
+        services.AddScoped<ITokenService, JwtTokenService>();
+        services.AddScoped<AuthService>();
+        services.AddScoped<ProfileService>();
+
+        // --- Quản trị (Giai đoạn 5) ---
+        services.AddScoped<IAdminService, AdminService>();
+
+        // --- Mạng xã hội (Giai đoạn 2) ---
+        services.AddScoped<IUserDirectoryService, UserDirectoryService>();
+        services.AddScoped<IFriendshipService, FriendshipService>();
+        services.AddScoped<IFollowService, FollowService>();
+        services.AddScoped<IPostService, PostService>();
+        services.AddScoped<ILikeService, LikeService>();
+        services.AddScoped<ICommentService, CommentService>();
+        services.AddScoped<IMediaService, MediaService>();
+
+        // --- Nhắn tin (Giai đoạn 3) ---
+        services.AddScoped<IConversationService, Messaging.ConversationService>();
+        services.AddScoped<IMessageService, Messaging.MessageService>();
+        services.AddScoped<IPinnedMessageService, Messaging.PinnedMessageService>();
+
+        // --- Cuộc gọi (Giai đoạn 4) ---
+        services.Configure<Calls.LiveKitOptions>(configuration.GetSection(Calls.LiveKitOptions.SectionName));
+        services.AddSingleton<ICallProvider, Calls.LiveKitCallProvider>();
+        services.AddScoped<ICallService, Calls.CallService>();
+
+        // --- Thông báo / push FCM (Giai đoạn 6) ---
+        services.Configure<FirebasePushOptions>(configuration.GetSection(FirebasePushOptions.SectionName));
+        services.AddSingleton<IPushSender, FcmPushSender>();
+        services.AddScoped<INotificationService, NotificationService>();
+
+        // --- Lưu trữ media: Cloudinary khi có khoá, ngược lại lưu đĩa cục bộ (dev) ---
+        services.Configure<MediaStorageOptions>(configuration.GetSection(MediaStorageOptions.SectionName));
+        services.AddScoped<IMediaStorage>(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<MediaStorageOptions>>().Value;
+
+            return options.UseCloudinary
+                ? (IMediaStorage)ActivatorUtilities.CreateInstance<CloudinaryMediaStorage>(sp)
+                : ActivatorUtilities.CreateInstance<LocalDiskMediaStorage>(sp);
+        });
+
         // --- Redis ---
         var redisConnectionString = configuration.GetConnectionString("Redis")
             ?? throw new InvalidOperationException("Redis connection string is not configured.");
@@ -62,6 +223,21 @@ public static class DependencyInjection
         services.AddSingleton<IConnectionMultiplexer>(_ =>
             ConnectionMultiplexer.Connect(redisConnectionString));
 
+        // Presence (NC Giai đoạn 7): singleton vì chỉ giữ kết nối Redis + clock, không giữ state theo request.
+        services.AddSingleton<IPresenceService, Messaging.RedisPresenceService>();
+
         return services;
+    }
+
+    /// <summary>
+    /// Đăng ký <see cref="TimeProvider"/> nếu chưa có.
+    /// Dùng để mọi thành phần lấy thời gian UTC từ một nguồn duy nhất (dễ test).
+    /// </summary>
+    private static void TryAddTimeProvider(this IServiceCollection services)
+    {
+        if (!services.Any(d => d.ServiceType == typeof(TimeProvider)))
+        {
+            services.AddSingleton(TimeProvider.System);
+        }
     }
 }

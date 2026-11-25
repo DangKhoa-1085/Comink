@@ -1,10 +1,34 @@
 # ========================
 # Secrets — KHÔNG BAO GIỜ commit
 # ========================
+# .env (đã bị bỏ qua) chứa cấu hình thật; .env.example là file mẫu được commit.
 .env
 .env.local
 .env.*.local
 *.user.json
+
+# Cấu hình ghi đè cục bộ cho từng máy (chứa bí mật, không commit)
+appsettings.*.local.json
+appsettings.Local.json
+
+# Cấu hình chạy app mobile cho từng máy (Firebase + API base URL).
+# Mẫu được commit: mobile/config/dev.example.json
+mobile/config/dev.json
+mobile/config/dev.*.json
+!mobile/config/dev.example.json
+
+# Khoá bí mật thô (ví dụ Firebase service account JSON)
+*.pem
+*.key
+*.p12
+*.pfx
+*serviceAccount*.json
+*service-account*.json
+# Thư mục chứa service account Firebase khi dev: bỏ qua MỌI tên file trong đó
+backend/secrets/
+
+# Tệp media lưu cục bộ khi dev (Giai đoạn 2, phương án B) — dữ liệu sinh ra, không commit
+infra/uploads/
 
 # ========================
 # .NET / ASP.NET Core

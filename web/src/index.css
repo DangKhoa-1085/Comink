@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/*
+ * Tailwind CSS v4 mặc định gắn biến thể `dark:` với `prefers-color-scheme` (cài đặt hệ điều hành),
+ * KHÔNG phải class. Vì vậy nút "Đổi giao diện" sẽ không có tác dụng trên máy đang bật chế độ tối.
+ * Khai báo dưới đây chuyển biến thể `dark:` sang class `.dark` để nút bấm điều khiển được
+ * (đúng tài liệu: https://tailwindcss.com/docs/dark-mode).
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   :root {
     --background: 220 25% 97%;

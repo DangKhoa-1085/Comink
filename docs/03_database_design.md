@@ -1,7 +1,8 @@
 # Comink — Thiết kế cơ sở dữ liệu (PostgreSQL)
 
 > Tài liệu 03, dựa trên `COMINK_SPEC.md` và `02_tech_stack_decisions.md`. Mô tả toàn bộ schema PostgreSQL, quan hệ, enum, chỉ mục và cách quản lý migration.
-> Trạng thái: **Đã chốt (2026-10-10)**; migration M0 (Identity: `20261010_Identity_InitialCreate`) đã được sinh thành công trong `Persistence/Migrations/`.
+> Trạng thái: **Đã chốt (2026-10-10)**; migration M0 (Identity: `20261015_Identity_InitialCreate`) đã được sinh trong `Persistence/Migrations/`, bao gồm extension `pg_trgm`, `unaccent` và hàm `immutable_unaccent` (mục 5.1), và **đã áp thành công lên PostgreSQL 17** khi kiểm chứng Giai đoạn 0.
+> Migration M0 đã được sinh lại ngày 2026-10-15 để khớp tài liệu (`user_name` varchar(32), `users.updated_at`, `user_settings.notification_settings`) — xem `docs/tasks/phase0_remediation.md`.
 
 ---
 
@@ -326,20 +327,22 @@ Lớp `ApplicationUser : IdentityUser<Guid>`, đổi tên bảng Identity sang `
 |---|---|---|
 | `id` | uuid | PK |
 | `user_name` / `normalized_user_name` | varchar(32) | NN, UQ trên cột chuẩn hóa. Tên đăng nhập/handle hiển thị dạng `@ten` |
-| `email` / `normalized_email` | varchar(256) | NN, UQ trên cột chuẩn hóa |
+| `email` / `normalized_email` | varchar(256) | NN, UQ trên cột chuẩn hóa. **Lưu ý:** Identity chỉ tạo `EmailIndex` không unique — chỉ mục unique phải khai báo tường minh trong `ApplicationUserConfiguration` (migration `20261015_Identity_UniqueEmailIndex`) |
 | `email_confirmed` | bool | NN, mặc định `false` (xác minh email **[NC]**) |
 | `password_hash` | text | Do Identity băm |
 | `security_stamp`, `concurrency_stamp` | text | Cột chuẩn của Identity |
 | `lockout_end`, `lockout_enabled`, `access_failed_count` | | Khóa tạm do đăng nhập sai (cơ chế Identity) |
 | `account_status` | varchar(16) | NN, mặc định `Active` (xem enum). **Khóa do quản trị** dùng cột này, tách khỏi lockout của Identity |
 | `locked_reason` | varchar(500) | Lý do khóa |
-| `locked_at`, `locked_by` | timestamptz, uuid FK→users | Thời điểm và admin thực hiện |
+| `locked_at`, `locked_by` | timestamptz, uuid FK→users | Thời điểm và admin thực hiện. FK tự tham chiếu `users(id)`, **ON DELETE SET NULL** (migration M5 `Admin_AddLockedByForeignKey`), cột nullable nên hợp lệ |
 | `last_active_at` | timestamptz | Cập nhật thưa (ví dụ 5 phút/lần) để thống kê |
 | `created_at` | timestamptz | NN |
 
 Các bảng Identity chuẩn khác: `roles`, `user_roles`, `user_claims`, `role_claims`, `user_logins`, `user_tokens` (giữ nguyên cấu trúc, chỉ đổi tên/khóa). Token xác minh email và đặt lại mật khẩu do Identity tạo dạng **không trạng thái** (data protection token), nên **không cần bảng riêng**.
 
-Dữ liệu khởi tạo (seed): hai role `User`, `Admin`; tài khoản admin đầu tiên lấy từ biến môi trường.
+Dữ liệu khởi tạo (seed): hai role `User`, `Admin`; tài khoản admin đầu tiên lấy từ cấu hình `AdminSeed` (email, mật khẩu, tên hiển thị).
+
+> **Cách seed:** role và tài khoản admin được seed **lúc ứng dụng khởi động** trong `Comink.Infrastructure/MigrationExtensions.cs` (chỉ môi trường `Development`), **không** nằm trong migration. Migration chỉ tạo cấu trúc bảng. Nhờ vậy migration thuần cấu trúc, không phụ thuộc giá trị cấu hình.
 
 #### `user_profiles` (1–1 với `users`)
 
@@ -394,6 +397,8 @@ Dữ liệu khởi tạo (seed): hai role `User`, `Admin`; tài khoản admin đ
 | `device_name` | varchar(100) | |
 | `is_active` | bool | NN. Đặt `false` khi FCM báo token hết hạn |
 | `created_at`, `last_seen_at` | timestamptz | |
+
+> Migration GĐ 6: `20261027_Notifications_InitialCreate` (bảng `user_devices`, `notifications`).
 
 ### 3.2. Module Mạng xã hội
 
@@ -521,9 +526,9 @@ Khi chặn, backend xóa `friendships` và `follows` giữa hai người trong c
 | `role` | varchar(16) | NN, mặc định `Member` (`Owner`, `Admin`, `Member`); chat riêng luôn `Member` |
 | `joined_at` | timestamptz | NN |
 | `left_at` | timestamptz | null = còn trong nhóm. Rời nhóm thì **giữ dòng** để còn lịch sử tin trước đó |
-| `last_read_message_id` | uuid | FK→messages `SET NULL`. Mốc **đã đọc** (xem ghi chú dưới) |
-| `last_read_at` | timestamptz | |
-| `muted_until` | timestamptz | **[NC]** null = bật thông báo; thời điểm tương lai = đang tắt; `'infinity'` = tắt vô thời hạn |
+| `last_read_message_id` | uuid | FK→messages `SET NULL`. Mốc **đã đọc** (xem ghi chú dưới). Có từ **M6** (NC GĐ 7) |
+| `last_read_at` | timestamptz | Cùng bộ với `last_read_message_id`; có từ **M6** (NC GĐ 7) |
+| `muted_until` | timestamptz | null = bật thông báo; thời điểm tương lai = đang tắt; mốc `9999-12-31T23:59:59Z` = tắt vĩnh viễn (không dùng `'infinity'` vì EF/Npgsql không đọc được vào `DateTimeOffset`). Có từ **M7** |
 
 > **Đã đọc:** lưu một mốc cho mỗi thành viên thay vì một dòng cho mỗi tin. Số tin chưa đọc = số tin có `(created_at, id)` lớn hơn tin mốc và `sender_id` khác chính người đó.
 
@@ -537,13 +542,17 @@ Khi chặn, backend xóa `friendships` và `follows` giữa hai người trong c
 | `type` | varchar(16) | NN (`Text`, `Image`, `Video`, `File`, `System`, `Call`) |
 | `content` | text | `CHECK (char_length(content) <= 4000)`. Rỗng với tin chỉ có tệp; **bị xóa (set null) khi thu hồi** |
 | `client_message_id` | uuid | NN. Client sinh, chống gửi trùng. **UQ (`sender_id`, `client_message_id`)** |
-| `reply_to_message_id` | uuid | FK→messages `SET NULL` **[NC]** |
-| `forwarded_from_message_id` | uuid | FK→messages `SET NULL` **[NC]** |
+| `reply_to_message_id` | uuid | FK→messages `SET NULL`. Có từ **M7**; xoá tin đích chỉ mất trích dẫn, tin trả lời vẫn giữ |
+| `forwarded_from_message_id` | uuid | FK→messages `SET NULL`. Có từ **M7**; tin chuyển tiếp giữ liên kết tới tin gốc |
 | `call_id` | uuid | FK→calls `SET NULL`. Dùng cho tin `type = 'Call'` (bản ghi cuộc gọi hiện trong khung chat) |
-| `content_search` | tsvector | Cột sinh tự động từ `content` **[NC]** |
 | `created_at` | timestamptz | NN |
-| `edited_at` | timestamptz | **[NC]** null = chưa sửa |
-| `deleted_at` | timestamptz | **[NC]** thu hồi tin: set thời điểm và xóa `content`, vẫn giữ dòng để khung "Tin nhắn đã bị thu hồi" hiển thị đúng chỗ |
+| `edited_at` | timestamptz | Có từ **M7**; null = chưa sửa |
+| `deleted_at` | timestamptz | Có từ **M7**: thu hồi tin — set thời điểm và xóa `content`, vẫn giữ dòng để khung "Tin nhắn đã bị thu hồi" hiển thị đúng chỗ |
+
+> **Tìm kiếm tin nhắn:** không dùng cột `content_search` `tsvector`; dùng chỉ mục GIN trigram trên
+> `immutable_unaccent(lower(content))` (mục 5.2) và luôn lọc theo hội thoại người dùng là thành viên.
+> Lý do: tìm được **một phần từ** tiếng Việt và dùng lại hàm `immutable_unaccent` đã có từ M0
+> (quyết định D5, `docs/tasks/phase7b_advanced_messaging.md` mục 2).
 
 Tệp đính kèm nằm ở `message_attachments`. Tin hệ thống (`System`) dùng cho sự kiện nhóm: "A thêm B vào nhóm", đổi tên nhóm, v.v. (nội dung tạo ở backend, đa ngôn ngữ nên 💡 lưu mã sự kiện trong `content` và client dịch).
 
@@ -555,7 +564,7 @@ Tệp đính kèm nằm ở `message_attachments`. Tin hệ thống (`System`) d
 | `media_id` | uuid | PK (2), FK→media_assets `RESTRICT` |
 | `sort_order` | smallint | NN, mặc định 0 |
 
-#### `message_reactions` **[NC]**
+#### `message_reactions` (có từ **M7**)
 
 | Cột | Kiểu | Ghi chú |
 |---|---|---|
@@ -564,7 +573,10 @@ Tệp đính kèm nằm ở `message_attachments`. Tin hệ thống (`System`) d
 | `emoji` | varchar(16) | PK (3). 💡 Một người **được thả nhiều loại emoji** lên cùng một tin, nhưng mỗi loại một lần |
 | `created_at` | timestamptz | NN |
 
-#### `pinned_messages` **[NC]**
+> API trao đổi cảm xúc bằng **khoá chữ** (`like`, `love`, `haha`, `wow`, `sad`, `angry`); server quy đổi
+> sang ký tự emoji lưu ở cột `emoji` để tránh lỗi URL-encode và lệch variation selector (quyết định D2).
+
+#### `pinned_messages` (có từ **M7**)
 
 | Cột | Kiểu | Ghi chú |
 |---|---|---|
@@ -573,7 +585,7 @@ Tệp đính kèm nằm ở `message_attachments`. Tin hệ thống (`System`) d
 | `pinned_by` | uuid | NN, FK→users `RESTRICT` |
 | `pinned_at` | timestamptz | NN |
 
-Giới hạn số tin ghim mỗi hội thoại (💡 tối đa 10) kiểm tra ở tầng ứng dụng.
+Giới hạn số tin ghim mỗi hội thoại (**tối đa 10**, đã chốt) kiểm tra ở tầng ứng dụng.
 
 ### 3.4. Module Cuộc gọi
 
@@ -747,7 +759,8 @@ Mỗi enum tương ứng một `enum` trong C#, lưu **chuỗi** trong DB và c�
 | `Visibility` | `posts.visibility`, `albums.visibility`, `user_settings.default_post_visibility` | `Public` | Mọi người |
 | | | `Friends` | Chỉ bạn bè |
 | | | `OnlyMe` | Chỉ mình tôi |
-| `AudienceScope` | `user_settings.profile_visibility`, `who_can_message`, `who_can_call` | `Everyone`, `Friends`, `Nobody` | Ai được xem hồ sơ / nhắn tin / gọi. Riêng `profile_visibility` chỉ dùng `Everyone` hoặc `Friends` (mặc định `Everyone`, thay cho `Public` ở mục 3.1) |
+| `AudienceScope` | `user_settings.who_can_message`, `who_can_call` | `Everyone`, `Friends`, `Nobody` | Ai được nhắn tin / gọi |
+| `ProfileVisibility` | `user_settings.profile_visibility` | `Everyone`, `Friends` | Ai được xem hồ sơ. **Không** dùng `Nobody` (mặc định `Everyone`; thay cho `Public` ở mục 3.1) |
 | `FriendshipStatus` | `friendships.status` | `Pending`, `Accepted` | Chờ chấp nhận / đã là bạn |
 | `ContentStatus` | `posts.status`, `comments.status` | `Active`, `Hidden` | Hiển thị / bị admin ẩn |
 | `ConversationType` | `conversations.type` | `Direct`, `Group` | Chat riêng / nhóm |
@@ -765,7 +778,7 @@ Mỗi enum tương ứng một `enum` trong C#, lưu **chuỗi** trong DB và c�
 | `CallEndReason` | `calls.end_reason` | `Completed`, `NoAnswer`, `Declined`, `Cancelled`, `Failed` | Lý do kết thúc |
 | `MediaResourceType` | `media_assets.resource_type` | `Image`, `Video`, `File` | Loại tệp |
 | `MediaContext` | `media_assets.context` | `Post`, `Message`, `Avatar`, `Cover`, `Album` | Mục đích tải lên |
-| `MediaProvider` | `media_assets.provider` | `Cloudinary`, `Firebase` | Nơi lưu |
+| `MediaProvider` | `media_assets.provider` | `Cloudinary`, `Firebase`, `Local` | Nơi lưu. `Local` **chỉ dùng khi chạy dev** chưa có khoá Cloudinary (phương án B của GĐ 2, xem `docs/tasks/phase2_social.md` mục 3.9) |
 | `DevicePlatform` | `user_devices.platform` | `Web`, `Android`, `iOS` | |
 | `ReportTargetType` | `reports.target_type` | `Post`, `Comment`, `Message`, `User` | Đối tượng bị báo cáo |
 | `ReportReason` | `reports.reason` | `Spam`, `Harassment`, `Inappropriate`, `Misinformation`, `Other` | |
@@ -813,6 +826,7 @@ $$ SELECT public.unaccent('public.unaccent', $1) $$;
 | Mục đích | Chỉ mục |
 |---|---|
 | Lịch sử tin nhắn của hội thoại | `messages (conversation_id, created_at DESC, id DESC)` |
+| Tìm kiếm tin nhắn (gõ không dấu, khớp một phần từ) | `messages USING gin (immutable_unaccent(lower(content)) gin_trgm_ops)` (M7) |
 | Danh sách hội thoại của tôi | `conversation_members (user_id) WHERE left_at IS NULL` và `conversations (last_message_at DESC)` |
 | Bài viết của một người (trang cá nhân, và là nguồn bảng tin) | `posts (author_id, created_at DESC, id DESC) WHERE deleted_at IS NULL AND status = 'Active'` |
 | Bình luận của bài | `comments (post_id, created_at, id) WHERE deleted_at IS NULL AND parent_comment_id IS NULL`; trả lời: `comments (parent_comment_id, created_at)` |
@@ -864,6 +878,7 @@ CREATE UNIQUE INDEX ux_messages_client_id
 | Hàng đợi báo cáo | `reports (status, created_at DESC)` |
 | Báo cáo theo đối tượng | `reports (target_type, target_id)` |
 | Nhật ký theo admin/thời gian | `audit_logs (admin_id, created_at DESC)`, `audit_logs (created_at DESC)` |
+| Ai đã khóa tài khoản | `users (locked_by)` — chỉ mục cho FK tự tham chiếu, `ON DELETE SET NULL` |
 | Dọn token hết hạn | `refresh_tokens (expires_at)`, `refresh_tokens (user_id)` |
 
 ### 5.3. Truy vấn tham chiếu: bảng tin
@@ -940,12 +955,14 @@ Chỉ tạo bảng khi cần, mỗi nhóm một migration riêng:
 
 | Mốc | Migration chứa | Điều kiện |
 |---|---|---|
-| M0 | Extension, hàm `immutable_unaccent`, `users` + bảng Identity, `roles` (seed), `user_profiles`, `user_settings`, `refresh_tokens` | Khởi tạo |
+| M0 | Extension, hàm `immutable_unaccent`, `users` + bảng Identity, `user_profiles`, `user_settings`, `refresh_tokens` (role `User`/`Admin` và tài khoản admin seed lúc khởi động, không nằm trong migration — xem mục 3.1) | Khởi tạo |
 | M1 | `media_assets`, `posts`, `post_media`, `post_likes`, `comments`, `friendships`, `follows` | Mạng xã hội **cơ bản** |
 | M2 | `conversations`, `conversation_members`, `messages`, `message_attachments` (cột `reply_to`, `forwarded_from`, `edited_at`, `deleted_at`, `content_search` **chưa thêm**) | Nhắn tin **cơ bản** |
 | M3 | `calls`, `call_participants` (+ cột `messages.call_id`) | Gọi **cơ bản** |
 | M4 | `user_devices`, `notifications` | Push/thông báo |
-| M5 | Cột quản trị trên `users` đã có sẵn từ M0. Thêm hàng đợi kiểm duyệt: `reports`, `audit_logs` | Quản trị cơ bản/nâng cao |
+| M5 | **FK `users.locked_by` → `users(id)` `ON DELETE SET NULL` + chỉ mục `users (locked_by)`** (migration `Admin_AddLockedByForeignKey`, GĐ 5). Cột quản trị trên `users` đã có sẵn từ M0. Khi làm NC: thêm hàng đợi kiểm duyệt `reports`, `audit_logs` | Quản trị cơ bản/nâng cao |
+| M6 | `conversation_members.last_read_message_id` (FK→`messages` `SET NULL`) + `last_read_at` + chỉ mục FK (migration `Messaging_AddReadMarkers`, GĐ 7 — Ưu tiên 1) | Nhắn tin **nâng cao**: đã gửi/đã đọc |
+| M7 | `messages.reply_to_message_id`, `forwarded_from_message_id` (FK→`messages` `SET NULL`), `edited_at`, `deleted_at`; `message_reactions`; `pinned_messages`; `conversation_members.muted_until`; chỉ mục GIN trigram cho tìm kiếm tin (migration `Messaging_AddMessageFeatures`, GĐ 7 — Ưu tiên 2) | Nhắn tin **nâng cao**: phản hồi/sửa/thu hồi/cảm xúc/ghim/chuyển tiếp/tìm kiếm/tắt thông báo |
 | N-x | Từng nhóm **nâng cao** khi làm tới: hashtags/saved_posts, reactions/pins/reply/forward/edit/search, `blocks`, albums, `daily_stats`, `banned_keywords`, cài đặt riêng tư và mute | Chỉ sau khi mức cơ bản của nhóm đó xong |
 | Cuối | `ai_conversations`, `ai_messages`, `ai_usage_logs` | Sau khi các chức năng chính ổn định |
 
@@ -969,7 +986,7 @@ Không đổi tên cột/bảng trực tiếp trên dữ liệu thật mà khôn
 
 | Loại | Nội dung | Môi trường |
 |---|---|---|
-| Bắt buộc | Role `User`, `Admin`; tài khoản admin đầu tiên (email và mật khẩu lấy từ biến môi trường) | Mọi môi trường |
+| Bắt buộc | Role `User`, `Admin`; tài khoản admin đầu tiên (email và mật khẩu lấy từ cấu hình `AdminSeed`; mật khẩu nên đặt bằng user-secrets) — seed lúc khởi động ở môi trường `Development` | Mọi môi trường |
 | Dev/Demo | Khoảng 20–30 người dùng mẫu, quan hệ bạn bè/theo dõi, bài viết, vài hội thoại có tin nhắn, vài cuộc gọi trong lịch sử | Chỉ `Development` và kịch bản demo, bật bằng cờ cấu hình |
 | Kiểm thử hiệu năng | Sinh số lượng lớn (ví dụ 50.000 tin nhắn) bằng công cụ sinh dữ liệu (Bogus) | Chỉ khi đo hiệu năng |
 
@@ -984,13 +1001,13 @@ Không đổi tên cột/bảng trực tiếp trên dữ liệu thật mà khôn
 
 | # | Nội dung | Gợi ý trong tài liệu |
 |---|---|---|
-| 1 | Một người được thả nhiều emoji vào một tin, hay chỉ một | Nhiều emoji (khóa chính gồm `emoji`) |
+| 1 | Một người được thả nhiều emoji vào một tin, hay chỉ một | **Đã chốt (2026-11-20):** nhiều emoji (khóa chính gồm `emoji`), danh mục cố định 6 khoá |
 | 2 | Bình luận lồng nhau mấy cấp | 1 cấp trả lời |
 | 3 | Chia sẻ bài viết: dạng bài mới tham chiếu `shared_post_id` | Có |
-| 4 | Giới hạn số tin ghim mỗi hội thoại | 10 |
+| 4 | Giới hạn số tin ghim mỗi hội thoại | **Đã chốt (2026-11-20):** 10 |
 | 5 | Có cần tin nhắn "đã nhận" (delivered) riêng với "đã đọc" | Chưa, chỉ `đã gửi` (có dòng trong DB) và `đã đọc` (mốc đọc) |
 | 6 | Có xóa cứng tài khoản không | Không, chỉ khóa/vô hiệu hóa |
-| 7 | Dữ liệu tìm kiếm tiếng Việt không dấu | Dùng `unaccent` + `pg_trgm` như mục 5 |
+| 7 | Dữ liệu tìm kiếm tiếng Việt không dấu | **Đã chốt (2026-11-20):** dùng `unaccent` + `pg_trgm` như mục 5 (không dùng `tsvector` cho tin nhắn) |
 | 8 | Dung lượng tối đa mỗi tệp và tổng mỗi người | Chốt khi làm mục Hình ảnh/Tệp mức nâng cao; chỉ cần cấu hình, không đổi schema |
 | 9 | Tin hệ thống trong nhóm (`System`) lưu mã sự kiện hay câu chữ đã dịch | Lưu mã sự kiện, client dịch |
 

@@ -1,0 +1,36 @@
+// Tên sự kiện SignalR của module Nhắn tin — hằng số dùng chung backend/web
+// (docs/02_tech_stack_decisions.md mục 5.8: không viết tay tên sự kiện rải rác).
+namespace Comink.Application.Messaging;
+
+/// <summary>Tên sự kiện hub và tiền tố group.</summary>
+public static class ChatEvents
+{
+    /// <summary>Server → client: có tin nhắn mới trong hội thoại.</summary>
+    public const string MessageCreated = "MessageCreated";
+
+    /// <summary>Server → client: một người đã đọc tin trong hội thoại (NC Giai đoạn 7).</summary>
+    public const string MessagesRead = "MessagesRead";
+
+    /// <summary>Server → client: trạng thái online của một người vừa đổi (NC Giai đoạn 7).</summary>
+    public const string PresenceChanged = "PresenceChanged";
+
+    /// <summary>Server → client: một người bắt đầu/ngừng gõ trong hội thoại (NC Giai đoạn 7).</summary>
+    public const string TypingChanged = "TypingChanged";
+
+    /// <summary>
+    /// Server → client: một tin vừa bị sửa/thu hồi/đổi cảm xúc (NC Giai đoạn 7 — Ưu tiên 2).
+    /// Payload là <c>MessageDto</c> đầy đủ để client thay thế nguyên tử trong cache.
+    /// </summary>
+    public const string MessageUpdated = "MessageUpdated";
+
+    /// <summary>
+    /// Server → client: danh sách tin ghim của hội thoại vừa thay đổi (ghim/bỏ ghim/thu hồi).
+    /// </summary>
+    public const string PinnedMessagesChanged = "PinnedMessagesChanged";
+
+    /// <summary>Group theo hội thoại: <c>conversation:{id}</c>.</summary>
+    public static string ConversationGroup(Guid conversationId) => $"conversation:{conversationId}";
+
+    /// <summary>Group riêng của người dùng: <c>user:{id}</c> (đã dùng từ GĐ 1).</summary>
+    public static string UserGroup(Guid userId) => $"user:{userId}";
+}

@@ -1,10 +1,12 @@
 // Extension giúp áp dụng migration và seed dữ liệu khi khởi động (chỉ môi trường Dev)
 using Comink.Infrastructure.Identity;
 using Comink.Infrastructure.Persistence;
+using Comink.Infrastructure.Seed;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Comink.Infrastructure;
@@ -22,6 +24,7 @@ public static class MigrationExtensions
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+        var environment = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<ApplicationDbContext>>();
 
         try
@@ -35,6 +38,23 @@ public static class MigrationExtensions
 
             // Seed admin account từ biến môi trường
             await SeedAdminAsync(userManager, configuration, logger);
+
+            // Seed dữ liệu mẫu cho demo (mặc định tắt; CHỈ Development) — xem docs/tasks/milestone_a_web_cb.md
+            var demoEnabled = bool.TryParse(configuration["DemoSeed:Enabled"], out var enabled) && enabled;
+            if (environment.IsDevelopment() && demoEnabled)
+            {
+                var demoSeeded = await DemoDataSeeder.SeedAsync(
+                    db,
+                    userManager,
+                    enabled: true,
+                    password: configuration["DemoSeed:Password"],
+                    logger);
+
+                if (demoSeeded)
+                {
+                    logger.LogInformation("Dữ liệu demo đã sẵn sàng — xem README mục dữ liệu mẫu");
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -78,6 +98,10 @@ public static class MigrationExtensions
 
         var admin = new ApplicationUser
         {
+            // Phải gán Id tường minh: ApplicationUser được cấu hình ValueGeneratedNever
+            // (xem IdentityConfigurations), nên bỏ trống thì EF ghi Guid.Empty — trùng với
+            // giá trị "chưa đặt" mà code thường dùng để kiểm tra.
+            Id = Guid.CreateVersion7(),
             UserName = "admin",
             Email = adminEmail,
             EmailConfirmed = true,

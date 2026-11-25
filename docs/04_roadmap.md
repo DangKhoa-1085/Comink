@@ -63,107 +63,142 @@ Mỗi giai đoạn gồm: **mục tiêu**, **phụ thuộc** và **checklist ho�
 - [x] Đã chốt các mục ❓ còn lại ở `02_tech_stack_decisions.md` (nhà cung cấp gọi, nơi lưu tệp, LLM mặc định, thư viện UI)
 - [x] Đã rà soát và chốt `03_database_design.md`; có migration M0 chạy thành công
 
+> **Trạng thái (cập nhật 2026-10-15):** cả 8 mục đã được kiểm chứng bằng cách chạy thật trên máy phát triển: backend build 7/7 project, `flutter analyze` sạch, `npm run build` thành công, `docker compose` chạy 4/4 service, migration M0 đã áp lên PostgreSQL 17 và seed role/tài khoản admin hoạt động, hook chặn bí mật đã bật. Chi tiết và các mục chuyển tiếp ở `docs/tasks/phase0_remediation.md`.
+> *Lưu ý:* mục CI mới chỉ được xác nhận là **đã có workflow** (`build + test + lint`); chưa có lần chạy thật trên GitHub Actions vì chưa mở Pull Request nào sau khi Phase 0 hoàn tất.
+
 ### Giai đoạn 1: Nền tảng và Tài khoản (Bảo mật CB)
 
 **Mục tiêu:** người dùng đăng ký, đăng nhập và có hồ sơ; hệ thống phân quyền hoạt động.
 **Phụ thuộc:** GĐ 0.
 
-- [ ] Đăng ký, đăng nhập, đăng xuất, làm mới token hoạt động trên web
-- [ ] Phân quyền hai vai trò `User` và `Admin`; endpoint chỉ-admin bị chặn với người thường
-- [ ] Kiểm tra dữ liệu đầu vào ở backend cho mọi endpoint hiện có (trả mã lỗi thống nhất)
-- [ ] Hồ sơ cá nhân: xem và sửa tên hiển thị, tiểu sử
-- [ ] Có tài khoản admin đầu tiên (seed từ biến môi trường)
-- [ ] Khung đa ngôn ngữ Việt/Anh chạy trên web (mọi chuỗi hiển thị đi qua i18n)
-- [ ] SignalR kết nối được và xác thực bằng token (chưa cần nghiệp vụ)
-- [ ] Có test cho đăng nhập và phân quyền; bí mật/khóa API không nằm trong Git
+- [x] Đăng ký, đăng nhập, đăng xuất, làm mới token hoạt động trên web
+- [x] Phân quyền hai vai trò `User` và `Admin`; endpoint chỉ-admin bị chặn với người thường
+- [x] Kiểm tra dữ liệu đầu vào ở backend cho mọi endpoint hiện có (trả mã lỗi thống nhất)
+- [x] Hồ sơ cá nhân: xem và sửa tên hiển thị, tiểu sử
+- [x] Có tài khoản admin đầu tiên (seed từ cấu hình `AdminSeed`)
+- [x] Khung đa ngôn ngữ Việt/Anh chạy trên web (mọi chuỗi hiển thị đi qua i18n)
+- [x] SignalR kết nối được và xác thực bằng token (chưa cần nghiệp vụ)
+- [x] Có test cho đăng nhập và phân quyền; bí mật/khóa API không nằm trong Git
+
+> **Trạng thái (cập nhật 2026-10-17):** cả 8 mục đã đạt. Backend: 29 test pass (unit + tích hợp trên PostgreSQL thật). Web: `lint` + `build` sạch, 39 kiểm tra end-to-end qua proxy của Vite, 5 kiểm tra SignalR, 27 kiểm tra render (SSR).
+> **Đã kiểm chứng trên trình duyệt thật** (Chrome qua BrowserSkill, hạ tầng Docker + backend + Vite): đăng ký → đăng nhập → hồ sơ → khôi phục phiên → đa ngôn ngữ → đăng xuất → route bảo vệ, và phiên `Admin` với `/admin/users` (danh sách, tìm kiếm, trạng thái rỗng). Hai lỗi nhỏ phát hiện trong đợt này (lỗi framework thiếu `code`, số nhiều tiếng Anh) đã sửa và kiểm chứng lại.
+> Chi tiết ở `docs/tasks/phase1_foundation_auth.md`. Hợp đồng API: `docs/05_api_contract.md`.
 
 ### Giai đoạn 2: Mạng xã hội CB + Ảnh trong bài viết
 
 **Mục tiêu:** có một mạng xã hội dùng được: kết nối bạn bè, đăng bài, tương tác.
 **Phụ thuộc:** GĐ 1.
 
-- [ ] Kết bạn hai chiều: gửi, chấp nhận, từ chối lời mời; xem danh sách bạn
-- [ ] Theo dõi / bỏ theo dõi (một chiều)
-- [ ] Tìm kiếm người dùng (có hỗ trợ gõ không dấu)
-- [ ] Đăng, sửa, xóa bài viết; chọn phạm vi hiển thị (công khai/bạn bè/chỉ mình tôi)
-- [ ] Đính kèm ảnh vào bài viết (tải lên cloud, hiển thị đúng)
-- [ ] Bảng tin hiển thị bài của bạn bè và người theo dõi, phân trang cuộn
-- [ ] Thích, bình luận (có trả lời) và chia sẻ bài viết
-- [ ] Trang cá nhân hiển thị bài viết, số bạn bè/người theo dõi
-- [ ] Quyền xem bài viết đúng (không xem được bài `Friends` của người lạ)
-- [ ] Có test cho quyền xem bài và trạng thái kết bạn
+- [x] Kết bạn hai chiều: gửi, chấp nhận, từ chối lời mời; xem danh sách bạn
+- [x] Theo dõi / bỏ theo dõi (một chiều)
+- [x] Tìm kiếm người dùng (có hỗ trợ gõ không dấu)
+- [x] Đăng, sửa, xóa bài viết; chọn phạm vi hiển thị (công khai/bạn bè/chỉ mình tôi)
+- [x] Đính kèm ảnh vào bài viết (tải lên cloud, hiển thị đúng)
+- [x] Bảng tin hiển thị bài của bạn bè và người theo dõi, phân trang cuộn
+- [x] Thích, bình luận (có trả lời) và chia sẻ bài viết
+- [x] Trang cá nhân hiển thị bài viết, số bạn bè/người theo dõi
+- [x] Quyền xem bài viết đúng (không xem được bài `Friends` của người lạ)
+- [x] Có test cho quyền xem bài và trạng thái kết bạn
+
+> **Trạng thái (cập nhật 2026-10-17):** cả 10 mục đã **cài đặt và kiểm chứng** ở backend + web; **bạn đã tick đủ 10/10 mục** (người dùng tick theo quy ước `AGENTS.md` mục 12).
+> - Backend: **81 test pass** (Domain 24 · Application 15 · Tích hợp 42 trên PostgreSQL thật), `dotnet build` 0 warning 0 error.
+> - Web: `npm run lint` 0 warning/0 error; `npm run build` thành công; **kiểm chứng trên trình duyệt thật** (Chrome qua BrowserSkill): bảng tin + soạn/đăng bài + ảnh hiển thị + thích + bình luận (đếm tăng đúng) + tìm người dùng **không dấu** + trang bạn bè + trang cá nhân + nút quan hệ.
+> - Kiểm chứng HTTP thật với **3 tài khoản**: 28/28 phép kiểm tra quan hệ bạn bè/theo dõi, 32/35 lượt kiểm tra bài viết (3 lỗi còn lại là do script test của tôi, đã sửa và chạy lại đạt), media 5/5.
+> - **Hai lỗi thật đã sửa:** (1) `Visibility.Public` bị lưu thành `Friends` do bẫy enum `0` + `HasDefaultValue` (sửa bằng `HasSentinel`); (2) Vite thiếu proxy `/uploads` làm ảnh lưu cục bộ bị vỡ.
+> - Migration: **M1** (`Social_InitialCreate`) + `Media_AddLocalProvider`. Chi tiết: `docs/tasks/phase2_social.md`; hợp đồng API: `docs/05_api_contract.md` mục 7.
+
+> **Cập nhật 2026-10-18 (sau khi chuyển sang Cloudinary thật):**
+> - **Cloudinary đã bật và kiểm chứng thật:** ký HMAC-SHA1 → client upload trực tiếp lên `comink/post`, đăng ký media (`provider = Cloudinary`), đăng bài kèm ảnh, ảnh truy cập công khai `HTTP 200 image/png`; `/uploads` trả `404` và `local-upload` bị chặn đúng thiết kế (400).
+> - **(Sửa lỗi hợp đồng lỗi)** Body JSON không parse được trước đây trả `500 INTERNAL_ERROR`, nay trả `400 VALIDATION_FAILED` (`ExceptionStatusMapper`). Thêm nữa `title` nay suy ra từ `code` (`ApiResults.ApplyProblemDefaults`) nên lỗi cùng mã luôn cùng tiêu đề. `dotnet test` nay **92/92 pass** (Domain 24 · Application 15 · Tích hợp 53), `dotnet build` 0 warning 0 error.
+> - Đã xoá bài test dùng ảnh lưu cục bộ (phương án a) — không còn bài "đang sống" nào tham chiếu ảnh `Local`.
 
 ### Giai đoạn 3: Nhắn tin CB + Ảnh trong tin nhắn
 
 **Mục tiêu:** hai người dùng nhắn tin được với nhau theo thời gian thực và xem lại lịch sử.
 **Phụ thuộc:** GĐ 1 (cần bạn bè từ GĐ 2 nếu giới hạn ai được nhắn cho ai).
 
-- [ ] Tạo hoặc mở cuộc chat riêng 1–1 (mỗi cặp người chỉ có một cuộc chat)
-- [ ] Gửi và nhận tin nhắn văn bản **theo thời gian thực** qua SignalR
-- [ ] Tin nhắn được lưu vào DB; mở lại thấy đủ lịch sử, tải thêm khi cuộn lên (phân trang)
-- [ ] Gửi ảnh trong tin nhắn
-- [ ] Danh sách hội thoại sắp theo tin mới nhất, có xem trước tin cuối
-- [ ] Gửi trùng khi mất mạng không tạo tin nhắn lặp (kiểm tra `client_message_id`)
-- [ ] Mất kết nối rồi có lại thì client tự kết nối lại và lấy phần tin bị lỡ
-- [ ] Người ngoài hội thoại **không** đọc được tin và **không** vào được group SignalR của hội thoại đó
-- [ ] Có test cho quyền truy cập hội thoại và gửi/nhận tin
+> ✅ **GĐ 3 CB XONG:** backend + web đầy đủ, migration **M2** đã áp; `dotnet test` hiện **161/161**, `dotnet build` 0 warning, `npm run lint`/`build` sạch. Đã kiểm chứng thật: thời gian thực (thành viên nhận tin ngay, người ngoài không nhận — kể cả khi hội thoại tạo **sau** lúc kết nối), ảnh trong tin nhắn qua Cloudinary, đồng bộ tin bị lỡ bằng `after` cursor, 2 tài khoản thật. Chi tiết: `docs/tasks/phase3_messaging.md`; hợp đồng API: `docs/05_api_contract.md` mục 8.
+
+- [x] Tạo hoặc mở cuộc chat riêng 1–1 (mỗi cặp người chỉ có một cuộc chat)
+- [x] Gửi và nhận tin nhắn văn bản **theo thời gian thực** qua SignalR
+- [x] Tin nhắn được lưu vào DB; mở lại thấy đủ lịch sử, tải thêm khi cuộn lên (phân trang)
+- [x] Gửi ảnh trong tin nhắn
+- [x] Danh sách hội thoại sắp theo tin mới nhất, có xem trước tin cuối
+- [x] Gửi trùng khi mất mạng không tạo tin nhắn lặp (kiểm tra `client_message_id`)
+- [x] Mất kết nối rồi có lại thì client tự kết nối lại và lấy phần tin bị lỡ
+- [x] Người ngoài hội thoại **không** đọc được tin và **không** vào được group SignalR của hội thoại đó
+- [x] Có test cho quyền truy cập hội thoại và gửi/nhận tin
+
+> ✅ **NC của GĐ 3 — Chat nhóm (XONG 2026-10-23):** tạo nhóm từ bạn bè (3–10 người, người tạo `Owner`), danh sách hội thoại hiện cả nhóm (`type`, `title`, `memberCount`), chat nhóm **hiện tên người gửi**, và **gọi nhóm ngay trong nhóm** (mọi thành viên nhận `CallIncoming`) — giống Messenger. `dotnet test` **161/161**, lint 0/0. **Đã test tay 3 tài khoản thành công** (modal cuộc gọi đến + nghe/nói 3 chiều). Chi tiết: `docs/tasks/phase3_messaging.md` mục 7; hợp đồng: `docs/05_api_contract.md` §8.2b.
 
 ### Giai đoạn 4: Gọi trực tuyến CB
 
 **Mục tiêu:** gọi thoại/video giữa hai người và gọi nhóm hoạt động ổn định.
 **Phụ thuộc:** GĐ 3 (cuộc gọi gắn với hội thoại).
 
-- [ ] Gọi thoại 1–1 hai máy khác nhau, nghe/nói được hai chiều
-- [ ] Gọi video 1–1 hai chiều
-- [ ] Gọi nhóm có cả thoại và video (tối thiểu 3 người tham gia)
-- [ ] Backend cấp token gọi có thời hạn ngắn; người ngoài hội thoại không xin được token
-- [ ] TURN hoạt động: gọi được khi hai máy ở **hai mạng khác nhau** hoặc sau NAT
-- [ ] Cuộc gọi được ghi vào DB (người gọi, người nhận, loại, thời điểm kết thúc)
-- [ ] Hiển thị được lúc cuộc gọi đến để người nhận có thể vào cuộc gọi
-- [ ] Kết thúc cuộc gọi giải phóng đúng tài nguyên (không còn room "treo")
+- [x] Gọi thoại 1–1 hai máy khác nhau, nghe/nói được hai chiều
+- [x] Gọi video 1–1 hai chiều
+- [x] Gọi nhóm có cả thoại và video (tối thiểu 3 người tham gia)
+- [x] Backend cấp token gọi có thời hạn ngắn; người ngoài hội thoại không xin được token
+- [x] TURN hoạt động: gọi được khi hai máy ở **hai mạng khác nhau** hoặc sau NAT
+  - *Ghi chú 2026-10-23: **chưa chứng minh**. Cách kiểm tra nhanh: mở cả hai máy ở `…/calls/<id>?relay=1` (nhãn “TURN mode (relay)”), nếu vẫn nghe/nói được thì media đã đi qua TURN `:3478`. Hiện đã bật TURN/UDP 3478 + dải relay 30500–30510 trong `infra/livekit.yaml`/`docker-compose.yml`.*
+- [x] Cuộc gọi được ghi vào DB (người gọi, người nhận, loại, thời điểm kết thúc)
+- [x] Hiển thị được lúc cuộc gọi đến để người nhận có thể vào cuộc gọi
+- [x] Kết thúc cuộc gọi giải phóng đúng tài nguyên (không còn room "treo")
+
+> ✅ **Cập nhật 2026-10-23 — GĐ 4 đạt 7/8 mục:** gọi thoại 1–1 hai máy ✅, gọi video 1–1 ✅, **gọi nhóm 3 người ✅ (test tay thành công)**, token ngắn hạn + người ngoài `404` ✅, ghi DB ✅, modal cuộc gọi đến ✅, kết thúc giải phóng room ✅ (`ListRooms` 0→1→0). Đã sửa trong quá trình test: modal không còn biến mất khi người khác nghe; **timeout đổ chuông 30s phía server** (`CallRingTimeoutService`); thông báo `CALL_MEDIA_FAILED` thay cho “Máy chủ gặp lỗi”; bẫy `node_ip` phải đúng đường mạng của client. `dotnet test` **161/161**, build 0 warning, `npm run lint` 0/0. **Chỉ còn mục TURN** (chờ test `?relay=1` giữa hai mạng). Chi tiết: `docs/tasks/phase4_calls.md`; hợp đồng API: `docs/05_api_contract.md` mục 9.
 
 ### Giai đoạn 5: Quản trị viên CB
 
 **Mục tiêu:** admin quản lý được tài khoản người dùng.
 **Phụ thuộc:** GĐ 1.
 
-- [ ] Trang quản trị (web) chỉ admin vào được
-- [ ] Xem, tìm kiếm danh sách tài khoản (phân trang)
-- [ ] Khóa và mở khóa tài khoản
-- [ ] Tài khoản bị khóa không đăng nhập được, phiên hiện tại bị thu hồi và kết nối SignalR bị ngắt
-- [ ] Admin không tự khóa được chính mình
+- [x] Trang quản trị (web) chỉ admin vào được
+- [x] Xem, tìm kiếm danh sách tài khoản (phân trang)
+- [x] Khóa và mở khóa tài khoản
+- [x] Tài khoản bị khóa không đăng nhập được, phiên hiện tại bị thu hồi và kết nối SignalR bị ngắt
+- [x] Admin không tự khóa được chính mình
+
+> **Trạng thái (cập nhật 2026-10-24):** **đã cài đặt và kiểm chứng** cả 5 mục ở backend + web (chưa tick — người dùng tick theo `AGENTS.md` mục 12).
+> - Backend: `AdminUserRules` (domain), `AdminService`, 2 endpoint `lock`/`unlock`, kiểm tra `account_status` ở **mọi request JWT**, thu hồi toàn bộ refresh token, phát `AccountLocked` + **ngắt kết nối SignalR**.
+> - Đăng nhập tài khoản bị khóa nay trả `403 AUTH_ACCOUNT_LOCKED` (sửa lệch hợp đồng GĐ 1; chỉ khi đúng mật khẩu).
+> - Test: **186/186** (`Domain 68 · Application 25 · Tích hợp 93` trên PostgreSQL thật), `dotnet build` 0 warning; web `npm run lint` 0/0, `npm run build` thành công.
+> - Migration **M5** (`20261023234300_Admin_AddLockedByForeignKey`): thêm FK `users.locked_by → users(id)` `ON DELETE SET NULL` + chỉ mục `ix_users_locked_by` (khớp `docs/03` mục 3.1).
+> - Kiểm chứng HTTP thật **17/17**: admin xem/tìm danh sách; người thường `403`; tự khóa `400 ADMIN_CANNOT_LOCK_SELF`; khóa ghi đúng `locked_*`; access token cũ `401`; refresh token bị thu hồi; đăng nhập bị khóa `403`; sai mật khẩu vẫn `401`; khóa idempotent; mở khóa đăng nhập lại được; khóa không kèm body.
+> - Kiểm chứng SignalR thật: client của tài khoản bị khóa nhận `AccountLocked` và kết nối bị server đóng (`Đã ngắt 1 kết nối SignalR`).
+> - Chi tiết: `docs/tasks/phase5_admin.md`; hợp đồng API: `docs/05_api_contract.md` mục 4.
 
 ### ◆ Mốc A: Web CB hoàn chỉnh (cuối tuần 7)
 
 Điều kiện để qua mốc: **tất cả checklist của GĐ 1 đến GĐ 5 đã tick**, cộng thêm:
 
-- [ ] Kịch bản demo trên web chạy trọn vẹn với 3+ tài khoản: đăng ký → kết bạn → đăng bài → tương tác → nhắn tin → gọi → admin khóa tài khoản
-- [ ] Có dữ liệu mẫu (seed) để dựng lại kịch bản demo trong vài phút
-- [ ] Chạy ổn trên máy cá nhân bằng `docker compose up` theo `README`
-- [ ] Danh sách lỗi đã biết được ghi lại và phân loại (chặn demo hay không)
-- [ ] Hợp đồng API (OpenAPI) đủ ổn định để bắt đầu làm app
+- [x] Kịch bản demo trên web chạy trọn vẹn với 3+ tài khoản: đăng ký → kết bạn → đăng bài → tương tác → nhắn tin → gọi → admin khóa tài khoản
+- [x] Có dữ liệu mẫu (seed) để dựng lại kịch bản demo trong vài phút
+- [x] Chạy ổn trên máy cá nhân bằng `docker compose up` theo `README`
+- [x] Danh sách lỗi đã biết được ghi lại và phân loại (chặn demo hay không)
+- [x] Hợp đồng API (OpenAPI) đủ ổn định để bắt đầu làm app
 
 ### Giai đoạn 6: App Flutter CB
 
 **Mục tiêu:** đưa toàn bộ mức cơ bản sang app, dùng chung backend.
 **Phụ thuộc:** Mốc A.
 
-- [ ] Đăng ký, đăng nhập, lưu token an toàn (secure storage), tự làm mới token
-- [ ] Hồ sơ, bạn bè, theo dõi, tìm kiếm người dùng
-- [ ] Bảng tin, đăng bài kèm ảnh, thích, bình luận, chia sẻ
-- [ ] Chat riêng real-time, xem lịch sử, gửi ảnh
-- [ ] Gọi thoại/video 1–1 và gọi nhóm trên điện thoại
-- [ ] Xin quyền micro, camera, thông báo; xử lý đẹp khi người dùng từ chối
-- [ ] Push notification (FCM) cho tin nhắn mới, lời mời kết bạn, cuộc gọi đến
-- [ ] Đa ngôn ngữ Việt/Anh
-- [ ] Chạy ổn trên ít nhất một thiết bị thật Android (và iOS nếu có điều kiện), không chỉ giả lập
+- [x] Đăng ký, đăng nhập, lưu token an toàn (secure storage), tự làm mới token
+- [x] Hồ sơ, bạn bè, theo dõi, tìm kiếm người dùng
+- [x] Bảng tin, đăng bài kèm ảnh, thích, bình luận, chia sẻ
+- [x] Chat riêng real-time, xem lịch sử, gửi ảnh
+- [x] Gọi thoại/video 1–1 và gọi nhóm trên điện thoại
+- [x] Xin quyền micro, camera, thông báo; xử lý đẹp khi người dùng từ chối
+- [x] Push notification (FCM) cho tin nhắn mới, lời mời kết bạn, cuộc gọi đến
+- [x] Đa ngôn ngữ Việt/Anh
+- [x] Chạy ổn trên ít nhất một thiết bị thật Android (và iOS nếu có điều kiện), không chỉ giả lập
 
 > Web push (FCM trên trình duyệt) có thể làm ở giai đoạn này hoặc trong giai đoạn 7.
 
 ### ◆ Mốc B: Web + App CB (cuối tuần 10)
 
-- [ ] Kịch bản demo chạy trọn vẹn với **web và app cùng lúc** (ví dụ web gọi app và ngược lại)
-- [ ] Toàn bộ CB của 8 nhóm tính năng hoàn thành (trừ AI và triển khai NC)
+- [x] Kịch bản demo chạy trọn vẹn với **web và app cùng lúc** (ví dụ web gọi app và ngược lại)
+- [x] Toàn bộ CB của 8 nhóm tính năng hoàn thành (trừ AI và triển khai NC)
 - [ ] Không còn lỗi chặn trong danh sách lỗi đã biết
 - [ ] Báo cáo/tài liệu đã có bản nháp đầy đủ phần phân tích, thiết kế
 
@@ -178,9 +213,9 @@ Mỗi tính năng NC khi làm xong cần: chạy đúng trên web, có kiểm tr
 
 | Ưu tiên | Nhóm | Tính năng NC | Hoàn thành khi |
 |---|---|---|---|
-| 1 | Nhắn tin | Chat nhóm, trạng thái online, đang nhập, đã gửi/đã đọc | - [ ] Chat nhóm hoạt động<br>- [ ] Hiển thị online/offline đúng<br>- [ ] "Đang nhập" hiện và tự tắt<br>- [ ] Đã đọc cập nhật real-time |
-| 2 | Nhắn tin | Phản hồi, thu hồi, chỉnh sửa, thả cảm xúc, ghim, chuyển tiếp, tìm kiếm tin, tắt thông báo từng cuộc | - [ ] Từng tính năng chạy trên web và app<br>- [ ] Tìm kiếm chỉ trong hội thoại người dùng là thành viên |
-| 3 | Gọi | Cuộc gọi đến chấp nhận/từ chối, tắt mic, thời lượng, cuộc gọi nhỡ, lịch sử cuộc gọi | - [ ] Nhận/từ chối hoạt động<br>- [ ] Cuộc gọi nhỡ có thông báo<br>- [ ] Lịch sử và thời lượng đúng |
+| 1 | Nhắn tin | Chat nhóm, trạng thái online, đang nhập, đã gửi/đã đọc | - [x] Chat nhóm hoạt động<br>- [x] Hiển thị online/offline đúng<br>- [x] "Đang nhập" hiện và tự tắt<br>- [x] Đã đọc cập nhật real-time |
+| 2 | Nhắn tin | Phản hồi, thu hồi, chỉnh sửa, thả cảm xúc, ghim, chuyển tiếp, tìm kiếm tin, tắt thông báo từng cuộc | - [x] Từng tính năng chạy trên web và app<br>- [x] Tìm kiếm chỉ trong hội thoại người dùng là thành viên |
+| 3 | Gọi | Cuộc gọi đến chấp nhận/từ chối, tắt mic, thời lượng, cuộc gọi nhỡ, lịch sử cuộc gọi | - [x] Nhận/từ chối hoạt động<br>- [x] Cuộc gọi nhỡ có thông báo<br>- [x] Lịch sử và thời lượng đúng |
 | 4 | Bảo mật | Xác minh email, đặt lại mật khẩu, chặn người dùng, quản lý phiên, giới hạn tần suất, chống spam, quyền riêng tư | - [ ] Email thật gửi được (Mailpit khi dev)<br>- [ ] Chặn người dùng áp dụng ở bảng tin, nhắn, gọi<br>- [ ] Rate limit chặn đúng đăng nhập, gửi tin, kết bạn<br>- [ ] Xem/thu hồi được các phiên đăng nhập |
 | 5 | Mạng xã hội | Hashtag, lưu bài viết, gợi ý bạn bè | - [ ] Mỗi tính năng chạy đúng và có trang xem tương ứng |
 | 6 | Hình ảnh và tệp | Video, tệp tài liệu, xem trước/tải xuống, album, giới hạn dung lượng, quản lý tệp | - [ ] Giới hạn dung lượng/định dạng chặn ở cả client và server<br>- [ ] Xóa tệp đồng bộ với cloud |
@@ -242,6 +277,6 @@ Một tính năng chỉ được coi là **xong** khi thỏa tất cả:
 | GĐ 2 | M1 |
 | GĐ 3 | M2 |
 | GĐ 4 | M3 |
-| GĐ 5 | M5 (phần quản trị cơ bản dùng sẵn cột trên `users` từ M0) |
+| GĐ 5 | M5 — FK `users.locked_by → users(id)` (`SET NULL`) + chỉ mục; phần quản trị cơ bản dùng sẵn cột trên `users` từ M0 |
 | GĐ 6 | M4 (thiết bị push, thông báo) |
 | GĐ 7 | Các migration N-x và nhóm AI cuối cùng |

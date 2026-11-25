@@ -1,4 +1,5 @@
 // ApplicationUser — mở rộng ASP.NET Core Identity
+using Comink.Infrastructure.Persistence.Entities;
 using Microsoft.AspNetCore.Identity;
 
 namespace Comink.Infrastructure.Identity;
@@ -22,6 +23,9 @@ public class ApplicationUser : IdentityUser<Guid>
 
     // Thời điểm tạo tài khoản
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    // Thời điểm cập nhật tài khoản gần nhất
+    public DateTimeOffset? UpdatedAt { get; set; }
 
     // Navigation properties
     public UserProfile? Profile { get; set; }
@@ -79,34 +83,17 @@ public class UserSettings
     public bool ShowOnlineStatus { get; set; } = true;
     public bool ShowReadReceipts { get; set; } = true;
 
+    // Cài đặt bật/tắt từng loại thông báo, lưu dạng jsonb.
+    // Mặc định bật hết (mục 3.1 của 03_database_design.md).
+    public string NotificationSettings { get; set; } = DefaultNotificationSettings;
+
     public DateTimeOffset? UpdatedAt { get; set; }
-}
 
-/// <summary>
-/// Refresh token cho phiên đăng nhập.
-/// Ánh xạ sang bảng `refresh_tokens`.
-/// </summary>
-public class RefreshToken
-{
-    public Guid Id { get; set; } = Guid.CreateVersion7();
-    public Guid UserId { get; set; }
-    public ApplicationUser User { get; set; } = null!;
-
-    // Chỉ lưu băm, không lưu token gốc
-    public string TokenHash { get; set; } = string.Empty;
-
-    // Mọi token xoay vòng từ cùng một lần đăng nhập chung một family_id
-    public Guid FamilyId { get; set; }
-
-    // Thông tin thiết bị (cho quản lý phiên [NC])
-    public string? DeviceName { get; set; }
-    public string? IpAddress { get; set; }
-    public string? UserAgent { get; set; }
-
-    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-    public DateTimeOffset ExpiresAt { get; set; }
-    public DateTimeOffset? RevokedAt { get; set; }
-    public Guid? ReplacedByTokenId { get; set; }
-
-    public bool IsActive => RevokedAt == null && DateTimeOffset.UtcNow < ExpiresAt;
+    /// <summary>
+    /// Giá trị mặc định của <see cref="NotificationSettings"/>: bật tất cả loại thông báo.
+    /// </summary>
+    public const string DefaultNotificationSettings =
+        "{\"friendRequest\":true,\"friendAccepted\":true,\"newFollower\":true,\"postLiked\":true," +
+        "\"postCommented\":true,\"commentReplied\":true,\"postShared\":true,\"mentioned\":true," +
+        "\"missedCall\":true,\"addedToGroup\":true,\"adminAction\":true}";
 }

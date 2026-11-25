@@ -1,5 +1,6 @@
 // Cấu hình EF Core cho ApplicationUser và các bảng Identity mở rộng
 using Comink.Infrastructure.Identity;
+using Comink.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -26,6 +27,20 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
         builder.Property(u => u.LockedReason).HasMaxLength(500);
         builder.Property(u => u.CreatedAt).IsRequired();
 
+        // users.updated_at: cột chuẩn khi tài khoản được cập nhật (mục 1.2 tài liệu thiết kế)
+        builder.Property(u => u.UpdatedAt);
+
+        // user_name: tài liệu 03_database_design.md mục 3.1 quy định varchar(32)
+        builder.Property(u => u.UserName).HasMaxLength(32);
+        builder.Property(u => u.NormalizedUserName).HasMaxLength(32);
+
+        // email là duy nhất (mục 3.1: "NN, UQ trên cột chuẩn hóa").
+        // Chỉ mục EmailIndex do Identity tạo KHÔNG unique, nên phải khai báo rõ ở đây —
+        // nếu thiếu, hai tài khoản có thể trùng email và đăng nhập sẽ lỗi khi tìm theo email.
+        builder.Property(u => u.Email).HasMaxLength(256);
+        builder.Property(u => u.NormalizedEmail).HasMaxLength(256);
+        builder.HasIndex(u => u.NormalizedEmail).IsUnique();
+
         // Quan hệ 1-1 với UserProfile
         builder.HasOne(u => u.Profile)
             .WithOne(p => p.User)
@@ -43,6 +58,16 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
             .WithOne(t => t.User)
             .HasForeignKey(t => t.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Người thực hiện khóa tài khoản — tự tham chiếu users.id (docs/03 mục 3.1: "uuid FK→users").
+        // - SET NULL: nếu sau này có xóa cứng một admin, cột `locked_by` về null thay vì chặn xóa
+        //   hoặc xóa lan sang tài khoản bị họ khóa (không dùng CASCADE).
+        // - Không khai báo navigation: danh sách/hồ sơ người dùng không cần nạp admin đã khóa,
+        //   tránh join thừa; muốn hiển thị "khóa bởi ai" thì query tường minh theo `LockedBy`.
+        builder.HasOne<ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(u => u.LockedBy)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
 
@@ -82,6 +107,12 @@ public class UserSettingsConfiguration : IEntityTypeConfiguration<UserSettings>
         builder.Property(s => s.WhoCanCall).HasMaxLength(16).IsRequired().HasDefaultValue("Friends");
         builder.Property(s => s.ShowOnlineStatus).IsRequired().HasDefaultValue(true);
         builder.Property(s => s.ShowReadReceipts).IsRequired().HasDefaultValue(true);
+
+        // Bật/tắt từng loại thông báo — jsonb, mặc định bật hết
+        builder.Property(s => s.NotificationSettings)
+            .HasColumnType("jsonb")
+            .IsRequired()
+            .HasDefaultValue(UserSettings.DefaultNotificationSettings);
     }
 }
 
