@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { LogOut, Moon, Save, Sun } from 'lucide-react'
+import { Camera, Loader2, LogOut, Moon, Save, Sun, Trash2 } from 'lucide-react'
+import { mediaApi } from '../api/media'
 import { usersApi } from '../api/users'
 import type { MyProfile } from '../api/types'
 import { ApiError } from '../lib/http'
@@ -21,8 +22,12 @@ import { Alert, Card, FieldError, Label, Spinner } from '../components/ui/Feedba
 import { cn } from '../lib/utils'
 
 type ProfileTab = 'edit' | 'account' | 'settings'
+type ImageTarget = 'avatar' | 'cover'
 
-/** Trang hồ sơ cá nhân: ảnh bìa thương hiệu, thống kê, sửa hồ sơ và cài đặt tài khoản. */
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+
+/** Trang hồ sơ cá nhân: đổi ảnh bìa, ảnh đại diện, thống kê, sửa hồ sơ và cài đặt tài khoản. */
 export function ProfilePage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -33,6 +38,9 @@ export function ProfilePage() {
   const { current, changeLanguage } = useLanguage()
   const { isDark, toggleTheme } = useTheme()
   const [tab, setTab] = useState<ProfileTab>('edit')
+  const [uploadingTarget, setUploadingTarget] = useState<ImageTarget | null>(null)
+  const avatarInputRef = useRef<HTMLInputElement | null>(null)
+  const coverInputRef = useRef<HTMLInputElement | null>(null)
 
   const { data: profile, isLoading, isError, error, refetch } = useQuery<MyProfile>({
     // Gắn userId vào queryKey để tách biệt cache hồ sơ giữa các tài khoản.
@@ -88,6 +96,92 @@ export function ProfilePage() {
     },
   })
 
+  const syncProfileUpdate = (updated: MyProfile, messageKey: string) => {
+    const user = useAuthStore.getState().user
+    if (user) {
+      setUser({
+        ...user,
+        displayName: updated.displayName,
+        avatarUrl: updated.avatarUrl,
+      })
+    }
+    queryClient.setQueryData(['profile', 'me', currentUserId], updated)
+    void queryClient.invalidateQueries({ queryKey: ['profile', 'me'] })
+    void queryClient.invalidateQueries({ queryKey: ['public-profile'] })
+    void queryClient.invalidateQueries({ queryKey: ['feed'] })
+    void queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    toast.success(t(messageKey))
+  }
+
+  const handleImageUpload = async (file: File | undefined, target: ImageTarget) => {
+    if (!file || uploadingTarget !== null) {
+      return
+    }
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      toast.error(t('social.bad_type'))
+      return
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error(t('social.too_large_image'))
+      return
+    }
+
+    setUploadingTarget(target)
+    try {
+      const context = target === 'avatar' ? 'Avatar' : 'Cover'
+      const signature = await mediaApi.getSignature(context)
+      const uploaded = await mediaApi.upload(signature, file)
+      const asset = await mediaApi.register({
+        providerPublicId: uploaded.providerPublicId,
+        url: uploaded.url,
+        thumbnailUrl: uploaded.url,
+        mimeType: uploaded.mimeType,
+        sizeBytes: uploaded.sizeBytes,
+        context,
+      })
+      const updated = await usersApi.updateProfile(
+        target === 'avatar' ? { avatarUrl: asset.url } : { coverUrl: asset.url },
+      )
+      syncProfileUpdate(
+        updated,
+        target === 'avatar' ? 'profile.avatar_updated' : 'profile.cover_updated',
+      )
+    } catch (uploadError) {
+      const code = uploadError instanceof ApiError ? uploadError.code : 'INTERNAL_ERROR'
+      toast.error(translateErrorCode(t, code))
+    } finally {
+      setUploadingTarget(null)
+      if (target === 'avatar' && avatarInputRef.current) {
+        avatarInputRef.current.value = ''
+      }
+      if (target === 'cover' && coverInputRef.current) {
+        coverInputRef.current.value = ''
+      }
+    }
+  }
+
+  const handleRemoveImage = async (target: ImageTarget) => {
+    if (uploadingTarget !== null) {
+      return
+    }
+    setUploadingTarget(target)
+    try {
+      const updated = await usersApi.updateProfile(
+        target === 'avatar' ? { avatarUrl: '' } : { coverUrl: '' },
+      )
+      syncProfileUpdate(
+        updated,
+        target === 'avatar' ? 'profile.avatar_updated' : 'profile.cover_updated',
+      )
+    } catch (removeError) {
+      const code = removeError instanceof ApiError ? removeError.code : 'INTERNAL_ERROR'
+      toast.error(translateErrorCode(t, code))
+    } finally {
+      setUploadingTarget(null)
+    }
+  }
+
   const handleLogout = async () => {
     await logout()
     toast.success(t('auth.logout_success'))
@@ -127,8 +221,64 @@ export function ProfilePage() {
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs dark:border-slate-800 dark:bg-[#121826]">
-        <div className="relative h-28 bg-gradient-to-r from-sky-700 via-sky-500 to-cyan-400">
-          <span className="absolute bottom-3 right-4 rounded-full bg-black/25 px-3 py-1 text-xs font-semibold text-white backdrop-blur-xs">
+        <input
+          ref={coverInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={(event) => void handleImageUpload(event.target.files?.[0], 'cover')}
+        />
+        <input
+          ref={avatarInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={(event) => void handleImageUpload(event.target.files?.[0], 'avatar')}
+        />
+
+        <div className="relative h-36 bg-gradient-to-r from-sky-700 via-sky-500 to-cyan-400 sm:h-44">
+          {profile.coverUrl && (
+            <img
+              src={profile.coverUrl}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          )}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/15" />
+
+          <div className="absolute right-3 top-3 flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => coverInputRef.current?.click()}
+              disabled={uploadingTarget !== null}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-black/45 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-xs transition-colors hover:bg-black/65 disabled:opacity-60"
+            >
+              {uploadingTarget === 'cover' ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Camera className="h-3.5 w-3.5" />
+              )}
+              <span>
+                {uploadingTarget === 'cover'
+                  ? t('profile.uploading_image')
+                  : t('profile.change_cover')}
+              </span>
+            </button>
+            {profile.coverUrl && (
+              <button
+                type="button"
+                onClick={() => void handleRemoveImage('cover')}
+                disabled={uploadingTarget !== null}
+                title={t('profile.remove_cover')}
+                aria-label={t('profile.remove_cover')}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-black/45 text-white backdrop-blur-xs transition-colors hover:bg-rose-600/80 disabled:opacity-60"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          <span className="absolute bottom-3 right-4 rounded-full bg-black/35 px-3 py-1 text-xs font-semibold text-white backdrop-blur-xs">
             {t('profile.joined_at')}: {new Date(profile.createdAt).toLocaleDateString()}
           </span>
         </div>
@@ -136,8 +286,22 @@ export function ProfilePage() {
         <div className="px-5 pb-5">
           <div className="relative z-10 -mt-10 flex flex-wrap items-end justify-between gap-3">
             <div className="flex min-w-0 items-end gap-3.5">
-              <div className="shrink-0 rounded-full bg-white p-1 ring-2 ring-white dark:bg-[#121826] dark:ring-[#121826]">
+              <div className="relative shrink-0 rounded-full bg-white p-1 ring-2 ring-white dark:bg-[#121826] dark:ring-[#121826]">
                 <Avatar name={profile.displayName} url={profile.avatarUrl} size="lg" />
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={uploadingTarget !== null}
+                  title={t('profile.change_avatar')}
+                  aria-label={t('profile.change_avatar')}
+                  className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-sky-600 text-white shadow-sm transition-colors hover:bg-sky-700 disabled:opacity-60 dark:border-[#121826] dark:bg-sky-500 dark:hover:bg-sky-400"
+                >
+                  {uploadingTarget === 'avatar' ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Camera className="h-3.5 w-3.5" />
+                  )}
+                </button>
               </div>
               <div className="min-w-0 pt-11">
                 <h1 className="truncate text-xl font-bold text-slate-900 dark:text-slate-100">
@@ -149,6 +313,19 @@ export function ProfilePage() {
                 </p>
               </div>
             </div>
+
+            {profile.avatarUrl && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void handleRemoveImage('avatar')}
+                disabled={uploadingTarget !== null}
+                className="text-xs text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {t('profile.remove_avatar')}
+              </Button>
+            )}
           </div>
 
           {profile.bio && (

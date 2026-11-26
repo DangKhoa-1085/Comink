@@ -248,7 +248,7 @@ function AuthenticatedShell({
               isMessagesRoute ? 'justify-center p-1.5' : 'gap-2.5 p-2',
             )}
           >
-            <Avatar name={user.displayName} size="sm" />
+            <Avatar name={user.displayName} url={user.avatarUrl} size="sm" />
             {!isMessagesRoute && (
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">

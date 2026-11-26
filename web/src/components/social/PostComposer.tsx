@@ -114,7 +114,7 @@ export function PostComposer({ onPosted }: { onPosted: () => void }) {
   return (
     <div className="mb-6 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#121826]">
       <div className="flex gap-3">
-        <Avatar name={user.displayName} size="md" />
+        <Avatar name={user.displayName} url={user.avatarUrl} size="md" />
         <div className="min-w-0 flex-1">
           <textarea
             value={content}

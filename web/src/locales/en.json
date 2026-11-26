@@ -117,7 +117,14 @@
     "tab_account": "Account info",
     "tab_settings": "Settings",
     "session_title": "Sign-in session",
-    "session_desc": "Sign out of this device and return to the login screen."
+    "session_desc": "Sign out of this device and return to the login screen.",
+    "change_avatar": "Change avatar",
+    "change_cover": "Change cover",
+    "remove_avatar": "Remove avatar",
+    "remove_cover": "Remove cover",
+    "uploading_image": "Uploading image...",
+    "avatar_updated": "Avatar updated",
+    "cover_updated": "Cover photo updated"
   },
   "admin": {
     "title": "User administration",

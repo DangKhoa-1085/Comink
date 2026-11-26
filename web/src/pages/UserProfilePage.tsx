@@ -88,8 +88,16 @@ export function UserProfilePage() {
   return (
     <div className="mx-auto max-w-2xl space-y-5">
       <section className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs dark:border-slate-800 dark:bg-[#121826]">
-        <div className="relative h-28 bg-gradient-to-r from-sky-700 via-sky-500 to-cyan-400">
-          <span className="absolute bottom-3 right-4 rounded-full bg-black/25 px-3 py-1 text-xs font-semibold text-white backdrop-blur-xs">
+        <div className="relative h-36 bg-gradient-to-r from-sky-700 via-sky-500 to-cyan-400 sm:h-44">
+          {profile.coverUrl && (
+            <img
+              src={profile.coverUrl}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          )}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10" />
+          <span className="absolute bottom-3 right-4 rounded-full bg-black/35 px-3 py-1 text-xs font-semibold text-white backdrop-blur-xs">
             {t('social.joined')}: {timeAgo(profile.createdAt, i18n.language)}
           </span>
         </div>

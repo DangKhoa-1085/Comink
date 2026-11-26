@@ -19,7 +19,7 @@ type FriendsTab = 'incoming' | 'outgoing' | 'list'
 export function FriendsPage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
-  const [tab, setTab] = useState<FriendsTab>('incoming')
+  const [tab, setTab] = useState<FriendsTab>('list')
 
   const incomingQuery = useQuery({
     queryKey: ['friendships', 'incoming'],
@@ -77,9 +77,9 @@ export function FriendsPage() {
   const friends = friendsQuery.data?.items ?? []
 
   const tabs: { id: FriendsTab; label: string; count: number }[] = [
+    { id: 'list', label: t('social.friends_list'), count: friends.length },
     { id: 'incoming', label: t('social.requests_incoming'), count: incoming.length },
     { id: 'outgoing', label: t('social.requests_outgoing'), count: outgoing.length },
-    { id: 'list', label: t('social.friends_list'), count: friends.length },
   ]
 
   const renderRequestCard = (friendship: Friendship, isIncoming: boolean) => (

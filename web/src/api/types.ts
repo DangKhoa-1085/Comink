@@ -19,6 +19,7 @@ export interface AuthUser {
   userName: string
   email: string
   displayName: string
+  avatarUrl?: string | null
   roles: string[]
 }
 
@@ -90,6 +91,8 @@ export interface UpdateProfilePayload {
   bio?: string
   location?: string
   dateOfBirth?: string
+  avatarUrl?: string | null
+  coverUrl?: string | null
 }
 
 export interface UpdateSettingsPayload {

@@ -49,7 +49,23 @@ export const useAuthStore = create<AuthState>((set) => ({
       // Xóa toàn bộ cache truy vấn cũ để tránh hiển thị dữ liệu của tài khoản trước khi chuyển tài khoản.
       await queryClient.cancelQueries()
       queryClient.clear()
-      set({ user: auth.user, loading: false })
+
+      // Đồng bộ thêm avatarUrl từ hồ sơ hiện tại vì response đăng nhập không kèm trường này.
+      let user = auth.user
+      try {
+        const profile = await usersApi.getMe()
+        queryClient.setQueryData(['profile', 'me', profile.id], profile)
+        user = {
+          ...auth.user,
+          displayName: profile.displayName,
+          avatarUrl: profile.avatarUrl,
+        }
+        session.setUser(user)
+      } catch {
+        // Không chặn đăng nhập nếu tải hồ sơ phụ thất bại.
+      }
+
+      set({ user, loading: false })
       return true
     } catch (error) {
       const apiError = error instanceof ApiError ? error : null
@@ -123,9 +139,11 @@ export const useAuthStore = create<AuthState>((set) => ({
         userName: profile.userName,
         email: profile.email,
         displayName: profile.displayName,
+        avatarUrl: profile.avatarUrl,
         roles: profile.roles,
       }
       session.setUser(user)
+      queryClient.setQueryData(['profile', 'me', user.id], profile)
       set({ user, initialized: true })
     } catch {
       // Refresh token hết hiệu lực hoặc tài khoản bị khóa → coi như chưa đăng nhập.

@@ -152,7 +152,9 @@ public class IdentityServiceTests : IntegrationTestBase
             displayName: "Tên Mới",
             bio: "Tiểu sử",
             location: "Hà Nội",
-            dateOfBirth: new DateOnly(2004, 5, 1));
+            dateOfBirth: new DateOnly(2004, 5, 1),
+            avatarUrl: "/uploads/avatar/a.jpg",
+            coverUrl: "/uploads/cover/c.jpg");
         Assert.True(updated.Succeeded);
 
         var data = await sut.GetByIdAsync(user.Id);
@@ -161,6 +163,21 @@ public class IdentityServiceTests : IntegrationTestBase
         Assert.Equal("Tiểu sử", data.Bio);
         Assert.Equal("Hà Nội", data.Location);
         Assert.Equal(new DateOnly(2004, 5, 1), data.DateOfBirth);
+        Assert.Equal("/uploads/avatar/a.jpg", data.AvatarUrl);
+        Assert.Equal("/uploads/cover/c.jpg", data.CoverUrl);
+
+        var cleared = await sut.UpdateProfileAsync(
+            user.Id,
+            displayName: null,
+            bio: null,
+            location: null,
+            dateOfBirth: null,
+            avatarUrl: "",
+            coverUrl: "");
+        Assert.True(cleared.Succeeded);
+        var clearedData = await sut.GetByIdAsync(user.Id);
+        Assert.Null(clearedData!.AvatarUrl);
+        Assert.Null(clearedData.CoverUrl);
     }
 
     [Fact]

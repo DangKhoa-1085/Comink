@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/i18n/app_localizations.dart';
 import '../../../core/i18n/locale_controller.dart';
 import '../../../core/network/api_exception.dart';
@@ -9,6 +11,10 @@ import '../../../core/theme/theme_controller.dart';
 import '../../../core/widgets/app_avatar.dart';
 import '../../../core/widgets/states.dart';
 import '../../auth/data/session_controller.dart';
+import '../../chats/data/chat_providers.dart';
+import '../../feed/data/feed_providers.dart';
+import '../../friends/data/friends_providers.dart';
+import '../../media/data/media_service.dart';
 import '../../notifications/data/push_service.dart';
 import '../data/profile_providers.dart';
 import '../domain/my_profile.dart';
@@ -36,18 +42,173 @@ class ProfilePage extends ConsumerWidget {
   }
 }
 
-class _ProfileContent extends ConsumerWidget {
+class _ProfileContent extends ConsumerStatefulWidget {
   const _ProfileContent({required this.profile});
 
   final MyProfile profile;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ProfileContent> createState() => _ProfileContentState();
+}
+
+class _ProfileContentState extends ConsumerState<_ProfileContent> {
+  bool _uploadingAvatar = false;
+  bool _uploadingCover = false;
+
+  Future<void> _handlePhotoAction({required bool isAvatar, required bool hasExisting}) async {
+    if (_uploadingAvatar || _uploadingCover) {
+      return;
+    }
+
+    if (!hasExisting) {
+      await _pickAndUpload(isAvatar: isAvatar);
+      return;
+    }
+
+    final l10n = AppLocalizations.of(context);
+    final colors = Theme.of(context).colorScheme;
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.photo_library_outlined, color: colors.primary),
+              title: Text(
+                isAvatar ? l10n.t('profile_change_avatar') : l10n.t('profile_change_cover'),
+              ),
+              onTap: () => Navigator.of(sheetContext).pop('change'),
+            ),
+            ListTile(
+              leading: Icon(Icons.delete_outline, color: colors.error),
+              title: Text(
+                isAvatar ? l10n.t('profile_remove_avatar') : l10n.t('profile_remove_cover'),
+                style: TextStyle(color: colors.error),
+              ),
+              onTap: () => Navigator.of(sheetContext).pop('remove'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+    if (choice == 'change') {
+      await _pickAndUpload(isAvatar: isAvatar);
+    } else if (choice == 'remove') {
+      await _updateMediaField(isAvatar: isAvatar, url: '');
+    }
+  }
+
+  Future<void> _pickAndUpload({required bool isAvatar}) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    XFile? picked;
+    try {
+      picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 1920,
+      );
+    } catch (_) {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.error('MEDIA_UPLOAD_FAILED'))));
+      return;
+    }
+    if (picked == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      if (isAvatar) {
+        _uploadingAvatar = true;
+      } else {
+        _uploadingCover = true;
+      }
+    });
+
+    try {
+      final asset = await ref.read(mediaServiceProvider).upload(
+            picked,
+            context: isAvatar ? 'Avatar' : 'Cover',
+          );
+      await _updateMediaField(isAvatar: isAvatar, url: asset.url);
+    } on ApiException catch (error) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.error(error.code))));
+      }
+    } catch (_) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.error('MEDIA_UPLOAD_FAILED'))));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _uploadingAvatar = false;
+          _uploadingCover = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _updateMediaField({required bool isAvatar, required String url}) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    setState(() {
+      if (isAvatar) {
+        _uploadingAvatar = true;
+      } else {
+        _uploadingCover = true;
+      }
+    });
+
+    try {
+      await ref.read(apiClientProvider).patch(
+        '/api/users/me/profile',
+        data: isAvatar ? {'avatarUrl': url} : {'coverUrl': url},
+      );
+      ref.invalidate(myProfileProvider);
+      ref.invalidate(feedProvider);
+      ref.invalidate(friendsProvider);
+      ref.invalidate(conversationsProvider);
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              isAvatar ? l10n.t('profile_avatar_updated') : l10n.t('profile_cover_updated'),
+            ),
+          ),
+        );
+      }
+    } on ApiException catch (error) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.error(error.code))));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _uploadingAvatar = false;
+          _uploadingCover = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = widget.profile;
     final l10n = AppLocalizations.of(context);
     final colors = Theme.of(context).colorScheme;
     final localeCode = ref.watch(localeControllerProvider).languageCode;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final joinedDate = MaterialLocalizations.of(context).formatShortDate(profile.createdAt);
+    final hasCover = profile.coverUrl != null && profile.coverUrl!.trim().isNotEmpty;
+    final hasAvatar = profile.avatarUrl != null && profile.avatarUrl!.trim().isNotEmpty;
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -66,7 +227,8 @@ class _ProfileContent extends ConsumerWidget {
                   clipBehavior: Clip.none,
                   children: [
                     Container(
-                      height: 112,
+                      height: 136,
+                      width: double.infinity,
                       decoration: const BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
@@ -78,6 +240,75 @@ class _ProfileContent extends ConsumerWidget {
                           end: Alignment.bottomRight,
                         ),
                       ),
+                      child: hasCover
+                          ? Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                Image.network(
+                                  AppConfig.resolveMediaUrl(profile.coverUrl!),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                                ),
+                                DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.black.withValues(alpha: 0.4),
+                                        Colors.transparent,
+                                        Colors.black.withValues(alpha: 0.2),
+                                      ],
+                                      begin: Alignment.bottomCenter,
+                                      end: Alignment.topCenter,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : null,
+                    ),
+                    Positioned(
+                      right: 10,
+                      top: 10,
+                      child: Material(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: _uploadingAvatar || _uploadingCover
+                              ? null
+                              : () => _handlePhotoAction(isAvatar: false, hasExisting: hasCover),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_uploadingCover)
+                                  const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                else
+                                  const Icon(Icons.camera_alt_outlined, size: 15, color: Colors.white),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _uploadingCover
+                                      ? l10n.t('profile_uploading_image')
+                                      : l10n.t('profile_change_cover'),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                     Positioned(
                       right: 12,
@@ -85,7 +316,7 @@ class _ProfileContent extends ConsumerWidget {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.25),
+                          color: Colors.black.withValues(alpha: 0.35),
                           borderRadius: BorderRadius.circular(99),
                         ),
                         child: Text(
@@ -101,17 +332,58 @@ class _ProfileContent extends ConsumerWidget {
                     Positioned(
                       left: 16,
                       bottom: -36,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: colors.surface,
-                          shape: BoxShape.circle,
-                        ),
-                        child: AppAvatar(
-                          name: profile.displayName,
-                          url: profile.avatarUrl,
-                          radius: 38,
-                        ),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: colors.surface,
+                              shape: BoxShape.circle,
+                            ),
+                            child: AppAvatar(
+                              name: profile.displayName,
+                              url: profile.avatarUrl,
+                              radius: 38,
+                            ),
+                          ),
+                          Positioned(
+                            right: -2,
+                            bottom: -2,
+                            child: Material(
+                              color: colors.primary,
+                              shape: CircleBorder(
+                                side: BorderSide(color: colors.surface, width: 2),
+                              ),
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: _uploadingAvatar || _uploadingCover
+                                    ? null
+                                    : () => _handlePhotoAction(
+                                          isAvatar: true,
+                                          hasExisting: hasAvatar,
+                                        ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(6),
+                                  child: _uploadingAvatar
+                                      ? const SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.camera_alt_outlined,
+                                          size: 14,
+                                          color: Colors.white,
+                                        ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],

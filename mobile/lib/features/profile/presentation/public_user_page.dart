@@ -84,7 +84,8 @@ class _PublicProfileView extends ConsumerWidget {
                   clipBehavior: Clip.none,
                   children: [
                     Container(
-                      height: 112,
+                      height: 136,
+                      width: double.infinity,
                       decoration: const BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
@@ -96,6 +97,30 @@ class _PublicProfileView extends ConsumerWidget {
                           end: Alignment.bottomRight,
                         ),
                       ),
+                      child: (profile.coverUrl != null && profile.coverUrl!.trim().isNotEmpty)
+                          ? Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                Image.network(
+                                  AppConfig.resolveMediaUrl(profile.coverUrl!),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                                ),
+                                DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.black.withValues(alpha: 0.35),
+                                        Colors.transparent,
+                                      ],
+                                      begin: Alignment.bottomCenter,
+                                      end: Alignment.topCenter,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : null,
                     ),
                     Positioned(
                       right: 12,

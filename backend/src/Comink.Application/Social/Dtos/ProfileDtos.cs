@@ -24,7 +24,9 @@ public record UpdateProfileRequest(
     string? DisplayName,
     string? Bio,
     string? Location,
-    DateOnly? DateOfBirth);
+    DateOnly? DateOfBirth,
+    string? AvatarUrl = null,
+    string? CoverUrl = null);
 
 /// <summary>Yêu cầu sửa cài đặt; Giai đoạn 1 chỉ có ngôn ngữ giao diện.</summary>
 public record UpdateSettingsRequest(string? Language);

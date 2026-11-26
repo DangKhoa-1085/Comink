@@ -117,7 +117,14 @@
     "tab_account": "Thông tin tài khoản",
     "tab_settings": "Cài đặt",
     "session_title": "Phiên đăng nhập",
-    "session_desc": "Đăng xuất khỏi thiết bị này và quay về màn hình đăng nhập."
+    "session_desc": "Đăng xuất khỏi thiết bị này và quay về màn hình đăng nhập.",
+    "change_avatar": "Đổi ảnh đại diện",
+    "change_cover": "Đổi ảnh bìa",
+    "remove_avatar": "Gỡ ảnh đại diện",
+    "remove_cover": "Gỡ ảnh bìa",
+    "uploading_image": "Đang tải ảnh...",
+    "avatar_updated": "Đã cập nhật ảnh đại diện",
+    "cover_updated": "Đã cập nhật ảnh bìa"
   },
   "admin": {
     "title": "Quản trị người dùng",

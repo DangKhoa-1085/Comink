@@ -23,7 +23,7 @@ class FriendsPage extends ConsumerStatefulWidget {
 class _FriendsPageState extends ConsumerState<FriendsPage> {
   final _searchController = TextEditingController();
   String _query = '';
-  _FriendsTab _tab = _FriendsTab.requests;
+  _FriendsTab _tab = _FriendsTab.friends;
 
   @override
   void dispose() {
@@ -133,14 +133,14 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
                 runSpacing: 8,
                 children: [
                   ChoiceChip(
-                    selected: _tab == _FriendsTab.requests,
-                    onSelected: (_) => setState(() => _tab = _FriendsTab.requests),
-                    label: Text('${l10n.t('friends_requests_title')} ($requestCount)'),
-                  ),
-                  ChoiceChip(
                     selected: _tab == _FriendsTab.friends,
                     onSelected: (_) => setState(() => _tab = _FriendsTab.friends),
                     label: Text('${l10n.t('friends_title')} ($friendCount)'),
+                  ),
+                  ChoiceChip(
+                    selected: _tab == _FriendsTab.requests,
+                    onSelected: (_) => setState(() => _tab = _FriendsTab.requests),
+                    label: Text('${l10n.t('friends_requests_title')} ($requestCount)'),
                   ),
                 ],
               ),
