@@ -45,6 +45,8 @@ public class ProfileService
             request.Bio,
             request.Location,
             request.DateOfBirth,
+            request.AvatarUrl,
+            request.CoverUrl,
             cancellationToken);
 
         if (!updated.Succeeded)

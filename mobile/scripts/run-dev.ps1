@@ -4,8 +4,9 @@
 
 .DESCRIPTION
   - Đọc API_BASE_URL + Firebase từ config/dev.json (không chứa secret trong script).
-  - Nếu API_BASE_URL là 127.0.0.1/localhost: tự chạy `adb reverse tcp:5117 tcp:5117`
-    để điện thoại gọi backend qua cáp USB (không cần LAN, không cần mở tường lửa).
+  - Nếu API_BASE_URL là 127.0.0.1/localhost: tự chạy `adb reverse` cho cả
+    cổng `5117` (Backend/SignalR) và `7880` (LiveKit) để điện thoại gọi qua cáp USB
+    (không cần LAN, không cần mở tường lửa).
   - Kiểm tra /health trước khi chạy app để báo lỗi sớm.
 
 .EXAMPLE
@@ -62,10 +63,11 @@ elseif ($serials -notcontains $serial) {
 }
 Write-Host "Device: $serial" -ForegroundColor Green
 
-# --- USB: chuyển cổng 5117 của điện thoại về máy tính ---
+# --- USB: chuyển cổng 5117 (API/SignalR) và 7880 (LiveKit) của điện thoại về máy tính ---
 if ($usesLoopback) {
     adb -s $serial reverse tcp:5117 tcp:5117 | Out-Null
-    Write-Host 'adb reverse: device tcp:5117 -> host tcp:5117 (chạy lại mỗi khi cắm cáp/khởi động lại máy)' -ForegroundColor Green
+    adb -s $serial reverse tcp:7880 tcp:7880 | Out-Null
+    Write-Host 'adb reverse: device tcp:5117, tcp:7880 -> host (chạy lại mỗi khi cắm cáp/khởi động lại máy)' -ForegroundColor Green
 }
 
 # --- Kiểm tra backend bằng đúng URL app sẽ dùng ---

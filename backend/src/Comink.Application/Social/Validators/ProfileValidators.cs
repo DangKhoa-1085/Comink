@@ -25,6 +25,31 @@ public class UpdateProfileRequestValidator : AbstractValidator<UpdateProfileRequ
             .LessThanOrEqualTo(_ => DateOnly.FromDateTime(DateTime.UtcNow))
                 .WithMessage("Ngày sinh không thể ở tương lai.")
             .When(x => x.DateOfBirth.HasValue);
+
+        RuleFor(x => x.AvatarUrl)
+            .MaximumLength(500).WithMessage("Đường dẫn ảnh đại diện tối đa 500 ký tự.")
+            .Must(IsValidMediaUrl).WithMessage("Đường dẫn ảnh đại diện không hợp lệ.");
+
+        RuleFor(x => x.CoverUrl)
+            .MaximumLength(500).WithMessage("Đường dẫn ảnh bìa tối đa 500 ký tự.")
+            .Must(IsValidMediaUrl).WithMessage("Đường dẫn ảnh bìa không hợp lệ.");
+    }
+
+    private static bool IsValidMediaUrl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        var trimmed = value.Trim();
+        if (trimmed.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return Uri.TryCreate(trimmed, UriKind.Absolute, out var uri) &&
+               (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
     }
 }
 

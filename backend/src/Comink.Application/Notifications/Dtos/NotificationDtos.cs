@@ -17,4 +17,6 @@ public record NotificationDto(
     string? Data,
     bool IsRead,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? ReadAt);
+    DateTimeOffset? ReadAt,
+    string? ActorDisplayName = null,
+    string? ActorAvatarUrl = null);

@@ -34,7 +34,7 @@ export function ToastContainer() {
             key={toast.id}
             role="status"
             className={cn(
-              'pointer-events-auto flex items-start gap-2 rounded-lg border p-3 text-sm shadow-lg',
+              'pointer-events-auto flex items-start gap-2.5 rounded-xl border p-3.5 text-sm shadow-xl backdrop-blur-md',
               styles[toast.variant],
             )}
           >

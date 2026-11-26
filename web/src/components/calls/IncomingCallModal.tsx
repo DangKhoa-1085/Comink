@@ -78,36 +78,45 @@ function IncomingCallDialog({ call }: { call: CallDto }) {
   const isVideo = call.type === 'Video'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
       <div
         role="dialog"
         aria-modal="true"
-        className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl dark:bg-slate-900"
+        className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-2xl dark:border-slate-800 dark:bg-[#121826]"
       >
-        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300">
-          {isVideo ? <Video className="h-7 w-7" /> : <Phone className="h-7 w-7" />}
+        <div className="relative mx-auto mb-4 flex h-16 w-16 items-center justify-center">
+          <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/25" />
+          <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg">
+            {isVideo ? <Video className="h-7 w-7" /> : <Phone className="h-7 w-7" />}
+          </div>
         </div>
 
-        <p className="text-xs uppercase tracking-wide text-slate-500">
+        <p className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
           {isVideo ? t('call.incoming_video') : t('call.incoming_audio')}
         </p>
-        <p className="mt-1 text-lg font-bold">{caller?.displayName ?? t('call.unknown_caller')}</p>
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">
+          {caller?.displayName ?? t('call.unknown_caller')}
+        </p>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           {expired
             ? t('call.ring_timeout')
             : t('call.ringing_seconds', { seconds: Math.max(secondsLeft, 0) })}
         </p>
 
-        <div className="mt-6 flex items-center justify-center gap-3">
+        <div className="mt-6 grid grid-cols-2 gap-3">
           <Button
-            variant="outline"
+            variant="danger"
             onClick={() => declineMutation.mutate()}
             disabled={declineMutation.isPending || expired}
           >
             <PhoneOff className="h-4 w-4" />
             {t('call.decline')}
           </Button>
-          <Button onClick={() => answerMutation.mutate()} disabled={answerMutation.isPending || expired}>
+          <Button
+            className="bg-emerald-600 text-white hover:bg-emerald-500 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+            onClick={() => answerMutation.mutate()}
+            disabled={answerMutation.isPending || expired}
+          >
             <Phone className="h-4 w-4" />
             {t('call.answer')}
           </Button>

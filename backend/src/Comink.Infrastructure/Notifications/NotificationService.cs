@@ -99,6 +99,8 @@ public class NotificationService : INotificationService
         var pageSize = Math.Clamp(limit, 1, 50);
         var query = _db.Notifications
             .AsNoTracking()
+            .Include(n => n.Actor)
+                .ThenInclude(a => a!.Profile)
             .Where(n => n.RecipientId == currentUserId);
 
         var decoded = CursorCodec.TryDecode(cursor);
@@ -129,7 +131,9 @@ public class NotificationService : INotificationService
                 n.Data,
                 n.IsRead,
                 n.CreatedAt,
-                n.ReadAt))
+                n.ReadAt,
+                n.Actor?.Profile?.DisplayName ?? n.Actor?.UserName,
+                n.Actor?.Profile?.AvatarUrl))
             .ToList();
 
         var nextCursor = hasMore && pageRows.Count > 0

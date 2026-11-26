@@ -22,6 +22,8 @@ void main() {
 
     expect(vi.error('AUTH_ACCOUNT_LOCKED'), contains('bị khóa'));
     expect(en.error('AUTH_ACCOUNT_LOCKED'), contains('locked'));
+    expect(vi.error('CALL_ALREADY_ACTIVE'), contains('cuộc gọi khác'));
+    expect(en.error('CALL_ALREADY_ACTIVE'), contains('Another call'));
     expect(vi.error('KHONG_TON_TAI'), vi.t('error_INTERNAL_ERROR'));
     expect(en.error(null), en.t('error_INTERNAL_ERROR'));
   });

@@ -10,7 +10,9 @@ import '../../../core/widgets/states.dart';
 import '../data/friends_providers.dart';
 import '../domain/friends_models.dart';
 
-/// Tab Bạn bè: lời mời kết bạn, danh sách bạn, tìm người dùng + theo dõi.
+enum _FriendsTab { requests, friends }
+
+/// Tab Bạn bè: tìm kiếm người dùng, lời mời kết bạn và danh sách bạn bè.
 class FriendsPage extends ConsumerStatefulWidget {
   const FriendsPage({super.key});
 
@@ -21,6 +23,7 @@ class FriendsPage extends ConsumerStatefulWidget {
 class _FriendsPageState extends ConsumerState<FriendsPage> {
   final _searchController = TextEditingController();
   String _query = '';
+  _FriendsTab _tab = _FriendsTab.friends;
 
   @override
   void dispose() {
@@ -64,20 +67,13 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final colors = Theme.of(context).colorScheme;
     final friends = ref.watch(friendsProvider);
     final incoming = ref.watch(incomingFriendRequestsProvider);
+    final requestCount = incoming.asData?.value.length ?? 0;
+    final friendCount = friends.asData?.value.length ?? 0;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.t('friends_title')),
-        actions: [
-          IconButton(
-            tooltip: l10n.t('common_retry'),
-            onPressed: _invalidateLists,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
-      ),
       body: RefreshIndicator(
         onRefresh: () async {
           _invalidateLists();
@@ -89,8 +85,26 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
         },
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
           children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l10n.t('friends_title'),
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: l10n.t('common_retry'),
+                  onPressed: _invalidateLists,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
             TextField(
               controller: _searchController,
               textInputAction: TextInputAction.search,
@@ -99,7 +113,11 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
                 hintText: l10n.t('friends_search_hint'),
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _query.isEmpty
-                    ? null
+                    ? IconButton(
+                        tooltip: l10n.t('common_search'),
+                        onPressed: _submitSearch,
+                        icon: Icon(Icons.arrow_forward, color: colors.primary),
+                      )
                     : IconButton(
                         onPressed: _clearSearch,
                         icon: const Icon(Icons.close),
@@ -110,65 +128,84 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
             if (_query.isNotEmpty)
               _buildSearchResults(l10n)
             else ...[
-              _SectionHeader(
-                icon: Icons.person_add_alt_1_outlined,
-                title: l10n.t('friends_requests_title'),
-              ),
-              incoming.when(
-                data: (items) => items.isEmpty
-                    ? _EmptyLine(text: l10n.t('friends_requests_empty'))
-                    : Column(
-                        children: items
-                            .map((request) => _IncomingRequestTile(
-                                  request: request,
-                                  onAccept: () => _runAction(
-                                    () => ref.read(apiClientProvider).post(
-                                          '/api/friendships/requests/${request.id}/accept',
-                                        ),
-                                    'friends_accepted',
-                                  ),
-                                  onDecline: () => _runAction(
-                                    () => ref.read(apiClientProvider).delete(
-                                          '/api/friendships/requests/${request.id}',
-                                        ),
-                                    'friends_declined',
-                                  ),
-                                ))
-                            .toList(growable: false),
-                      ),
-                loading: () => const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-                error: (error, _) => _InlineError(
-                  message: l10n.error(error is ApiException ? error.code : 'INTERNAL_ERROR'),
-                  retryLabel: l10n.t('common_retry'),
-                  onRetry: () => ref.invalidate(incomingFriendRequestsProvider),
-                ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ChoiceChip(
+                    selected: _tab == _FriendsTab.friends,
+                    onSelected: (_) => setState(() => _tab = _FriendsTab.friends),
+                    label: Text('${l10n.t('friends_title')} ($friendCount)'),
+                  ),
+                  ChoiceChip(
+                    selected: _tab == _FriendsTab.requests,
+                    onSelected: (_) => setState(() => _tab = _FriendsTab.requests),
+                    label: Text('${l10n.t('friends_requests_title')} ($requestCount)'),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
-              _SectionHeader(icon: Icons.people_outline, title: l10n.t('friends_title')),
-              friends.when(
-                data: (items) => items.isEmpty
-                    ? _EmptyLine(text: l10n.t('friends_empty'))
-                    : Column(
-                        children: items
-                            .map((friendship) => _FriendTile(
-                                  friendship: friendship,
-                                  onUnfriend: () => _confirmUnfriend(friendship),
-                                ))
-                            .toList(growable: false),
-                      ),
-                loading: () => const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Center(child: CircularProgressIndicator()),
+              if (_tab == _FriendsTab.requests)
+                incoming.when(
+                  data: (items) => items.isEmpty
+                      ? EmptyState(
+                          message: l10n.t('friends_requests_empty'),
+                          icon: Icons.person_add_alt_1_outlined,
+                        )
+                      : Column(
+                          children: items
+                              .map((request) => _IncomingRequestTile(
+                                    request: request,
+                                    onAccept: () => _runAction(
+                                      () => ref.read(apiClientProvider).post(
+                                            '/api/friendships/requests/${request.id}/accept',
+                                          ),
+                                      'friends_accepted',
+                                    ),
+                                    onDecline: () => _runAction(
+                                      () => ref.read(apiClientProvider).delete(
+                                            '/api/friendships/requests/${request.id}',
+                                          ),
+                                      'friends_declined',
+                                    ),
+                                  ))
+                              .toList(growable: false),
+                        ),
+                  loading: () => const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  error: (error, _) => ErrorState(
+                    message: l10n.error(error is ApiException ? error.code : 'INTERNAL_ERROR'),
+                    retryLabel: l10n.t('common_retry'),
+                    onRetry: () => ref.invalidate(incomingFriendRequestsProvider),
+                  ),
+                )
+              else
+                friends.when(
+                  data: (items) => items.isEmpty
+                      ? EmptyState(
+                          message: l10n.t('friends_empty'),
+                          icon: Icons.people_outline,
+                        )
+                      : Column(
+                          children: items
+                              .map((friendship) => _FriendTile(
+                                    friendship: friendship,
+                                    onUnfriend: () => _confirmUnfriend(friendship),
+                                  ))
+                              .toList(growable: false),
+                        ),
+                  loading: () => const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  error: (error, _) => ErrorState(
+                    message: l10n.error(error is ApiException ? error.code : 'INTERNAL_ERROR'),
+                    retryLabel: l10n.t('common_retry'),
+                    onRetry: () => ref.invalidate(friendsProvider),
+                  ),
                 ),
-                error: (error, _) => _InlineError(
-                  message: l10n.error(error is ApiException ? error.code : 'INTERNAL_ERROR'),
-                  retryLabel: l10n.t('common_retry'),
-                  onRetry: () => ref.invalidate(friendsProvider),
-                ),
-              ),
             ],
           ],
         ),
@@ -220,7 +257,7 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
         padding: EdgeInsets.all(24),
         child: Center(child: CircularProgressIndicator()),
       ),
-      error: (error, _) => _InlineError(
+      error: (error, _) => ErrorState(
         message: l10n.error(error is ApiException ? error.code : 'INTERNAL_ERROR'),
         retryLabel: l10n.t('common_retry'),
         onRetry: () => ref.invalidate(userSearchProvider(_query)),
@@ -266,7 +303,7 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 8, 4, 6),
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
       child: Row(
         children: [
           Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
@@ -279,45 +316,6 @@ class _SectionHeader extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _EmptyLine extends StatelessWidget {
-  const _EmptyLine({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-      child: Text(
-        text,
-        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
-      ),
-    );
-  }
-}
-
-class _InlineError extends StatelessWidget {
-  const _InlineError({
-    required this.message,
-    required this.retryLabel,
-    required this.onRetry,
-  });
-
-  final String message;
-  final String retryLabel;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: Text(message, style: TextStyle(color: Theme.of(context).colorScheme.error))),
-        TextButton(onPressed: onRetry, child: Text(retryLabel)),
-      ],
     );
   }
 }
@@ -342,25 +340,50 @@ class _IncomingRequestTile extends StatelessWidget {
         padding: const EdgeInsets.all(10),
         child: Row(
           children: [
-            AppAvatar(name: request.user.displayName, url: request.user.avatarUrl, radius: 18),
-            const SizedBox(width: 10),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(request.user.displayName, style: const TextStyle(fontWeight: FontWeight.w600)),
-                  Text(
-                    '@${request.user.userName}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => context.push('/users/${request.user.id}'),
+                child: Row(
+                  children: [
+                    AppAvatar(
+                      name: request.user.displayName,
+                      url: request.user.avatarUrl,
+                      radius: 20,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            request.user.displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          Text(
+                            '@${request.user.userName}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            FilledButton.tonal(
+            const SizedBox(width: 8),
+            FilledButton(
               onPressed: onAccept,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              ),
               child: Text(l10n.t('friends_accept')),
             ),
             IconButton(
@@ -389,7 +412,10 @@ class _FriendTile extends StatelessWidget {
       child: ListTile(
         onTap: () => context.push('/users/${friendship.user.id}'),
         leading: AppAvatar(name: friendship.user.displayName, url: friendship.user.avatarUrl),
-        title: Text(friendship.user.displayName),
+        title: Text(
+          friendship.user.displayName,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
         subtitle: Text('@${friendship.user.userName}'),
         trailing: PopupMenuButton<String>(
           onSelected: (value) {
@@ -435,19 +461,19 @@ class _SearchResultTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(18),
         onTap: () => context.push('/users/${user.id}'),
         child: Padding(
           padding: const EdgeInsets.all(10),
           child: Row(
             children: [
-              AppAvatar(name: user.displayName, url: user.avatarUrl, radius: 18),
+              AppAvatar(name: user.displayName, url: user.avatarUrl, radius: 20),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(user.displayName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    Text(user.displayName, style: const TextStyle(fontWeight: FontWeight.w700)),
                     Text(
                       '@${user.userName}',
                       style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
@@ -455,7 +481,11 @@ class _SearchResultTile extends StatelessWidget {
                     if (statusText.isNotEmpty)
                       Text(
                         statusText,
-                        style: TextStyle(fontSize: 11, color: colors.primary),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: colors.primary,
+                        ),
                       ),
                   ],
                 ),

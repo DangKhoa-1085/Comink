@@ -5,6 +5,7 @@ import { Loader2, Send, Users, X } from 'lucide-react'
 import { conversationsApi, type ChatMessage } from '../../api/conversations'
 import { ApiError } from '../../lib/http'
 import { translateErrorCode } from '../../lib/errorMessages'
+import { generateUuid } from '../../lib/uuid'
 import { toast } from '../../stores/toastStore'
 import { Avatar } from '../social/Avatar'
 import { Button } from '../ui/Button'
@@ -37,7 +38,7 @@ export function ForwardDialog({
 
   const forwardMutation = useMutation({
     mutationFn: (targetConversationId: string) =>
-      conversationsApi.forward(targetConversationId, message.id, crypto.randomUUID()),
+      conversationsApi.forward(targetConversationId, message.id, generateUuid()),
     onSuccess: (forwarded) => {
       toast.success(t('chat.forwarded'))
       onForwarded(forwarded)
@@ -88,7 +89,7 @@ export function ForwardDialog({
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
           placeholder={t('chat.forward_search_placeholder')}
-          className="mb-2 h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+          className="mb-2 h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-sky-500 dark:border-slate-700 dark:bg-[#1A2234] dark:text-slate-100"
         />
 
         {conversationsQuery.isLoading ? (
@@ -119,7 +120,7 @@ export function ForwardDialog({
                     {forwardMutation.isPending && forwardMutation.variables === conversation.id ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : isGroup ? (
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
                         <Users className="h-3.5 w-3.5" />
                       </span>
                     ) : (

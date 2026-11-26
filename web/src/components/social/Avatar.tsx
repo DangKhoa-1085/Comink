@@ -35,8 +35,8 @@ export function Avatar({
     <span
       aria-hidden="true"
       className={cn(
-        'flex shrink-0 items-center justify-center rounded-full bg-indigo-100 font-bold text-indigo-700',
-        'dark:bg-indigo-950 dark:text-indigo-300',
+        'flex shrink-0 items-center justify-center rounded-full bg-sky-100 font-bold text-sky-700',
+        'dark:bg-sky-500/20 dark:text-sky-300',
         sizes[size],
         className,
       )}

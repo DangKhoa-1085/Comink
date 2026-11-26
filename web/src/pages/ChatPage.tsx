@@ -29,6 +29,7 @@ import {
 } from '../api/conversations'
 import { mediaApi } from '../api/media'
 import { Avatar } from '../components/social/Avatar'
+import { ConversationListPanel } from '../components/chat/ConversationListPanel'
 import { ForwardDialog } from '../components/chat/ForwardDialog'
 import { MessageBubble } from '../components/chat/MessageBubble'
 import { MessageSearchPanel } from '../components/chat/MessageSearchPanel'
@@ -42,6 +43,7 @@ import { translateErrorCode } from '../lib/errorMessages'
 import { timeAgo } from '../lib/format'
 import { appendMessageToCache, replaceMessageInCache } from '../lib/messageCache'
 import { sendTyping } from '../lib/chatConnection'
+import { generateUuid } from '../lib/uuid'
 import { useAuthStore } from '../stores/authStore'
 import { EMPTY_TYPING_IDS, useTypingStore } from '../stores/typingStore'
 
@@ -62,12 +64,22 @@ function currentTimeMs(): number {
   return Date.now()
 }
 
-/** Khung chat 1–1: lịch sử (cuộn lên tải thêm), gửi chữ và ảnh (docs/05_api_contract.md mục 8.5–8.6). */
+/** Khung chat 1–1 & nhóm (Split-Pane trên Desktop, toàn màn hình trên Mobile). */
 export function ChatPage() {
   const { conversationId } = useParams<{ conversationId: string }>()
 
   // Đổi hội thoại → remount để xoá trạng thái soạn thảo (trả lời/sửa/nháp) của hội thoại cũ.
-  return <ChatPageView key={conversationId} />
+  return (
+    <div className="flex h-full min-h-0 overflow-hidden bg-[#F7F8FC] dark:bg-[#0B0F1A]">
+      <ConversationListPanel
+        activeConversationId={conversationId}
+        className="hidden lg:flex lg:w-[340px] lg:shrink-0 lg:border-r lg:border-slate-200/80 dark:lg:border-slate-800"
+      />
+      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <ChatPageView key={conversationId} />
+      </div>
+    </div>
+  )
 }
 
 function ChatPageView() {
@@ -320,7 +332,7 @@ function ChatPageView() {
     mutationFn: (payload: { content: string; mediaIds: string[] }) =>
       conversationsApi.send(conversationId!, {
         // clientMessageId sinh ở client để chống trùng khi mất mạng (idempotent phía server).
-        clientMessageId: crypto.randomUUID(),
+        clientMessageId: generateUuid(),
         content: payload.content.length > 0 ? payload.content : null,
         mediaIds: payload.mediaIds,
         replyToMessageId: replyTo?.id ?? null,
@@ -622,44 +634,59 @@ function ChatPageView() {
       : undefined
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-9rem)] max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-      <header className="flex items-center gap-3 border-b border-slate-200 p-3 dark:border-slate-800">
-        <Link to="/messages" className="rounded-lg p-1 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label={t('chat.back')}>
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#F7F8FC] dark:bg-[#0B0F1A]">
+      <header className="flex h-16 shrink-0 items-center gap-3 border-b border-slate-200/80 bg-white/85 px-4 backdrop-blur-md dark:border-slate-800 dark:bg-[#121826]/85">
+        <Link
+          to="/messages"
+          className="rounded-xl p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 lg:hidden"
+          aria-label={t('chat.back')}
+        >
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        {isGroup ? (
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300">
-            <Users className="h-4 w-4" />
-          </span>
-        ) : (
-          <span className="relative shrink-0">
-            <Avatar name={peerName} url={peer?.avatarUrl} size="sm" />
-            {peer && (
+        {!isGroup && peer ? (
+          <Link
+            to={`/users/${peer.userId}`}
+            className="group -ml-1.5 flex min-w-0 flex-1 items-center gap-3 rounded-xl px-1.5 py-1 transition-colors hover:bg-slate-100/80 dark:hover:bg-slate-800/70"
+          >
+            <span className="relative shrink-0">
+              <Avatar name={peerName} url={peer.avatarUrl} size="sm" />
               <PresenceDot
                 online={peer.isOnline}
                 label={presenceLabel}
                 className="absolute -bottom-0.5 -right-0.5"
               />
-            )}
-          </span>
-        )}
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{peerName}</p>
-          {isGroup ? (
-            <p className="truncate text-xs text-slate-500">
-              {`${t('chat.member_count', { count: conversation.members.length })} · ${t(
-                'chat.online_count',
-                { count: onlineMemberCount },
-              )}`}
-            </p>
-          ) : (
-            peer && (
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold transition-colors group-hover:text-sky-600 dark:group-hover:text-sky-400">
+                {peerName}
+              </p>
               <p className="truncate text-xs text-slate-500">
                 {peerStatus ?? `@${peer.userName}`}
               </p>
-            )
-          )}
-        </div>
+            </div>
+          </Link>
+        ) : (
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            {isGroup ? (
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
+                <Users className="h-4 w-4" />
+              </span>
+            ) : (
+              <Avatar name={peerName} url={null} size="sm" />
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold">{peerName}</p>
+              {isGroup && (
+                <p className="truncate text-xs text-slate-500">
+                  {`${t('chat.member_count', { count: conversation.members.length })} · ${t(
+                    'chat.online_count',
+                    { count: onlineMemberCount },
+                  )}`}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Gọi thoại/video ngay trong hội thoại (docs/05_api_contract.md mục 9.2) */}
         <div className="flex items-center gap-1">
@@ -696,7 +723,7 @@ function ChatPageView() {
           >
             <Pin className="h-4 w-4" />
             {pinnedMessages.length > 0 && (
-              <span className="absolute -right-1 -top-1 rounded-full bg-indigo-600 px-1 text-[9px] font-semibold leading-4 text-white">
+              <span className="absolute -right-1 -top-1 rounded-full bg-sky-600 px-1 text-[9px] font-semibold leading-4 text-white dark:bg-sky-500">
                 {pinnedMessages.length}
               </span>
             )}
@@ -754,7 +781,7 @@ function ChatPageView() {
         />
       )}
 
-      <div className="flex-1 overflow-y-auto p-3">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {messagesQuery.isLoading ? (
           <div className="flex items-center justify-center gap-2 py-8 text-sm text-slate-500">
             <Spinner /> {t('social.loading')}
@@ -784,7 +811,7 @@ function ChatPageView() {
                 <div className="mb-3 text-center">
                   <button
                     type="button"
-                    className="text-xs text-indigo-600 hover:underline disabled:opacity-60"
+                    className="text-xs font-semibold text-sky-600 hover:underline disabled:opacity-60 dark:text-sky-400"
                     onClick={() => void messagesQuery.fetchNextPage()}
                     disabled={messagesQuery.isFetchingNextPage}
                   >
@@ -833,11 +860,11 @@ function ChatPageView() {
         <div ref={bottomRef} />
       </div>
 
-      <footer className="border-t border-slate-200 p-3 dark:border-slate-800">
+      <footer className="shrink-0 border-t border-slate-200/80 bg-white px-4 py-3 dark:border-slate-800 dark:bg-[#121826]">
         {(replyTo || activeEditing) && (
-          <div className="mb-2 flex items-start gap-2 rounded-lg border-l-2 border-indigo-400 bg-slate-50 px-2 py-1 dark:bg-slate-950">
+          <div className="mb-2 flex items-start gap-2 rounded-xl border-l-2 border-sky-500 bg-slate-50 px-3 py-1.5 dark:bg-[#1A2234]">
             <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-1 text-xs font-semibold text-indigo-600 dark:text-indigo-300">
+              <p className="flex items-center gap-1 text-xs font-semibold text-sky-700 dark:text-sky-300">
                 {activeEditing ? <Pencil className="h-3 w-3" /> : <Reply className="h-3 w-3" />}
                 {activeEditing
                   ? t('chat.editing')
@@ -924,7 +951,7 @@ function ChatPageView() {
             }}
             placeholder={activeEditing ? t('chat.edit_placeholder') : t('chat.placeholder')}
             maxLength={4000}
-            className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm outline-none focus:border-sky-500 focus:bg-white dark:border-slate-700 dark:bg-[#1A2234] dark:text-slate-100 dark:focus:bg-[#0B0F1A]"
           />
 
           <Button

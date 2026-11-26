@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../config/app_config.dart';
+
 /// Avatar dùng chung: ảnh nếu có URL, ngược lại hiển thị chữ cái đầu.
 class AppAvatar extends StatelessWidget {
   const AppAvatar({
@@ -20,7 +22,7 @@ class AppAvatar extends StatelessWidget {
       return CircleAvatar(
         radius: radius,
         backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-        backgroundImage: NetworkImage(trimmedUrl),
+        backgroundImage: NetworkImage(AppConfig.resolveMediaUrl(trimmedUrl)),
       );
     }
 

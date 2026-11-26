@@ -182,10 +182,10 @@ Cần xác thực. Phản hồi `200 OK`:
 Cần xác thực. Chỉ gửi trường muốn đổi (bỏ trống = giữ nguyên):
 
 ```json
-{ "displayName": "Khoa Nguyễn", "bio": "Yêu thích C#", "location": "Hà Nội", "dateOfBirth": "2004-05-01" }
+{ "displayName": "Khoa Nguyễn", "bio": "Yêu thích C#", "location": "Hà Nội", "dateOfBirth": "2004-05-01", "avatarUrl": "/uploads/avatar/a.jpg", "coverUrl": "/uploads/cover/c.jpg" }
 ```
 
-Ràng buộc: `displayName` 1–64; `bio` ≤ 300; `location` ≤ 100; `dateOfBirth` không ở tương lai.
+Ràng buộc: `displayName` 1–64; `bio` ≤ 300; `location` ≤ 100; `dateOfBirth` không ở tương lai; `avatarUrl`/`coverUrl` ≤ 500 ký tự, chỉ nhận URL `http://`/`https://` hoặc `/uploads/...` (gửi `""` để gỡ ảnh).
 
 Phản hồi `200 OK`: cùng cấu trúc `GET /api/users/me`.
 
@@ -955,6 +955,8 @@ Tin gốc bị thu hồi **sau đó** vẫn trả `replyTo` với `isDeleted = t
   "id": "uuid",
   "type": "FriendRequestReceived",
   "actorId": "uuid|null",
+  "actorDisplayName": "string|null",
+  "actorAvatarUrl": "string|null",
   "entityType": "Friendship",
   "entityId": "uuid|null",
   "data": "{\"type\":\"FriendRequest\"}",
@@ -1000,3 +1002,5 @@ Tin gốc bị thu hồi **sau đó** vẫn trả `replyTo` với `isDeleted = t
 | 2026-10-27 | **GĐ 6:** thêm mục 10 — `POST/DELETE /api/devices`, `GET /api/notifications`, `POST /api/notifications/{id}/read`; push FCM cho tin nhắn/lời mời/cuộc gọi; migration `20261027_Notifications_InitialCreate` |
 | 2026-11-17 | **GĐ 7 — Ưu tiên 1:** thêm `POST /api/conversations/{id}/read`; DTO hội thoại có `isOnline`/`lastSeenAt`/`lastReadMessageId`/`lastReadAt`; `unreadCount` là số thật; sự kiện `PresenceChanged`/`TypingChanged`/`MessagesRead` + hub method `Typing`/`Ping`; mã lỗi `MESSAGE_NOT_FOUND`; migration **M6** `Messaging_AddReadMarkers`. Đã kiểm chứng 28/28 bằng HTTP + 2 client SignalR |
 | 2026-11-21 | **GĐ 7 — Ưu tiên 3:** `GET /api/calls?filter=all|missed`; `CallSummaryDto` thêm `myStatus`/`isMissed`/`conversationType`/`conversationTitle`/`peer`/`initiatorDisplayName`/`answeredAt`/`endedAt`; "đã nghe" chỉ tính người **không phải** người gọi vào room; cuộc gọi nhỡ tạo notification `MissedCall` + push `type=CallMissed`; không đổi schema |
+| 2026-11-26 | `NotificationDto` bổ sung 2 trường mở rộng tuỳ chọn `actorDisplayName` và `actorAvatarUrl` (từ `Actor.Profile`) để hiển thị avatar + tên người gửi trực tiếp trong hộp thư thông báo web/mobile; không đổi schema |
+| 2026-11-26 | `PATCH /api/users/me/profile` bổ sung `avatarUrl` và `coverUrl` tuỳ chọn để người dùng đổi/gỡ ảnh đại diện và ảnh bìa trên web/mobile |

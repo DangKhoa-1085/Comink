@@ -8,6 +8,8 @@ void main() {
       'id': 'n1',
       'type': 'FriendRequestReceived',
       'actorId': 'u1',
+      'actorDisplayName': 'Alice Nguyễn',
+      'actorAvatarUrl': 'https://cdn.example.com/a.jpg',
       'entityType': 'Friendship',
       'entityId': 'f1',
       'data': '{"type":"FriendRequest","friendshipId":"f1"}',
@@ -18,6 +20,8 @@ void main() {
 
     expect(notification.id, 'n1');
     expect(notification.type, 'FriendRequestReceived');
+    expect(notification.actorDisplayName, 'Alice Nguyễn');
+    expect(notification.actorAvatarUrl, 'https://cdn.example.com/a.jpg');
     expect(notification.data['friendshipId'], 'f1');
     expect(notification.isRead, isTrue);
     expect(notification.readAt, isNotNull);

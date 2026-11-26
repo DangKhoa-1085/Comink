@@ -7,6 +7,7 @@ import { authApi } from '../api/auth'
 import { usersApi } from '../api/users'
 import type { AuthUser, LoginPayload, RegisterPayload } from '../api/types'
 import { ApiError } from '../lib/http'
+import { queryClient } from '../lib/queryClient'
 import { session } from '../lib/session'
 
 interface AuthState {
@@ -45,7 +46,26 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const auth = await authApi.login(payload)
       session.set(auth)
-      set({ user: auth.user, loading: false })
+      // Xóa toàn bộ cache truy vấn cũ để tránh hiển thị dữ liệu của tài khoản trước khi chuyển tài khoản.
+      await queryClient.cancelQueries()
+      queryClient.clear()
+
+      // Đồng bộ thêm avatarUrl từ hồ sơ hiện tại vì response đăng nhập không kèm trường này.
+      let user = auth.user
+      try {
+        const profile = await usersApi.getMe()
+        queryClient.setQueryData(['profile', 'me', profile.id], profile)
+        user = {
+          ...auth.user,
+          displayName: profile.displayName,
+          avatarUrl: profile.avatarUrl,
+        }
+        session.setUser(user)
+      } catch {
+        // Không chặn đăng nhập nếu tải hồ sơ phụ thất bại.
+      }
+
+      set({ user, loading: false })
       return true
     } catch (error) {
       const apiError = error instanceof ApiError ? error : null
@@ -63,6 +83,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const auth = await authApi.register(payload)
       session.set(auth)
+      // Xóa toàn bộ cache truy vấn cũ khi đăng ký tài khoản mới trên cùng phiên trình duyệt.
+      await queryClient.cancelQueries()
+      queryClient.clear()
       set({ user: auth.user, loading: false })
       return true
     } catch (error) {
@@ -87,6 +110,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
     }
     session.clear()
+    // Hủy các truy vấn đang chạy và xóa cache TanStack Query của phiên vừa đăng xuất.
+    await queryClient.cancelQueries()
+    queryClient.clear()
     set({ user: null, errorCode: null, fieldErrors: {} })
   },
 
@@ -94,6 +120,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     // Không gọi /api/auth/logout: tài khoản đã bị khóa thì mọi refresh token đã bị thu hồi
     // phía server (Giai đoạn 5). Chỉ cần xóa phiên cục bộ; route bảo vệ sẽ đưa về trang đăng nhập.
     session.clear()
+    void queryClient.cancelQueries()
+    queryClient.clear()
     set({ user: null, errorCode: null, fieldErrors: {} })
   },
 
@@ -111,13 +139,17 @@ export const useAuthStore = create<AuthState>((set) => ({
         userName: profile.userName,
         email: profile.email,
         displayName: profile.displayName,
+        avatarUrl: profile.avatarUrl,
         roles: profile.roles,
       }
       session.setUser(user)
+      queryClient.setQueryData(['profile', 'me', user.id], profile)
       set({ user, initialized: true })
     } catch {
       // Refresh token hết hiệu lực hoặc tài khoản bị khóa → coi như chưa đăng nhập.
       session.clear()
+      await queryClient.cancelQueries()
+      queryClient.clear()
       set({ user: null, initialized: true })
     }
   },

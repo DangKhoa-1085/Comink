@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/i18n/app_localizations.dart';
+import '../../../core/widgets/comink_logo.dart';
 import '../data/session_controller.dart';
 
 /// MÃ n hÃ¬nh Ä‘Äƒng kÃ½ (GÄ 6).
@@ -71,6 +72,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const Center(child: CominkLogo(size: 64)),
+                  const SizedBox(height: 12),
                   Text(
                     AppConfig.appName,
                     textAlign: TextAlign.center,
@@ -204,6 +207,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                             ],
                             const SizedBox(height: 20),
                             FilledButton(
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size.fromHeight(48),
+                              ),
                               onPressed: session.loading ? null : _submit,
                               child: session.loading
                                   ? const SizedBox(

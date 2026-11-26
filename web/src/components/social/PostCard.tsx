@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Globe2, Lock, MessageCircle, Pencil, Repeat2, Share2, ThumbsUp, Trash2, Users } from 'lucide-react'
@@ -78,15 +79,28 @@ export function PostCard({ post, onChange }: { post: Post; onChange: () => void 
   const VisibilityIcon = visibilityIcon[post.visibility]
 
   return (
-    <article className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <article className="mb-4 rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs dark:border-slate-800 dark:bg-[#121826]">
       <header className="mb-3 flex items-start gap-3">
-        <Avatar name={post.author.displayName} url={post.author.avatarUrl} size="md" />
+        <Link
+          to={`/users/${post.author.id}`}
+          className="shrink-0 rounded-full transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+        >
+          <Avatar name={post.author.displayName} url={post.author.avatarUrl} size="md" />
+        </Link>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+          <Link
+            to={`/users/${post.author.id}`}
+            className="inline-block max-w-full truncate text-sm font-semibold text-slate-800 transition-colors hover:text-sky-600 hover:underline dark:text-slate-100 dark:hover:text-sky-400"
+          >
             {post.author.displayName}
-          </p>
+          </Link>
           <p className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-            <span className="truncate">@{post.author.userName}</span>
+            <Link
+              to={`/users/${post.author.id}`}
+              className="truncate transition-colors hover:text-sky-600 hover:underline dark:hover:text-sky-400"
+            >
+              @{post.author.userName}
+            </Link>
             <span aria-hidden="true">·</span>
             <span>{timeAgo(post.createdAt, i18n.language)}</span>
             <VisibilityIcon
@@ -120,13 +134,13 @@ export function PostCard({ post, onChange }: { post: Post; onChange: () => void 
             onChange={(event) => setDraft(event.target.value)}
             rows={3}
             maxLength={5000}
-            className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-sky-400 dark:border-slate-700 dark:bg-[#1A2234] dark:text-slate-100"
           />
           <div className="mt-2 flex items-center gap-2">
             <select
               value={draftVisibility}
               onChange={(event) => setDraftVisibility(event.target.value as Visibility)}
-              className="h-8 rounded-lg border border-slate-300 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              className="h-8 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-semibold dark:border-slate-700 dark:bg-[#1A2234] dark:text-slate-200"
               aria-label={t('social.visibility')}
             >
               <option value="Public">{t('social.visibility_public')}</option>
@@ -176,9 +190,12 @@ export function PostCard({ post, onChange }: { post: Post; onChange: () => void 
 
       {post.sharedPost && (
         <div className="mb-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-          <p className="mb-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+          <Link
+            to={`/users/${post.sharedPost.author.id}`}
+            className="mb-1 inline-block text-xs font-semibold text-slate-600 transition-colors hover:text-sky-600 hover:underline dark:text-slate-300 dark:hover:text-sky-400"
+          >
             {post.sharedPost.author.displayName}
-          </p>
+          </Link>
           {post.sharedPost.content && (
             <p className="whitespace-pre-wrap break-words text-sm text-slate-600 dark:text-slate-300">
               {post.sharedPost.content}
@@ -200,7 +217,7 @@ export function PostCard({ post, onChange }: { post: Post; onChange: () => void 
           size="sm"
           onClick={() => likeMutation.mutate()}
           disabled={likeMutation.isPending}
-          className={post.likedByMe ? 'text-indigo-600 dark:text-indigo-400' : undefined}
+          className={post.likedByMe ? 'bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300' : undefined}
         >
           <ThumbsUp className="h-4 w-4" />
           {post.likeCount}
@@ -236,7 +253,7 @@ export function PostCard({ post, onChange }: { post: Post; onChange: () => void 
             }}
             aria-label="edit-post"
             title={t('social.edit_post')}
-            className={editing ? 'text-indigo-600 dark:text-indigo-400' : undefined}
+            className={editing ? 'text-sky-600 dark:text-sky-400' : undefined}
           >
             <Pencil className="h-4 w-4" />
           </Button>
@@ -314,7 +331,7 @@ function CommentSection({ post, onChange }: { post: Post; onChange: () => void }
           onChange={(event) => setDraft(event.target.value)}
           placeholder={replyTo ? t('social.reply_to', { name: replyTo.author.displayName }) : t('social.comment_placeholder')}
           maxLength={2000}
-          className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+          className="h-9 min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-sky-400 dark:border-slate-700 dark:bg-[#1A2234] dark:text-slate-100"
         />
         {replyTo && (
           <Button variant="ghost" size="sm" onClick={() => setReplyTo(null)}>
@@ -364,22 +381,32 @@ function CommentItem({
   return (
     <li className="text-sm">
       <div className="flex items-start gap-2">
-        <Avatar name={comment.author.displayName} url={comment.author.avatarUrl} size="sm" />
+        <Link
+          to={`/users/${comment.author.id}`}
+          className="shrink-0 rounded-full transition-opacity hover:opacity-90"
+        >
+          <Avatar name={comment.author.displayName} url={comment.author.avatarUrl} size="sm" />
+        </Link>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-            {comment.author.displayName}
+            <Link
+              to={`/users/${comment.author.id}`}
+              className="transition-colors hover:text-sky-600 hover:underline dark:hover:text-sky-400"
+            >
+              {comment.author.displayName}
+            </Link>
             <span className="ml-2 font-normal text-slate-400">{timeAgo(comment.createdAt, i18n.language)}</span>
           </p>
           <p className="whitespace-pre-wrap break-words text-slate-700 dark:text-slate-200">{comment.content}</p>
           <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
-            <button type="button" className="hover:text-indigo-600" onClick={onReply}>
+            <button type="button" className="hover:text-sky-600" onClick={onReply}>
               {t('social.reply')}
             </button>
             <button type="button" className="hover:text-rose-600" onClick={() => deleteMutation.mutate()}>
               {t('social.delete_comment')}
             </button>
             {comment.replyCount > 0 && (
-              <button type="button" className="hover:text-indigo-600" onClick={() => setShowReplies((v) => !v)}>
+              <button type="button" className="hover:text-sky-600" onClick={() => setShowReplies((v) => !v)}>
                 {t('social.view_replies', { count: comment.replyCount })}
               </button>
             )}
@@ -393,7 +420,12 @@ function CommentItem({
                 repliesQuery.data?.items.map((reply) => (
                   <li key={reply.id}>
                     <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                      {reply.author.displayName}
+                      <Link
+                        to={`/users/${reply.author.id}`}
+                        className="transition-colors hover:text-sky-600 hover:underline dark:hover:text-sky-400"
+                      >
+                        {reply.author.displayName}
+                      </Link>
                     </p>
                     <p className="whitespace-pre-wrap break-words text-slate-700 dark:text-slate-200">
                       {reply.content}

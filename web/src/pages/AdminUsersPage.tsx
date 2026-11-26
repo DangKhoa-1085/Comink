@@ -42,6 +42,8 @@ export function AdminUsersPage() {
   })
 
   const users = data?.pages.flatMap((page) => page.items) ?? []
+  const activeCount = users.filter((item) => item.accountStatus === 'Active').length
+  const lockedCount = users.filter((item) => item.accountStatus === 'Locked').length
 
   const statusLabel = (status: string) =>
     ({
@@ -56,14 +58,41 @@ export function AdminUsersPage() {
       : 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-5xl space-y-5">
       <div className="flex items-center gap-3">
-        <ShieldCheck className="h-8 w-8 text-indigo-500" />
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300">
+          <ShieldCheck className="h-5 w-5" />
+        </span>
         <div>
-          <h1 className="text-2xl font-bold">{t('admin.title')}</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{t('admin.subtitle')}</p>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+            {t('admin.title')}
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400">{t('admin.subtitle')}</p>
         </div>
       </div>
+
+      {!isLoading && !isError && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Card className="p-4">
+            <p className="text-xs text-slate-500 dark:text-slate-400">{t('admin.stat_shown')}</p>
+            <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">
+              {users.length}
+            </p>
+          </Card>
+          <Card className="p-4">
+            <p className="text-xs text-slate-500 dark:text-slate-400">{t('admin.stat_active')}</p>
+            <p className="mt-1 text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+              {activeCount}
+            </p>
+          </Card>
+          <Card className="p-4">
+            <p className="text-xs text-slate-500 dark:text-slate-400">{t('admin.stat_locked')}</p>
+            <p className="mt-1 text-2xl font-bold text-rose-600 dark:text-rose-400">
+              {lockedCount}
+            </p>
+          </Card>
+        </div>
+      )}
 
       <form
         className="flex gap-2"

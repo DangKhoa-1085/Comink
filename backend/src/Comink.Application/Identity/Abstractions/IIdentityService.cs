@@ -93,6 +93,8 @@ public interface IIdentityService
         string? bio,
         string? location,
         DateOnly? dateOfBirth,
+        string? avatarUrl = null,
+        string? coverUrl = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>Cập nhật ngôn ngữ giao diện (<c>vi</c> hoặc <c>en</c>).</summary>

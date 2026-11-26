@@ -103,6 +103,7 @@ export function useChatConnection(enabled: boolean): ChatConnectionState {
       await queryClient.invalidateQueries({ queryKey: ['conversations'] })
       // Trạng thái online có thể đã đổi trong lúc mất kết nối → đọc lại chi tiết đang mở.
       await queryClient.invalidateQueries({ queryKey: ['conversation'] })
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] })
     }
 
     connection.on(MESSAGE_CREATED_EVENT, (message: ChatMessage) => {
@@ -251,6 +252,7 @@ export function useChatConnection(enabled: boolean): ChatConnectionState {
 
         queryClient.invalidateQueries({ queryKey: ['call', ended.callId] })
         queryClient.invalidateQueries({ queryKey: ['calls'] })
+        queryClient.invalidateQueries({ queryKey: ['notifications'] })
       },
     )
 

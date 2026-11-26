@@ -30,4 +30,50 @@ class AppConfig {
       firebaseAppId.isNotEmpty &&
       firebaseApiKey.isNotEmpty &&
       firebaseMessagingSenderId.isNotEmpty;
+
+  /// Ghép URL tương đối (ví dụ `/uploads/...` khi dev lưu đĩa cục bộ) với [apiBaseUrl].
+  /// URL tuyệt đối (`http://`, `https://`, ví dụ Cloudinary) được giữ nguyên.
+  static String resolveMediaUrl(String url, {String? baseUrl}) {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) {
+      return trimmed;
+    }
+    final uri = Uri.tryParse(trimmed);
+    if (uri != null && uri.hasScheme) {
+      return trimmed;
+    }
+    final origin = (baseUrl ?? apiBaseUrl).trim().replaceAll(RegExp(r'/+$'), '');
+    final path = trimmed.startsWith('/') ? trimmed : '/$trimmed';
+    return '$origin$path';
+  }
+
+  /// Chuẩn hoá URL WebSocket LiveKit theo [apiBaseUrl] khi backend trả `localhost`/`127.0.0.1`.
+  /// - Nếu app đang nối backend qua LAN (`192.168.x.x`) hoặc emulator (`10.0.2.2`), đổi host
+  ///   LiveKit sang cùng host đó để gọi được mà không bắt buộc cấu hình `LiveKit__PublicUrl`.
+  /// - Nếu app nối qua cáp USB (`127.0.0.1`), đổi `localhost` thành `127.0.0.1` để Android luôn
+  ///   đi đúng IPv4 khớp với `adb reverse tcp:7880 tcp:7880` (tránh rơi sang IPv6 `::1`).
+  /// - Nếu backend đã trả host thật (LAN/cloud), giữ nguyên.
+  static String resolveLiveKitUrl(String url, {String? baseUrl}) {
+    final trimmed = url.trim();
+    final liveKitUri = Uri.tryParse(trimmed);
+    if (liveKitUri == null || liveKitUri.host.isEmpty) {
+      return trimmed;
+    }
+
+    final isLoopback = liveKitUri.host == 'localhost' ||
+        liveKitUri.host == '127.0.0.1' ||
+        liveKitUri.host == '::1';
+    if (!isLoopback) {
+      return trimmed;
+    }
+
+    final apiUri = Uri.tryParse((baseUrl ?? apiBaseUrl).trim());
+    final apiHost = apiUri?.host ?? '';
+    if (apiHost.isEmpty) {
+      return trimmed;
+    }
+
+    final targetHost = apiHost == 'localhost' ? '127.0.0.1' : apiHost;
+    return liveKitUri.replace(host: targetHost).toString();
+  }
 }

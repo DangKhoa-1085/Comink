@@ -46,7 +46,7 @@ export function UserProfilePage() {
   const openChat = useMutation({
     mutationFn: () => conversationsApi.openDirect(id!),
     onSuccess: (conversation) => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      void queryClient.invalidateQueries({ queryKey: ['conversations'] })
       navigate(`/messages/${conversation.id}`)
     },
     onError: (error) => {
@@ -56,8 +56,8 @@ export function UserProfilePage() {
   })
 
   const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['user-posts', id] })
-    queryClient.invalidateQueries({ queryKey: ['feed'] })
+    void queryClient.invalidateQueries({ queryKey: ['user-posts', id] })
+    void queryClient.invalidateQueries({ queryKey: ['feed'] })
   }
 
   const sentinelRef = useInfiniteScroll(
@@ -72,7 +72,7 @@ export function UserProfilePage() {
   if (profileQuery.isLoading) {
     return (
       <div className="flex items-center justify-center gap-2 py-12 text-sm text-slate-500">
-        <Spinner /> {t('social.loading')}
+        <Spinner className="text-sky-600 dark:text-sky-400" /> {t('social.loading')}
       </div>
     )
   }
@@ -86,68 +86,109 @@ export function UserProfilePage() {
   const posts = postsQuery.data?.pages.flatMap((page) => page.items) ?? []
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <section className="mb-5 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-start gap-4">
-          <Avatar name={profile.displayName} url={profile.avatarUrl} size="lg" />
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-xl font-bold">{profile.displayName}</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">@{profile.userName}</p>
-            {profile.bio && <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">{profile.bio}</p>}
-            <p className="mt-1 text-xs text-slate-400">
-              {t('social.joined')}: {timeAgo(profile.createdAt, i18n.language)}
-            </p>
+    <div className="mx-auto max-w-2xl space-y-5">
+      <section className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs dark:border-slate-800 dark:bg-[#121826]">
+        <div className="relative h-36 bg-gradient-to-r from-sky-700 via-sky-500 to-cyan-400 sm:h-44">
+          {profile.coverUrl && (
+            <img
+              src={profile.coverUrl}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          )}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10" />
+          <span className="absolute bottom-3 right-4 rounded-full bg-black/35 px-3 py-1 text-xs font-semibold text-white backdrop-blur-xs">
+            {t('social.joined')}: {timeAgo(profile.createdAt, i18n.language)}
+          </span>
+        </div>
 
-            <dl className="mt-3 flex gap-5 text-sm">
-              <div>
-                <dt className="text-xs text-slate-500">{t('social.stat_friends')}</dt>
-                <dd className="font-bold">{profile.friendCount}</dd>
+        <div className="px-5 pb-5">
+          <div className="relative z-10 -mt-10 flex flex-wrap items-end justify-between gap-3">
+            <div className="flex min-w-0 items-end gap-3.5">
+              <div className="shrink-0 rounded-full bg-white p-1 ring-2 ring-white dark:bg-[#121826] dark:ring-[#121826]">
+                <Avatar name={profile.displayName} url={profile.avatarUrl} size="lg" />
               </div>
-              <div>
-                <dt className="text-xs text-slate-500">{t('social.stat_followers')}</dt>
-                <dd className="font-bold">{profile.followerCount}</dd>
+              <div className="min-w-0 pt-11">
+                <h1 className="truncate text-xl font-bold text-slate-900 dark:text-slate-100">
+                  {profile.displayName}
+                </h1>
+                <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                  @{profile.userName}
+                </p>
               </div>
-              <div>
-                <dt className="text-xs text-slate-500">{t('social.stat_following')}</dt>
-                <dd className="font-bold">{profile.followingCount}</dd>
-              </div>
-            </dl>
-          </div>
+            </div>
 
-          <div className="flex shrink-0 flex-col items-end gap-2">
-            {isSelf ? (
-              <Link to="/profile" className="text-sm font-medium text-indigo-600 hover:underline">
-                {t('social.edit_profile')}
-              </Link>
-            ) : (
-              <>
-                <RelationshipActions
-                  userId={profile.id}
-                  relationship={profile.relationship}
-                  incomingRequestId={incomingRequests.get(profile.id)}
-                  onChange={() => void profileQuery.refetch()}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => openChat.mutate()}
-                  disabled={openChat.isPending}
-                  title={t('chat.open')}
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {isSelf ? (
+                <Link
+                  to="/profile"
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-sky-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-[#1A2234] dark:text-sky-400"
                 >
-                  <MessageCircle className="h-4 w-4" />
-                  {t('chat.open')}
-                </Button>
-              </>
-            )}
+                  {t('social.edit_profile')}
+                </Link>
+              ) : (
+                <>
+                  <RelationshipActions
+                    userId={profile.id}
+                    relationship={profile.relationship}
+                    incomingRequestId={incomingRequests.get(profile.id)}
+                    onChange={() => void profileQuery.refetch()}
+                  />
+                  <Button
+                    variant="soft"
+                    size="sm"
+                    onClick={() => openChat.mutate()}
+                    disabled={openChat.isPending}
+                    title={t('chat.open')}
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    {t('chat.open')}
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
+
+          {profile.bio && (
+            <p className="mt-3 text-sm leading-relaxed text-slate-700 dark:text-slate-200">
+              {profile.bio}
+            </p>
+          )}
+
+          <dl className="mt-4 grid grid-cols-3 gap-2.5 border-t border-slate-100 pt-4 text-center dark:border-slate-800">
+            <div className="rounded-xl bg-slate-50 px-2 py-2.5 dark:bg-[#1A2234]">
+              <dd className="text-lg font-bold text-sky-600 dark:text-sky-400">
+                {profile.friendCount}
+              </dd>
+              <dt className="text-xs text-slate-500 dark:text-slate-400">
+                {t('social.stat_friends')}
+              </dt>
+            </div>
+            <div className="rounded-xl bg-slate-50 px-2 py-2.5 dark:bg-[#1A2234]">
+              <dd className="text-lg font-bold text-sky-600 dark:text-sky-400">
+                {profile.followerCount}
+              </dd>
+              <dt className="text-xs text-slate-500 dark:text-slate-400">
+                {t('social.stat_followers')}
+              </dt>
+            </div>
+            <div className="rounded-xl bg-slate-50 px-2 py-2.5 dark:bg-[#1A2234]">
+              <dd className="text-lg font-bold text-sky-600 dark:text-sky-400">
+                {profile.followingCount}
+              </dd>
+              <dt className="text-xs text-slate-500 dark:text-slate-400">
+                {t('social.stat_following')}
+              </dt>
+            </div>
+          </dl>
         </div>
       </section>
 
-      <h2 className="mb-3 text-sm font-bold text-slate-600 dark:text-slate-300">{t('social.posts')}</h2>
+      <h2 className="text-sm font-bold text-slate-600 dark:text-slate-300">{t('social.posts')}</h2>
 
       {postsQuery.isLoading ? (
         <div className="flex items-center justify-center gap-2 py-8 text-sm text-slate-500">
-          <Spinner /> {t('social.loading')}
+          <Spinner className="text-sky-600 dark:text-sky-400" /> {t('social.loading')}
         </div>
       ) : postsQuery.isError ? (
         <Alert variant="error">
@@ -157,7 +198,7 @@ export function UserProfilePage() {
           </button>
         </Alert>
       ) : posts.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500 dark:border-slate-700">
+        <p className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-[#121826]/60 dark:text-slate-400">
           {t('social.no_posts')}
         </p>
       ) : (

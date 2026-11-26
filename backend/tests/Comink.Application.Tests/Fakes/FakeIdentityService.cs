@@ -126,6 +126,8 @@ public class FakeIdentityService : IIdentityService
         string? bio,
         string? location,
         DateOnly? dateOfBirth,
+        string? avatarUrl = null,
+        string? coverUrl = null,
         CancellationToken cancellationToken = default)
     {
         if (!_users.TryGetValue(userId, out var user))
@@ -138,7 +140,13 @@ public class FakeIdentityService : IIdentityService
             DisplayName = displayName ?? user.Data.DisplayName,
             Bio = bio ?? user.Data.Bio,
             Location = location ?? user.Data.Location,
-            DateOfBirth = dateOfBirth ?? user.Data.DateOfBirth
+            DateOfBirth = dateOfBirth ?? user.Data.DateOfBirth,
+            AvatarUrl = avatarUrl is not null
+                ? (string.IsNullOrWhiteSpace(avatarUrl) ? null : avatarUrl.Trim())
+                : user.Data.AvatarUrl,
+            CoverUrl = coverUrl is not null
+                ? (string.IsNullOrWhiteSpace(coverUrl) ? null : coverUrl.Trim())
+                : user.Data.CoverUrl
         };
 
         _users[userId] = (user.UserName, user.Email, user.Password, updated);

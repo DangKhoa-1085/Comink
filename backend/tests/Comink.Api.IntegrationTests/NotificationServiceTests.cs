@@ -151,6 +151,7 @@ public class NotificationServiceTests : IntegrationTestBase
 
         Assert.Empty(aliceList.Value!.Items);
         Assert.Single(bobList.Value!.Items);
+        Assert.Equal("alice", bobList.Value!.Items[0].ActorDisplayName);
 
         var read = await service.MarkReadAsync(bob.Id, notification.Id);
         var outsiderRead = await service.MarkReadAsync(alice.Id, notification.Id);

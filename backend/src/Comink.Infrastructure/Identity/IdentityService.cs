@@ -230,6 +230,8 @@ public class IdentityService : IIdentityService
         string? bio,
         string? location,
         DateOnly? dateOfBirth,
+        string? avatarUrl = null,
+        string? coverUrl = null,
         CancellationToken cancellationToken = default)
     {
         var profile = await _db.UserProfiles
@@ -240,11 +242,19 @@ public class IdentityService : IIdentityService
             return IdentityOperationResult.Fail(IdentityFailure.NotFound);
         }
 
-        // Chỉ cập nhật trường được gửi lên (null = giữ nguyên).
+        // Chỉ cập nhật trường được gửi lên (null = giữ nguyên; chuỗi rỗng với ảnh = gỡ ảnh).
         if (displayName is not null) profile.DisplayName = displayName;
         if (bio is not null) profile.Bio = bio;
         if (location is not null) profile.Location = location;
         if (dateOfBirth is not null) profile.DateOfBirth = dateOfBirth;
+        if (avatarUrl is not null)
+        {
+            profile.AvatarUrl = string.IsNullOrWhiteSpace(avatarUrl) ? null : avatarUrl.Trim();
+        }
+        if (coverUrl is not null)
+        {
+            profile.CoverUrl = string.IsNullOrWhiteSpace(coverUrl) ? null : coverUrl.Trim();
+        }
         profile.UpdatedAt = _timeProvider.GetUtcNow();
 
         await _db.SaveChangesAsync(cancellationToken);

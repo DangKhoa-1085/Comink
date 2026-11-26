@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -5,16 +6,20 @@ import { friendshipsApi } from '../api/friendships'
 import { Avatar } from '../components/social/Avatar'
 import { UserCard } from '../components/social/UserCard'
 import { Button } from '../components/ui/Button'
-import { Alert, Spinner } from '../components/ui/Feedback'
+import { Alert, Skeleton } from '../components/ui/Feedback'
 import { toast } from '../stores/toastStore'
 import { ApiError } from '../lib/http'
 import { translateErrorCode } from '../lib/errorMessages'
+import { cn } from '../lib/utils'
 import type { Friendship } from '../api/types'
 
-/** Trang bạn bè: lời mời nhận được, lời mời đã gửi và danh sách bạn bè. */
+type FriendsTab = 'incoming' | 'outgoing' | 'list'
+
+/** Trang bạn bè: phân tab lời mời nhận được, lời mời đã gửi và danh sách bạn bè. */
 export function FriendsPage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const [tab, setTab] = useState<FriendsTab>('list')
 
   const incomingQuery = useQuery({
     queryKey: ['friendships', 'incoming'],
@@ -30,9 +35,9 @@ export function FriendsPage() {
   })
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ['friendships'] })
-    queryClient.invalidateQueries({ queryKey: ['feed'] })
-    queryClient.invalidateQueries({ queryKey: ['public-profile'] })
+    void queryClient.invalidateQueries({ queryKey: ['friendships'] })
+    void queryClient.invalidateQueries({ queryKey: ['feed'] })
+    void queryClient.invalidateQueries({ queryKey: ['public-profile'] })
   }
 
   const showError = (error: unknown) => {
@@ -67,106 +72,160 @@ export function FriendsPage() {
     onError: showError,
   })
 
-  const renderRequestRow = (friendship: Friendship, incoming: boolean) => (
+  const incoming = incomingQuery.data?.items ?? []
+  const outgoing = outgoingQuery.data?.items ?? []
+  const friends = friendsQuery.data?.items ?? []
+
+  const tabs: { id: FriendsTab; label: string; count: number }[] = [
+    { id: 'list', label: t('social.friends_list'), count: friends.length },
+    { id: 'incoming', label: t('social.requests_incoming'), count: incoming.length },
+    { id: 'outgoing', label: t('social.requests_outgoing'), count: outgoing.length },
+  ]
+
+  const renderRequestCard = (friendship: Friendship, isIncoming: boolean) => (
     <li
       key={friendship.id}
-      className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+      className="flex flex-col justify-between gap-3 overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#121826]"
     >
-      <Avatar name={friendship.user.displayName} url={friendship.user.avatarUrl} size="md" />
-      <div className="min-w-0 flex-1">
-        <Link
-          to={`/users/${friendship.user.id}`}
-          className="block truncate text-sm font-semibold hover:text-indigo-600"
-        >
-          {friendship.user.displayName}
-        </Link>
-        <p className="truncate text-xs text-slate-500 dark:text-slate-400">@{friendship.user.userName}</p>
+      <div className="flex min-w-0 items-center gap-3">
+        <Avatar name={friendship.user.displayName} url={friendship.user.avatarUrl} size="md" />
+        <div className="min-w-0 flex-1">
+          <Link
+            to={`/users/${friendship.user.id}`}
+            className="block truncate text-sm font-bold text-slate-900 hover:text-sky-600 dark:text-slate-100 dark:hover:text-sky-400"
+          >
+            {friendship.user.displayName}
+          </Link>
+          <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+            @{friendship.user.userName}
+          </p>
+        </div>
       </div>
-      {incoming ? (
-        <div className="flex gap-1.5">
-          <Button size="sm" onClick={() => acceptMutation.mutate(friendship.id)} disabled={acceptMutation.isPending}>
-            {t('social.accept')}
-          </Button>
+
+      <div className="border-t border-slate-100 pt-2.5 dark:border-slate-800">
+        {isIncoming ? (
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              size="sm"
+              onClick={() => acceptMutation.mutate(friendship.id)}
+              disabled={acceptMutation.isPending}
+            >
+              {t('social.accept')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => declineMutation.mutate(friendship.id)}
+              disabled={declineMutation.isPending}
+            >
+              {t('social.decline')}
+            </Button>
+          </div>
+        ) : (
           <Button
             variant="outline"
             size="sm"
-            onClick={() => declineMutation.mutate(friendship.id)}
-            disabled={declineMutation.isPending}
+            className="w-full"
+            onClick={() => cancelMutation.mutate(friendship.id)}
+            disabled={cancelMutation.isPending}
           >
-            {t('social.decline')}
+            {t('social.cancel_request')}
           </Button>
-        </div>
-      ) : (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => cancelMutation.mutate(friendship.id)}
-          disabled={cancelMutation.isPending}
-        >
-          {t('social.cancel_request')}
-        </Button>
-      )}
+        )}
+      </div>
     </li>
   )
 
+  const activeQuery =
+    tab === 'incoming' ? incomingQuery : tab === 'outgoing' ? outgoingQuery : friendsQuery
+
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
-      <h1 className="text-xl font-bold">{t('social.friends')}</h1>
+    <div className="mx-auto max-w-3xl space-y-5">
+      <div>
+        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+          {t('social.friends')}
+        </h1>
+        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+          {t('social.friends_subtitle')}
+        </p>
+      </div>
 
-      <section>
-        <h2 className="mb-2 text-sm font-bold text-slate-600 dark:text-slate-300">
-          {t('social.requests_incoming')}
-        </h2>
-        {incomingQuery.isLoading ? (
-          <div className="flex gap-2 text-sm text-slate-500">
-            <Spinner /> {t('social.loading')}
-          </div>
-        ) : incomingQuery.isError ? (
-          <Alert variant="error">{t('common.error_title')}</Alert>
-        ) : (incomingQuery.data?.items.length ?? 0) === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">{t('social.no_requests')}</p>
-        ) : (
-          <ul className="space-y-2">{incomingQuery.data?.items.map((item) => renderRequestRow(item, true))}</ul>
-        )}
-      </section>
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+        {tabs.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setTab(item.id)}
+            className={cn(
+              'shrink-0 whitespace-nowrap rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors',
+              tab === item.id
+                ? 'bg-sky-600 text-white shadow-xs dark:bg-sky-500'
+                : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-[#121826] dark:text-slate-300 dark:hover:bg-slate-800',
+            )}
+          >
+            {item.label} ({item.count})
+          </button>
+        ))}
+      </div>
 
-      <section>
-        <h2 className="mb-2 text-sm font-bold text-slate-600 dark:text-slate-300">
-          {t('social.requests_outgoing')}
-        </h2>
-        {outgoingQuery.isLoading ? (
-          <div className="flex gap-2 text-sm text-slate-500">
-            <Spinner /> {t('social.loading')}
-          </div>
-        ) : outgoingQuery.isError ? (
-          <Alert variant="error">{t('common.error_title')}</Alert>
-        ) : (outgoingQuery.data?.items.length ?? 0) === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">{t('social.no_requests')}</p>
+      {activeQuery.isLoading ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {[1, 2, 3, 4].map((item) => (
+            <div
+              key={item}
+              className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-4 dark:border-slate-800 dark:bg-[#121826]"
+            >
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <div className="flex-1 space-y-1.5">
+                  <Skeleton className="h-3.5 w-28" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+              </div>
+              <Skeleton className="h-8 w-full" />
+            </div>
+          ))}
+        </div>
+      ) : activeQuery.isError ? (
+        <Alert variant="error">
+          <p className="mb-2">{t('common.error_title')}</p>
+          <Button variant="outline" size="sm" onClick={() => void activeQuery.refetch()}>
+            {t('common.retry')}
+          </Button>
+        </Alert>
+      ) : tab === 'incoming' ? (
+        incoming.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-[#121826]/60 dark:text-slate-400">
+            {t('social.no_requests')}
+          </p>
         ) : (
-          <ul className="space-y-2">{outgoingQuery.data?.items.map((item) => renderRequestRow(item, false))}</ul>
-        )}
-      </section>
-
-      <section>
-        <h2 className="mb-2 text-sm font-bold text-slate-600 dark:text-slate-300">{t('social.friends_list')}</h2>
-        {friendsQuery.isLoading ? (
-          <div className="flex gap-2 text-sm text-slate-500">
-            <Spinner /> {t('social.loading')}
-          </div>
-        ) : friendsQuery.isError ? (
-          <Alert variant="error">{t('common.error_title')}</Alert>
-        ) : (friendsQuery.data?.items.length ?? 0) === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">{t('social.no_friends')}</p>
-        ) : (
-          <ul className="space-y-2">
-            {friendsQuery.data?.items.map((friendship) => (
-              <li key={friendship.id}>
-                <UserCard user={friendship.user} onChange={invalidate} />
-              </li>
-            ))}
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {incoming.map((item) => renderRequestCard(item, true))}
           </ul>
-        )}
-      </section>
+        )
+      ) : tab === 'outgoing' ? (
+        outgoing.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-[#121826]/60 dark:text-slate-400">
+            {t('social.no_requests')}
+          </p>
+        ) : (
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {outgoing.map((item) => renderRequestCard(item, false))}
+          </ul>
+        )
+      ) : friends.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-[#121826]/60 dark:text-slate-400">
+          {t('social.no_friends')}
+        </p>
+      ) : (
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {friends.map((friendship) => (
+            <li key={friendship.id}>
+              <UserCard user={friendship.user} onChange={invalidate} />
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

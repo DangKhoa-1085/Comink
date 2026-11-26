@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/i18n/app_localizations.dart';
+import '../../core/widgets/comink_logo.dart';
 
 /// Màn hình chờ khôi phục phiên khi mở app.
 class SplashPage extends StatelessWidget {
@@ -17,8 +18,8 @@ class SplashPage extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.forum_rounded, size: 64, color: colors.primary),
-            const SizedBox(height: 12),
+            const CominkLogo(size: 72),
+            const SizedBox(height: 14),
             Text(
               AppConfig.appName,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(

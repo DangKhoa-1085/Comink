@@ -39,7 +39,7 @@ class CallScreen extends ConsumerWidget {
     final controller = ref.read(callControllerProvider.notifier);
 
     return Material(
-      color: const Color(0xFF101318),
+      color: const Color(0xFF080B14),
       child: SafeArea(
         child: switch (state.phase) {
           CallPhase.incoming => _IncomingView(state: state),
@@ -75,7 +75,24 @@ class _IncomingView extends ConsumerWidget {
     return Column(
       children: [
         const Spacer(),
-        AppAvatar(name: callerNames.isEmpty ? '?' : callerNames, radius: 52),
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: const Color(0xFF0EA5E9).withValues(alpha: 0.45),
+              width: 3,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0EA5E9).withValues(alpha: 0.22),
+                blurRadius: 28,
+                spreadRadius: 4,
+              ),
+            ],
+          ),
+          child: AppAvatar(name: callerNames.isEmpty ? '?' : callerNames, radius: 52),
+        ),
         const SizedBox(height: 20),
         Text(
           call?.isVideo == true ? l10n.t('call_incoming_video') : l10n.t('call_incoming_audio'),
@@ -203,26 +220,37 @@ class _ActiveView extends ConsumerWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _ControlButton(
-                icon: state.micEnabled ? Icons.mic : Icons.mic_off,
-                active: state.micEnabled,
-                onPressed: onToggleMic,
-              ),
-              if (isVideo)
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF121826),
+              borderRadius: BorderRadius.circular(99),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
                 _ControlButton(
-                  icon: state.cameraEnabled ? Icons.videocam : Icons.videocam_off,
-                  active: state.cameraEnabled,
-                  onPressed: onToggleCamera,
+                  icon: state.micEnabled ? Icons.mic : Icons.mic_off,
+                  active: state.micEnabled,
+                  onPressed: onToggleMic,
                 ),
-              _ControlButton(
-                icon: Icons.call_end,
-                color: Colors.red,
-                onPressed: onEnd,
-              ),
-            ],
+                if (isVideo) ...[
+                  const SizedBox(width: 16),
+                  _ControlButton(
+                    icon: state.cameraEnabled ? Icons.videocam : Icons.videocam_off,
+                    active: state.cameraEnabled,
+                    onPressed: onToggleCamera,
+                  ),
+                ],
+                const SizedBox(width: 16),
+                _ControlButton(
+                  icon: Icons.call_end,
+                  color: Colors.red,
+                  onPressed: onEnd,
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -303,9 +331,13 @@ class _ParticipantTile extends StatelessWidget {
     }
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: ColoredBox(
-        color: const Color(0xFF1C222B),
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF121826),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white12),
+        ),
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -389,6 +421,7 @@ class _EndedView extends ConsumerWidget {
         const Spacer(),
         TextButton(
           onPressed: controller.dismissEnded,
+          style: TextButton.styleFrom(foregroundColor: const Color(0xFF0EA5E9)),
           child: Text(l10n.t('common_close')),
         ),
         const SizedBox(height: 24),

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/providers.dart';
 import '../../chats/data/chat_realtime.dart';
@@ -41,6 +42,7 @@ class CallController extends Notifier<CallState> {
 
     _busy = true;
     _resetTimer?.cancel();
+    CallInfo? createdCall;
     try {
       if (!await _ensurePermissions(video: video)) {
         _showError('CALL_PERMISSION_DENIED');
@@ -62,6 +64,7 @@ class CallController extends Notifier<CallState> {
       }
 
       final call = CallInfo.fromJson(data.cast<String, dynamic>());
+      createdCall = call;
       state = CallState(
         phase: CallPhase.outgoing,
         call: call,
@@ -69,11 +72,19 @@ class CallController extends Notifier<CallState> {
       );
       await _joinRoom(call);
     } on ApiException catch (error) {
+      if (createdCall != null) {
+        unawaited(_endRemote(createdCall.id));
+        unawaited(_disconnectRoom());
+      }
       _showError(error.code);
     } catch (error) {
       // Ghi lại nguyên nhân thật (LiveKit/timeout/mạng) — nếu không, UI chỉ hiện câu chung
       // "Không kết nối được phòng gọi" và rất khó chẩn đoán khi máy thật lỗi media.
       debugPrint('Không kết nối được phòng gọi: $error');
+      if (createdCall != null) {
+        unawaited(_endRemote(createdCall.id));
+        unawaited(_disconnectRoom());
+      }
       _showError('CALL_MEDIA_FAILED');
     } finally {
       _busy = false;
@@ -132,9 +143,11 @@ class CallController extends Notifier<CallState> {
       );
       await _joinRoom(answered);
     } on ApiException catch (error) {
+      unawaited(_disconnectRoom());
       _showError(error.code);
     } catch (error) {
       debugPrint('Không kết nối được phòng gọi (trả lời): $error');
+      unawaited(_disconnectRoom());
       _showError('CALL_MEDIA_FAILED');
     } finally {
       _busy = false;
@@ -222,7 +235,8 @@ class CallController extends Notifier<CallState> {
     _room = room;
     room.addListener(_onRoomChanged);
 
-    await room.connect(token.url, token.token);
+    final liveKitUrl = AppConfig.resolveLiveKitUrl(token.url);
+    await room.connect(liveKitUrl, token.token);
     await room.localParticipant?.setMicrophoneEnabled(true);
     if (call.isVideo) {
       await room.localParticipant?.setCameraEnabled(true);
@@ -347,6 +361,14 @@ class CallController extends Notifier<CallState> {
       await ref.read(apiClientProvider).post('/api/calls/$callId/decline');
     } on ApiException {
       // Bỏ qua.
+    }
+  }
+
+  Future<void> _endRemote(String callId) async {
+    try {
+      await ref.read(apiClientProvider).post('/api/calls/$callId/end');
+    } on ApiException {
+      // Bỏ qua nếu cuộc gọi đã kết thúc trước đó.
     }
   }
 

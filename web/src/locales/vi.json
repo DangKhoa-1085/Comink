@@ -63,7 +63,14 @@
     "admin": "Quản trị",
     "login": "Đăng nhập",
     "register": "Đăng ký",
-    "logout": "Đăng xuất"
+    "logout": "Đăng xuất",
+    "settings": "Cài đặt",
+    "account_settings": "Cài đặt tài khoản",
+    "back_to_feed": "Về bảng tin",
+    "theme": "Giao diện",
+    "theme_light": "Sáng",
+    "theme_dark": "Tối",
+    "language": "Ngôn ngữ"
   },
   "auth": {
     "login_title": "Đăng nhập",
@@ -105,7 +112,19 @@
     "update_success": "Đã cập nhật hồ sơ",
     "settings_success": "Đã cập nhật cài đặt",
     "email_readonly": "Email không thể thay đổi ở giai đoạn này.",
-    "username_readonly": "Tên đăng nhập không thể thay đổi."
+    "username_readonly": "Tên đăng nhập không thể thay đổi.",
+    "tab_edit": "Chỉnh sửa hồ sơ",
+    "tab_account": "Thông tin tài khoản",
+    "tab_settings": "Cài đặt",
+    "session_title": "Phiên đăng nhập",
+    "session_desc": "Đăng xuất khỏi thiết bị này và quay về màn hình đăng nhập.",
+    "change_avatar": "Đổi ảnh đại diện",
+    "change_cover": "Đổi ảnh bìa",
+    "remove_avatar": "Gỡ ảnh đại diện",
+    "remove_cover": "Gỡ ảnh bìa",
+    "uploading_image": "Đang tải ảnh...",
+    "avatar_updated": "Đã cập nhật ảnh đại diện",
+    "cover_updated": "Đã cập nhật ảnh bìa"
   },
   "admin": {
     "title": "Quản trị người dùng",
@@ -139,7 +158,10 @@
     "locked_success": "Đã khóa tài khoản",
     "unlocked_success": "Đã mở khóa tài khoản",
     "cannot_lock_self": "Bạn không thể tự khóa tài khoản của chính mình",
-    "you": "Bạn"
+    "you": "Bạn",
+    "stat_shown": "Đang hiển thị",
+    "stat_active": "Đang hoạt động",
+    "stat_locked": "Đã khóa"
   },
   "call": {
     "start_audio": "Gọi thoại",
@@ -298,10 +320,20 @@
     "mute_1w": "Tắt 1 tuần",
     "mute_forever": "Tắt vĩnh viễn",
     "context_banner": "Đang xem quanh tin nhắn được chọn",
-    "context_latest": "Về tin mới nhất"
+    "context_latest": "Về tin mới nhất",
+    "filter_all": "Tất cả",
+    "filter_unread": "Chưa đọc",
+    "filter_groups": "Nhóm",
+    "select_conversation_title": "Chọn một cuộc trò chuyện",
+    "select_conversation_desc": "Chọn hội thoại bên trái để nhắn tin hoặc bắt đầu cuộc gọi thoại và video."
   },
   "social": {
     "feed": "Bảng tin",
+    "feed_subtitle": "Cập nhật từ bạn bè và người bạn đang theo dõi",
+    "online_friends": "Bạn bè đang hoạt động",
+    "online_friends_empty": "Chưa có bạn bè nào đang trực tuyến.",
+    "view_all": "Xem tất cả",
+    "friends_subtitle": "Quản lý lời mời kết bạn, theo dõi và danh sách bạn bè",
     "feed_error": "Không tải được bảng tin",
     "loading": "Đang tải...",
     "empty_feed": "Chưa có bài viết nào. Hãy kết bạn hoặc theo dõi ai đó!",
@@ -369,6 +401,37 @@
     "no_posts": "Chưa có bài viết nào",
     "profile_not_found": "Không tìm thấy người dùng",
     "edit_profile": "Sửa hồ sơ"
+  },
+  "notifications": {
+    "title": "Thông báo",
+    "filter_all": "Tất cả",
+    "filter_unread": "Chưa đọc",
+    "section_new": "Mới",
+    "section_earlier": "Trước đó",
+    "view_all": "Xem tất cả",
+    "mark_all_read": "Đánh dấu tất cả đã đọc",
+    "refresh": "Làm mới",
+    "empty": "Chưa có thông báo nào.",
+    "empty_unread": "Bạn đã đọc hết tất cả thông báo.",
+    "error": "Không tải được thông báo",
+    "more_options": "Tùy chọn thông báo",
+    "load_more": "Tải thêm thông báo",
+    "action_missed_call": "đã gọi nhỡ cho bạn.",
+    "action_missed_video_call": "đã gọi video nhỡ cho bạn.",
+    "action_friend_request": "đã gửi cho bạn lời mời kết bạn.",
+    "action_friend_accepted": "đã chấp nhận lời mời kết bạn của bạn.",
+    "action_new_follower": "đã bắt đầu theo dõi bạn.",
+    "action_post_liked": "đã thích bài viết của bạn.",
+    "action_post_commented": "đã bình luận về bài viết của bạn.",
+    "action_comment_replied": "đã trả lời bình luận của bạn.",
+    "action_post_shared": "đã chia sẻ bài viết của bạn.",
+    "action_mentioned": "đã nhắc đến bạn.",
+    "action_added_to_group": "đã thêm bạn vào một nhóm trò chuyện.",
+    "action_other": "đã gửi cho bạn một thông báo mới.",
+    "fallback_missed_call": "Cuộc gọi nhỡ",
+    "fallback_friend_request": "Lời mời kết bạn",
+    "fallback_friend_accepted": "Đã chấp nhận lời mời kết bạn",
+    "fallback_other": "Thông báo mới"
   },
   "errors": {
     "NETWORK_ERROR": "Không kết nối được tới máy chủ. Kiểm tra backend đã chạy chưa.",

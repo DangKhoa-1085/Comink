@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/i18n/app_localizations.dart';
 import '../../../core/network/api_exception.dart';
@@ -233,7 +234,10 @@ class _CommentTileState extends ConsumerState<_CommentTile> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppAvatar(name: comment.author.displayName, url: comment.author.avatarUrl, radius: 16),
+          GestureDetector(
+            onTap: () => _openUserProfile(context, comment.author.id),
+            child: AppAvatar(name: comment.author.displayName, url: comment.author.avatarUrl, radius: 16),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -242,9 +246,16 @@ class _CommentTileState extends ConsumerState<_CommentTile> {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        comment.author.displayName,
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                      child: GestureDetector(
+                        onTap: () => _openUserProfile(context, comment.author.id),
+                        child: Text(
+                          comment.author.displayName,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: colors.onSurface,
+                          ),
+                        ),
                       ),
                     ),
                     Text(
@@ -313,15 +324,21 @@ class _RepliesList extends ConsumerWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppAvatar(name: reply.author.displayName, url: reply.author.avatarUrl, radius: 11),
+                  GestureDetector(
+                    onTap: () => _openUserProfile(context, reply.author.id),
+                    child: AppAvatar(name: reply.author.displayName, url: reply.author.avatarUrl, radius: 11),
+                  ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          reply.author.displayName,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
+                        GestureDetector(
+                          onTap: () => _openUserProfile(context, reply.author.id),
+                          child: Text(
+                            reply.author.displayName,
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
+                          ),
                         ),
                         Text(reply.content, style: const TextStyle(fontSize: 13)),
                       ],
@@ -346,4 +363,10 @@ class _RepliesList extends ConsumerWidget {
       ),
     );
   }
+}
+
+void _openUserProfile(BuildContext context, String userId) {
+  final router = GoRouter.of(context);
+  Navigator.of(context).pop();
+  router.push('/users/$userId');
 }
