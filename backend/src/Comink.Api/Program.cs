@@ -10,6 +10,8 @@ using Comink.Infrastructure;
 using Comink.Infrastructure.Media;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using Serilog;
 
@@ -132,12 +134,22 @@ try
     {
         options.AddPolicy("AllowWebClient", policy =>
         {
-            var frontendUrl = builder.Configuration["FrontendUrl"] ?? "http://localhost:5173";
-            policy.WithOrigins(frontendUrl)
+            var allowedOrigins = Comink.Api.Common.CorsOriginsParser.Parse(
+                builder.Configuration["FrontendUrl"]);
+            policy.WithOrigins(allowedOrigins)
                   .AllowAnyHeader()
                   .AllowAnyMethod()
                   .AllowCredentials(); // cần cho SignalR
         });
+    });
+
+    // --- Forwarded Headers (cần khi chạy sau reverse proxy như Railway) ---
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        // Reverse proxy của nền tảng cloud dùng IP động nên xóa danh sách mặc định (chỉ tin loopback).
+        options.KnownIPNetworks.Clear();
+        options.KnownProxies.Clear();
     });
 
     // --- ProblemDetails cho error handling thống nhất ---
@@ -156,6 +168,7 @@ try
     var app = builder.Build();
 
     // --- Middleware pipeline ---
+    app.UseForwardedHeaders();
     app.UseSerilogRequestLogging();
 
     // --- Phục vụ tệp lưu cục bộ khi dev (phương án B: chỉ bật khi KHÔNG dùng Cloudinary) ---
@@ -221,8 +234,17 @@ try
     if (app.Environment.IsDevelopment())
     {
         app.MapOpenApi();
-        // Tự động áp dụng migration và seed khi dev
-        await app.Services.ApplyMigrationsAsync();
+        // Tự động áp dụng migration và seed khi dev (bỏ qua khi dotnet ef chạy design-time)
+        if (!EF.IsDesignTime)
+        {
+            await app.Services.ApplyMigrationsAsync();
+        }
+    }
+    else if (!EF.IsDesignTime)
+    {
+        // Production: KHÔNG tự chạy migration (AGENTS.md mục 8.2), nhưng đảm bảo role
+        // cơ bản (User, Admin) và tài khoản admin đầu tiên (nếu cấu hình AdminSeed) tồn tại.
+        await app.Services.SeedEssentialDataAsync();
     }
 
     // Lỗi đọc body (JSON sai định dạng / sai kiểu / thiếu trường) do framework ném

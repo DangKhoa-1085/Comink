@@ -1,5 +1,6 @@
 /**
  * Cấu hình môi trường.
- * Web dev gọi API qua proxy của Vite (mặc định `/api`), nên không cần URL tuyệt đối.
+ * - Dev local: để trống → gọi API và SignalR qua proxy của Vite (`/api`, `/hub/chat`).
+ * - Production (Vercel): đặt `VITE_API_BASE_URL=https://<backend>.up.railway.app`.
  */
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')

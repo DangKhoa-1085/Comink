@@ -275,7 +275,7 @@ App Flutter **không cần** giao diện quản trị trong phạm vi đồ án.
 |---|---|
 | Demo máy cá nhân (CB) | Docker Compose cho hạ tầng; backend/web chạy local; cấu hình qua biến môi trường |
 | Truy cập từ thiết bị khác trong LAN (NC) | Backend bind `0.0.0.0`, cấu hình CORS, **dùng HTTPS** (xem lưu ý dưới) |
-| Internet / production (NC) | Docker image cho từng thành phần, reverse proxy có HTTPS, biến môi trường/secret tách riêng, Redis backplane, sao lưu PostgreSQL |
+| Internet / production (NC) | Neon (PostgreSQL 17) + Railway (Backend .NET 10 Dockerfile + Redis) + Vercel (Web SPA) + LiveKit Cloud + Cloudinary (xem `docs/07_deployment_guide.md`) |
 
 > **Lưu ý quan trọng cho demo qua LAN:** trình duyệt chỉ cho phép dùng micro/camera và service worker (push) trên **ngữ cảnh an toàn** (HTTPS hoặc `localhost`). Khi mở web từ máy khác bằng địa chỉ IP qua HTTP, gọi thoại/video và web push sẽ **không hoạt động**. Cần chuẩn bị chứng chỉ HTTPS cục bộ (ví dụ `mkcert`) hoặc đường hầm HTTPS. Với app Flutter trên điện thoại thật, cần cho phép backend truy cập được từ mạng đó (và cấu hình cho phép HTTP/HTTPS tương ứng trên Android/iOS).
 
@@ -386,6 +386,7 @@ Mỗi khi chốt hoặc đổi quyết định, thêm một dòng ở đây.
 | 2026-10-10 | Mailpit (dev) + Resend (production) | Test cục bộ dễ dàng và đã sẵn có tài khoản Resend | Nhóm |
 | 2026-10-10 | Sẵn sàng switch LLM trả phí trong tương lai | Trừu tượng hóa qua `IAiProvider` | Nhóm |
 | 2026-10-10 | .NET 10 | Phiên bản SDK mới nhất, thống nhất qua `global.json` | Nhóm |
+| 2026-11-26 | Triển khai Internet trên Neon + Railway + Vercel + LiveKit Cloud | Phù hợp ngân sách đồ án, hỗ trợ đầy đủ PostgreSQL 17 extensions, SignalR WebSocket và WebRTC/TURN | Nhóm |
 
 ---
 
