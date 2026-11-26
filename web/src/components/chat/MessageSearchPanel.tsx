@@ -80,13 +80,13 @@ export function MessageSearchPanel({ conversationId, onClose, onPick }: MessageS
               }
             }}
             placeholder={t('chat.search_messages_placeholder')}
-            className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            className="h-9 min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-sky-500 dark:border-slate-700 dark:bg-[#1A2234] dark:text-slate-100"
           />
           <button
             type="button"
             onClick={submit}
             disabled={keyword.trim().length < 2}
-            className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+            className="rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-semibold text-white disabled:opacity-50 dark:bg-sky-500"
           >
             {searchQuery.isFetching && submitted.length >= 2 ? (
               <Loader2 className="h-4 w-4 animate-spin" />

@@ -251,14 +251,18 @@ export function CallPage() {
 
   if (callQuery.isLoading) {
     return (
-      <div className="flex items-center justify-center gap-2 py-12 text-sm text-slate-500">
-        <Spinner /> {t('social.loading')}
+      <div className="flex min-h-screen items-center justify-center gap-2 text-sm text-slate-300">
+        <Spinner className="text-sky-400" /> {t('social.loading')}
       </div>
     )
   }
 
   if (callQuery.isError || !callQuery.data) {
-    return <Alert variant="error">{t('call.not_found')}</Alert>
+    return (
+      <div className="mx-auto max-w-md px-4 py-16">
+        <Alert variant="error">{t('call.not_found')}</Alert>
+      </div>
+    )
   }
 
   // Camera/micro chỉ chạy trên secure context (HTTPS hoặc localhost). Mở bằng
@@ -267,9 +271,9 @@ export function CallPage() {
   // để người dùng đoán.
   if (typeof window !== 'undefined' && !window.isSecureContext) {
     return (
-      <div className="mx-auto max-w-xl space-y-3">
+      <div className="mx-auto max-w-xl space-y-3 px-4 py-16">
         <Alert variant="error">{t('call.insecure_context')}</Alert>
-        <p className="text-xs text-slate-500">{t('call.insecure_context_hint')}</p>
+        <p className="text-xs text-slate-400">{t('call.insecure_context_hint')}</p>
         <Button onClick={() => navigate(-1)}>{t('call.back')}</Button>
       </div>
     )
@@ -278,41 +282,48 @@ export function CallPage() {
   if (isTerminal) {
     const endReason = callQuery.data.endReason ?? 'Completed'
     return (
-      <div className="mx-auto max-w-md space-y-4 rounded-2xl border border-slate-200 p-6 text-center dark:border-slate-800">
-        <p className="text-lg font-semibold">{t('call.ended')}</p>
-        <p className="text-sm text-slate-500">
-          {t('call.ended_detail', {
-            duration: formatCallDuration(callQuery.data.durationSeconds ?? 0, t),
-            reason: t(`call.reason_${endReason.toLowerCase()}`, { defaultValue: endReason })
-          })}
-        </p>
-        <Button onClick={() => navigate(-1)}>{t('call.back')}</Button>
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-4 rounded-2xl border border-white/10 bg-[#121826] p-6 text-center shadow-2xl">
+          <p className="text-lg font-bold text-white">{t('call.ended')}</p>
+          <p className="text-sm text-slate-400">
+            {t('call.ended_detail', {
+              duration: formatCallDuration(callQuery.data.durationSeconds ?? 0, t),
+              reason: t(`call.reason_${endReason.toLowerCase()}`, { defaultValue: endReason }),
+            })}
+          </p>
+          <Button onClick={() => navigate(-1)}>{t('call.back')}</Button>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <div className="mb-3 flex items-center justify-between">
+    <div className="relative mx-auto flex min-h-screen max-w-5xl flex-col justify-between p-4 sm:p-6">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold">
-            {callQuery.data.type === 'Video' ? t('call.video_title') : t('call.audio_title')}
-          </h1>
-          <p className="text-xs text-slate-500">
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold text-white">
+              {callQuery.data.type === 'Video' ? t('call.video_title') : t('call.audio_title')}
+            </h1>
+            <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">
+              {connectionState === 'connecting' ? t('call.connecting') : t('call.connected')}
+            </span>
+          </div>
+          <p className="text-xs text-slate-400">
             {connectionState === 'connecting'
               ? t('call.connecting')
               : t('call.duration', { time: formatDuration(durationSeconds) })}
           </p>
         </div>
         {RELAY_ONLY && (
-          <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+          <span className="rounded-full bg-amber-500/20 px-3 py-1 text-xs font-semibold text-amber-300">
             {t('call.relay_mode')}
           </span>
         )}
       </div>
 
       {connectionState === 'error' ? (
-        <div>
+        <div className="my-auto">
           <Alert variant="error">
             <p>{errorCode ? translateErrorCode(t, errorCode) : t('call.error')}</p>
             {errorDetail && <p className="mt-1 text-xs opacity-80">{errorDetail}</p>}
@@ -335,23 +346,23 @@ export function CallPage() {
           </Button>
         </div>
       ) : (
-        <>
+        <div className="relative my-3 flex flex-1 flex-col justify-center">
           <div
             ref={remoteMediaRef}
-            className="mb-3 flex min-h-[240px] flex-col items-center justify-center gap-2 rounded-2xl bg-slate-900 p-3"
+            className="flex min-h-[320px] flex-1 flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-[#121826] p-4"
           >
             {connectionState === 'connecting' && isWaiting && (
               <span className="flex items-center gap-2 text-sm text-slate-300">
-                <Spinner /> {t('call.connecting')}
+                <Spinner className="text-sky-400" /> {t('call.connecting')}
               </span>
             )}
             {isWaiting ? (
-              <span className="text-xs text-slate-500">{t('call.remote_hint')}</span>
+              <span className="text-xs text-slate-400">{t('call.remote_hint')}</span>
             ) : !hasRemoteVideo ? (
               <div className="flex flex-wrap items-center justify-center gap-6">
                 {remotePeople.map((person) => (
                   <div key={person.userId} className="flex flex-col items-center gap-2">
-                    <span className="flex h-20 w-20 items-center justify-center rounded-full bg-indigo-500/20 text-2xl font-bold text-indigo-200">
+                    <span className="flex h-20 w-20 items-center justify-center rounded-full border border-sky-400/30 bg-sky-500/20 text-2xl font-bold text-sky-200">
                       {initialsOf(person.displayName)}
                     </span>
                     <span className="max-w-40 truncate text-sm font-medium text-slate-200">
@@ -363,31 +374,61 @@ export function CallPage() {
             ) : null}
           </div>
 
-          <div className={camOn ? 'mb-3' : 'mb-3 hidden'}>
+          <div
+            className={
+              camOn
+                ? 'mt-3 md:absolute md:bottom-4 md:right-4 md:mt-0 md:w-52'
+                : 'hidden'
+            }
+          >
             <video
               ref={localVideoRef}
               autoPlay
               muted
               playsInline
-              className="w-full max-h-56 rounded-2xl bg-slate-800 object-cover"
+              className="max-h-48 w-full rounded-2xl border border-white/20 bg-slate-800 object-cover shadow-2xl md:h-32"
             />
           </div>
-        </>
+        </div>
       )}
 
-      <div className="flex items-center justify-center gap-2">
-        <Button variant="outline" onClick={() => void toggleMic()} disabled={connectionState !== 'connected'}>
-          {micOn ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
-          {micOn ? t('call.mic_on') : t('call.mic_off')}
-        </Button>
-        <Button variant="outline" onClick={() => void toggleCamera()} disabled={connectionState !== 'connected'}>
-          {camOn ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
-          {camOn ? t('call.camera_on') : t('call.camera_off')}
-        </Button>
-        <Button onClick={() => void endCall()}>
-          <PhoneOff className="h-4 w-4" />
-          {t('call.hangup')}
-        </Button>
+      <div className="mt-3 flex justify-center">
+        <div className="inline-flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 py-2.5 backdrop-blur-md">
+          <button
+            type="button"
+            onClick={() => void toggleMic()}
+            disabled={connectionState !== 'connected'}
+            className={`inline-flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-xs font-semibold transition disabled:opacity-50 ${
+              micOn
+                ? 'bg-white/15 text-white hover:bg-white/20'
+                : 'border border-rose-400/40 bg-rose-500/25 text-rose-200'
+            }`}
+          >
+            {micOn ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+            <span>{micOn ? t('call.mic_on') : t('call.mic_off')}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => void toggleCamera()}
+            disabled={connectionState !== 'connected'}
+            className={`inline-flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-xs font-semibold transition disabled:opacity-50 ${
+              camOn
+                ? 'bg-white/15 text-white hover:bg-white/20'
+                : 'border border-rose-400/40 bg-rose-500/25 text-rose-200'
+            }`}
+          >
+            {camOn ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
+            <span>{camOn ? t('call.camera_on') : t('call.camera_off')}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => void endCall()}
+            className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-rose-600 px-5 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-rose-500"
+          >
+            <PhoneOff className="h-4 w-4" />
+            <span>{t('call.hangup')}</span>
+          </button>
+        </div>
       </div>
     </div>
   )

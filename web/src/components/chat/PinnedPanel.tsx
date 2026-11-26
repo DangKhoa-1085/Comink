@@ -22,11 +22,11 @@ export function PinnedPanel({ pinned, loading, error, onClose, onJump, onUnpin }
   return (
     <section
       aria-label={t('chat.pinned')}
-      className="border-b border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950"
+      className="border-b border-slate-200/80 bg-white px-4 py-2.5 dark:border-slate-800 dark:bg-[#121826]"
     >
       <div className="mb-2 flex items-center justify-between">
-        <p className="flex items-center gap-1 text-sm font-semibold">
-          <Pin className="h-4 w-4" />
+        <p className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">
+          <Pin className="h-3.5 w-3.5 text-amber-500" />
           {t('chat.pinned_count', { count: pinned.length })}
         </p>
         <button

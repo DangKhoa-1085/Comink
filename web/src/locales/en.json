@@ -63,7 +63,14 @@
     "admin": "Admin",
     "login": "Sign in",
     "register": "Sign up",
-    "logout": "Sign out"
+    "logout": "Sign out",
+    "settings": "Settings",
+    "account_settings": "Account settings",
+    "back_to_feed": "Back to feed",
+    "theme": "Theme",
+    "theme_light": "Light",
+    "theme_dark": "Dark",
+    "language": "Language"
   },
   "auth": {
     "login_title": "Sign in",
@@ -105,7 +112,12 @@
     "update_success": "Profile updated",
     "settings_success": "Settings updated",
     "email_readonly": "Email cannot be changed at this stage.",
-    "username_readonly": "Username cannot be changed."
+    "username_readonly": "Username cannot be changed.",
+    "tab_edit": "Edit profile",
+    "tab_account": "Account info",
+    "tab_settings": "Settings",
+    "session_title": "Sign-in session",
+    "session_desc": "Sign out of this device and return to the login screen."
   },
   "admin": {
     "title": "User administration",
@@ -140,7 +152,10 @@
     "locked_success": "Account locked",
     "unlocked_success": "Account unlocked",
     "cannot_lock_self": "You cannot lock your own account",
-    "you": "You"
+    "you": "You",
+    "stat_shown": "Showing",
+    "stat_active": "Active",
+    "stat_locked": "Locked"
   },
   "call": {
     "start_audio": "Voice call",
@@ -299,10 +314,20 @@
     "mute_1w": "Mute for 1 week",
     "mute_forever": "Mute forever",
     "context_banner": "Viewing around the selected message",
-    "context_latest": "Back to latest"
+    "context_latest": "Back to latest",
+    "filter_all": "All",
+    "filter_unread": "Unread",
+    "filter_groups": "Groups",
+    "select_conversation_title": "Select a conversation",
+    "select_conversation_desc": "Pick a thread on the left to start chatting or launch a voice/video call."
   },
   "social": {
     "feed": "Feed",
+    "feed_subtitle": "Updates from your friends and people you follow",
+    "online_friends": "Online friends",
+    "online_friends_empty": "No friends online right now.",
+    "view_all": "View all",
+    "friends_subtitle": "Manage friend requests, followers, and your friend list",
     "feed_error": "Could not load the feed",
     "loading": "Loading...",
     "empty_feed": "No posts yet. Add friends or follow someone!",
@@ -371,6 +396,37 @@
     "no_posts": "No posts yet",
     "profile_not_found": "User not found",
     "edit_profile": "Edit profile"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "filter_all": "All",
+    "filter_unread": "Unread",
+    "section_new": "New",
+    "section_earlier": "Earlier",
+    "view_all": "See all",
+    "mark_all_read": "Mark all as read",
+    "refresh": "Refresh",
+    "empty": "No notifications yet.",
+    "empty_unread": "You're all caught up.",
+    "error": "Could not load notifications",
+    "more_options": "Notification options",
+    "load_more": "Load more notifications",
+    "action_missed_call": "missed a call with you.",
+    "action_missed_video_call": "missed a video call with you.",
+    "action_friend_request": "sent you a friend request.",
+    "action_friend_accepted": "accepted your friend request.",
+    "action_new_follower": "started following you.",
+    "action_post_liked": "liked your post.",
+    "action_post_commented": "commented on your post.",
+    "action_comment_replied": "replied to your comment.",
+    "action_post_shared": "shared your post.",
+    "action_mentioned": "mentioned you.",
+    "action_added_to_group": "added you to a group chat.",
+    "action_other": "sent you a new notification.",
+    "fallback_missed_call": "Missed call",
+    "fallback_friend_request": "Friend request",
+    "fallback_friend_accepted": "Friend request accepted",
+    "fallback_other": "New notification"
   },
   "errors": {
     "NETWORK_ERROR": "Cannot reach the server. Check that the backend is running.",

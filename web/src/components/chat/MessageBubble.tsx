@@ -139,8 +139,8 @@ export function MessageBubble({
   }
 
   const bubbleTone = isMine
-    ? 'rounded-2xl rounded-br-sm bg-indigo-600 px-3 py-2 text-sm text-white'
-    : 'rounded-2xl rounded-bl-sm bg-slate-100 px-3 py-2 text-sm text-slate-800 dark:bg-slate-800 dark:text-slate-100'
+    ? 'rounded-2xl rounded-br-sm bg-sky-600 px-3.5 py-2.5 text-sm text-white shadow-xs dark:bg-sky-500'
+    : 'rounded-2xl rounded-bl-sm border border-slate-200/80 bg-white px-3.5 py-2.5 text-sm text-slate-800 shadow-xs dark:border-slate-800 dark:bg-[#1E293B] dark:text-slate-100'
 
   return (
     <li
@@ -172,8 +172,8 @@ export function MessageBubble({
                 disabled={replyTo.isDeleted}
                 className={
                   isMine
-                    ? 'mb-1 block w-full rounded-lg border-l-2 border-white/60 bg-white/10 px-2 py-1 text-left text-[11px] text-white/90 disabled:cursor-default'
-                    : 'mb-1 block w-full rounded-lg border-l-2 border-indigo-400 bg-white/70 px-2 py-1 text-left text-[11px] text-slate-600 dark:bg-slate-900/40 dark:text-slate-300'
+                    ? 'mb-1.5 block w-full rounded-lg border-l-2 border-white/70 bg-white/15 px-2.5 py-1 text-left text-xs text-white/95 disabled:cursor-default'
+                    : 'mb-1.5 block w-full rounded-lg border-l-2 border-sky-500 bg-slate-50 px-2.5 py-1 text-left text-xs text-slate-600 dark:bg-[#121826] dark:text-slate-300'
                 }
               >
                 <span className="block truncate font-semibold">{replyTo.senderDisplayName}</span>
@@ -187,8 +187,8 @@ export function MessageBubble({
 
             {message.forwardedFrom && (
               <p
-                className={`mb-1 flex items-center gap-1 text-[11px] italic ${
-                  isMine ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400'
+                className={`mb-1 flex items-center gap-1 text-xs italic ${
+                  isMine ? 'text-sky-100' : 'text-slate-500 dark:text-slate-400'
                 }`}
               >
                 <CornerUpRight className="h-3 w-3 shrink-0" />
@@ -197,7 +197,7 @@ export function MessageBubble({
             )}
 
             {isDeleted ? (
-              <p className={`italic ${isMine ? 'text-indigo-100' : 'text-slate-400'}`}>
+              <p className={`italic ${isMine ? 'text-sky-100' : 'text-slate-400'}`}>
                 {t('chat.recalled')}
               </p>
             ) : (
@@ -246,7 +246,7 @@ export function MessageBubble({
 
             <span
               className={
-                isMine ? 'mt-1 block text-[10px] text-indigo-200' : 'mt-1 block text-[10px] text-slate-400'
+                isMine ? 'mt-1 block text-[11px] text-sky-100/90' : 'mt-1 block text-[11px] text-slate-400'
               }
             >
               {timeAgo(message.createdAt, language)}
@@ -375,8 +375,8 @@ export function MessageBubble({
                 aria-pressed={reaction.reactedByMe}
                 className={
                   reaction.reactedByMe
-                    ? 'flex items-center gap-0.5 rounded-full border border-indigo-300 bg-indigo-50 px-2 py-0.5 text-[11px] text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950 dark:text-indigo-200'
-                    : 'flex items-center gap-0.5 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'
+                    ? 'flex items-center gap-0.5 rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-xs text-sky-700 dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-200'
+                    : 'flex items-center gap-0.5 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:bg-[#121826] dark:text-slate-300'
                 }
               >
                 <span>{reaction.emoji}</span>

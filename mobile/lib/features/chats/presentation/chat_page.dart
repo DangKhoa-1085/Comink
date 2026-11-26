@@ -3,14 +3,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/i18n/app_localizations.dart';
 import '../../../core/models/paged_result.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/providers.dart';
 import '../../../core/utils/highlight.dart';
 import '../../../core/utils/uuid.dart';
+import '../../../core/widgets/app_avatar.dart';
 import '../../../core/widgets/states.dart';
 import '../../auth/data/session_controller.dart';
 import '../../calls/data/call_controller.dart';
@@ -1005,25 +1008,96 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final title = detailValue?.displayTitle(currentUserId) ?? l10n.t('chats_title');
     final statusText = _statusText(context, l10n, detailValue, currentUserId);
     final typingText = _typingText(l10n, detailValue, currentUserId);
+    final colors = Theme.of(context).colorScheme;
+
+    ConversationPeer? directPeer;
+    if (detailValue != null && !detailValue.isGroup) {
+      for (final member in detailValue.members) {
+        if (member.userId != currentUserId) {
+          directPeer = member;
+          break;
+        }
+      }
+    }
+
+    final headerContent = Row(
+      children: [
+        if (detailValue?.isGroup == true)
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: colors.primaryContainer,
+            child: Icon(Icons.groups, size: 20, color: colors.onPrimaryContainer),
+          )
+        else
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              AppAvatar(
+                name: title,
+                url: directPeer?.avatarUrl,
+                radius: 18,
+              ),
+              if (directPeer?.isOnline == true)
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: colors.surface, width: 1.5),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700),
+              ),
+              if (statusText != null)
+                Text(
+                  statusText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: directPeer?.isOnline == true
+                        ? const Color(0xFF10B981)
+                        : colors.onSurfaceVariant,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
 
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(title),
-            if (statusText != null)
-              Text(
-                statusText,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w400,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+        titleSpacing: 0,
+        title: directPeer != null
+            ? InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => context.push('/users/${directPeer!.userId}'),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                  child: headerContent,
                 ),
-              ),
-          ],
-        ),
+              )
+            : headerContent,
+        shape: Border(bottom: BorderSide(color: colors.outlineVariant)),
         actions: [
           IconButton(
             tooltip: l10n.t('call_audio'),
@@ -1193,11 +1267,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               ),
             ),
           ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
-              child: Column(
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.surface,
+              border: Border(top: BorderSide(color: colors.outlineVariant)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
+                child: Column(
                 children: [
                   if (_replyTo != null || _editing != null)
                     Padding(
@@ -1344,6 +1423,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               ),
             ),
           ),
+          ),
         ],
       ),
     );
@@ -1473,8 +1553,11 @@ class _MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final colors = Theme.of(context).colorScheme;
-    final bubbleColor = isMine ? colors.primaryContainer : colors.surfaceContainerHighest;
-    final textColor = isMine ? colors.onPrimaryContainer : colors.onSurface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bubbleColor = isMine
+        ? (isDark ? const Color(0xFF0EA5E9) : const Color(0xFF0284C7))
+        : (isDark ? const Color(0xFF1A2234) : Colors.white);
+    final textColor = isMine ? Colors.white : colors.onSurface;
     final time = MaterialLocalizations.of(context).formatTimeOfDay(
       TimeOfDay.fromDateTime(message.createdAt),
       alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
@@ -1494,11 +1577,12 @@ class _MessageBubble extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
               decoration: BoxDecoration(
                 color: bubbleColor,
+                border: isMine ? null : Border.all(color: colors.outlineVariant),
                 borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(14),
-                  topRight: const Radius.circular(14),
-                  bottomLeft: Radius.circular(isMine ? 14 : 4),
-                  bottomRight: Radius.circular(isMine ? 4 : 14),
+                  topLeft: const Radius.circular(16),
+                  topRight: const Radius.circular(16),
+                  bottomLeft: Radius.circular(isMine ? 16 : 4),
+                  bottomRight: Radius.circular(isMine ? 4 : 16),
                 ),
               ),
               child: Column(
@@ -1562,7 +1646,7 @@ class _MessageBubble extends StatelessWidget {
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(10),
                             child: Image.network(
-                              attachment.url,
+                              AppConfig.resolveMediaUrl(attachment.url),
                               width: double.infinity,
                               height: 160,
                               fit: BoxFit.cover,
@@ -1703,16 +1787,16 @@ class _QuoteBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final colors = Theme.of(context).colorScheme;
-    final textColor = isMine ? colors.onPrimaryContainer : colors.onSurface;
+    final textColor = isMine ? Colors.white : colors.onSurface;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         border: Border(
-          left: BorderSide(color: isMine ? colors.onPrimaryContainer : colors.primary, width: 2),
+          left: BorderSide(color: isMine ? Colors.white70 : colors.primary, width: 2),
         ),
-        color: textColor.withValues(alpha: 0.08),
+        color: isMine ? Colors.white.withValues(alpha: 0.14) : textColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Column(

@@ -12,8 +12,13 @@ import 'core/ui/app_keys.dart';
 import 'features/auth/data/session_controller.dart';
 import 'features/calls/data/call_controller.dart';
 import 'features/calls/presentation/call_overlay.dart';
+import 'features/chats/data/chat_providers.dart';
 import 'features/chats/data/chat_realtime.dart';
+import 'features/feed/data/feed_providers.dart';
+import 'features/friends/data/friends_providers.dart';
+import 'features/notifications/data/notification_providers.dart';
 import 'features/notifications/data/push_service.dart';
+import 'features/profile/data/profile_providers.dart';
 import 'router/app_router.dart';
 
 /// Gốc ứng dụng: router, theme, i18n.
@@ -26,8 +31,17 @@ class CominkApp extends ConsumerWidget {
     final locale = ref.watch(localeControllerProvider);
     final themeMode = ref.watch(themeControllerProvider);
 
-    // Kết nối SignalR khi có phiên, ngắt khi đăng xuất.
-    ref.listen<SessionState>(sessionControllerProvider, (_, next) {
+    // Kết nối SignalR khi có phiên, ngắt khi đăng xuất và xóa cache dữ liệu theo người dùng cũ.
+    ref.listen<SessionState>(sessionControllerProvider, (previous, next) {
+      if (previous?.user?.id != next.user?.id) {
+        ref.invalidate(myProfileProvider);
+        ref.invalidate(feedProvider);
+        ref.invalidate(friendsProvider);
+        ref.invalidate(incomingFriendRequestsProvider);
+        ref.invalidate(conversationsProvider);
+        ref.invalidate(notificationsProvider);
+      }
+
       final realtime = ref.read(chatRealtimeProvider);
       if (next.isAuthenticated) {
         unawaited(realtime.connect());

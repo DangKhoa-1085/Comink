@@ -14,6 +14,7 @@ import { UserProfilePage } from '../pages/UserProfilePage'
 import { MessagesPage } from '../pages/MessagesPage'
 import { ChatPage } from '../pages/ChatPage'
 import { CallPage } from '../pages/CallPage'
+import { NotificationsPage } from '../pages/NotificationsPage'
 
 /**
  * Bảng định tuyến của web.
@@ -40,6 +41,7 @@ export const router = createBrowserRouter([
           { path: 'feed', element: <FeedPage /> },
           { path: 'messages', element: <MessagesPage /> },
           { path: 'messages/:conversationId', element: <ChatPage /> },
+          { path: 'notifications', element: <NotificationsPage /> },
           // Lịch sử cuộc gọi đã được ẩn; link cũ quay về Tin nhắn. Trang đang gọi vẫn ở bên dưới.
           { path: 'calls', element: <Navigate to="/messages" replace /> },
           { path: 'calls/:callId', element: <CallPage /> },

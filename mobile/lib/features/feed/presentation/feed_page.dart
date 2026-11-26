@@ -5,15 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/i18n/app_localizations.dart';
 import '../../../core/models/paged_result.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/providers.dart';
-import '../../../core/theme/theme_controller.dart';
 import '../../../core/widgets/app_avatar.dart';
 import '../../../core/widgets/states.dart';
 import '../../media/data/media_service.dart';
-import '../../notifications/presentation/notification_bell.dart';
 import '../data/feed_providers.dart';
 import '../domain/post.dart';
 import 'comments_sheet.dart';
@@ -80,23 +79,77 @@ class _FeedPageState extends ConsumerState<FeedPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final colors = Theme.of(context).colorScheme;
     final feed = ref.watch(feedProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    Widget buildHeader() => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.t('feed_title'),
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    l10n.t('feed_subtitle'),
+                    style: TextStyle(fontSize: 12.5, color: colors.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+            Card(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () => showDialog<void>(
+                  context: context,
+                  builder: (_) => const _CreatePostDialog(),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: colors.primaryContainer,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.edit_outlined, size: 18, color: colors.primary),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: colors.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: Text(
+                            l10n.t('feed_composer_hint'),
+                            style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13.5),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(Icons.photo_library_outlined, color: colors.primary),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        );
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.t('feed_title')),
-        actions: [
-          const NotificationBell(),
-          IconButton(
-            tooltip: l10n.t('profile_theme'),
-            onPressed: () => ref
-                .read(themeControllerProvider.notifier)
-                .toggle(Theme.of(context).brightness),
-            icon: Icon(isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined),
-          ),
-        ],
-      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => showDialog<void>(
           context: context,
@@ -128,8 +181,10 @@ class _FeedPageState extends ConsumerState<FeedPage> {
               child: merged.isEmpty
                   ? ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
                       children: [
-                        SizedBox(height: MediaQuery.sizeOf(context).height * 0.2),
+                        buildHeader(),
+                        SizedBox(height: MediaQuery.sizeOf(context).height * 0.14),
                         EmptyState(
                           message: l10n.t('feed_empty'),
                           icon: Icons.dynamic_feed_outlined,
@@ -137,11 +192,16 @@ class _FeedPageState extends ConsumerState<FeedPage> {
                       ],
                     )
                   : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
-                      itemCount: merged.length + (canLoad ? 1 : 0),
-                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
+                      itemCount: merged.length + 1 + (canLoad ? 1 : 0),
+                      separatorBuilder: (_, index) =>
+                          index == 0 ? const SizedBox.shrink() : const SizedBox(height: 10),
                       itemBuilder: (context, index) {
-                        if (index == merged.length) {
+                        if (index == 0) {
+                          return buildHeader();
+                        }
+                        final postIndex = index - 1;
+                        if (postIndex == merged.length) {
                           return Center(
                             child: _loadingMore
                                 ? const Padding(
@@ -158,7 +218,7 @@ class _FeedPageState extends ConsumerState<FeedPage> {
                                   ),
                           );
                         }
-                        return _PostCard(post: merged[index]);
+                        return _PostCard(post: merged[postIndex]);
                       },
                     ),
             ),
@@ -239,9 +299,16 @@ class _PostCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      post.sharedPost!.author.displayName,
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    GestureDetector(
+                      onTap: () => context.push('/users/${post.sharedPost!.author.id}'),
+                      child: Text(
+                        post.sharedPost!.author.displayName,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          color: colors.primary,
+                        ),
+                      ),
                     ),
                     if (post.sharedPost!.content != null) ...[
                       const SizedBox(height: 4),
@@ -261,7 +328,7 @@ class _PostCard extends ConsumerWidget {
             Row(
               children: [
                 _ActionButton(
-                  icon: post.likedByMe ? Icons.favorite : Icons.favorite_border,
+                  icon: post.likedByMe ? Icons.thumb_up : Icons.thumb_up_outlined,
                   label: post.likeCount > 0 ? '${post.likeCount}' : l10n.t('feed_like'),
                   active: post.likedByMe,
                   onTap: () => _toggleLike(context, ref),
@@ -370,7 +437,7 @@ class _PostImages extends StatelessWidget {
     Widget image(PostMediaItem item) => ClipRRect(
           borderRadius: BorderRadius.circular(10),
           child: Image.network(
-            item.url,
+            AppConfig.resolveMediaUrl(item.url),
             fit: BoxFit.cover,
             errorBuilder: (_, _, _) => Container(
               color: colors.surfaceContainerHighest,
@@ -459,13 +526,14 @@ class _ActionButton extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 18, color: active ? colors.error : colors.onSurfaceVariant),
+              Icon(icon, size: 18, color: active ? colors.primary : colors.onSurfaceVariant),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 13,
-                  color: active ? colors.error : colors.onSurfaceVariant,
+                  fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                  color: active ? colors.primary : colors.onSurfaceVariant,
                 ),
               ),
             ],

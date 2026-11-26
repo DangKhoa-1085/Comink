@@ -112,7 +112,7 @@ export function PostComposer({ onPosted }: { onPosted: () => void }) {
   }
 
   return (
-    <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div className="mb-6 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#121826]">
       <div className="flex gap-3">
         <Avatar name={user.displayName} size="md" />
         <div className="min-w-0 flex-1">
@@ -122,7 +122,7 @@ export function PostComposer({ onPosted }: { onPosted: () => void }) {
             placeholder={t('social.composer_placeholder')}
             rows={3}
             maxLength={5000}
-            className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-sm outline-none transition-colors focus:border-sky-400 focus:bg-white dark:border-slate-700 dark:bg-[#1A2234] dark:text-slate-100 dark:focus:bg-[#0B0F1A]"
           />
 
           {images.length > 0 && (
@@ -169,7 +169,7 @@ export function PostComposer({ onPosted }: { onPosted: () => void }) {
             <select
               value={visibility}
               onChange={(event) => setVisibility(event.target.value as Visibility)}
-              className="h-8 rounded-lg border border-slate-300 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              className="h-8 rounded-xl border border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold text-slate-700 outline-none focus:border-sky-400 dark:border-slate-700 dark:bg-[#1A2234] dark:text-slate-200"
               aria-label={t('social.visibility')}
             >
               <option value="Public">{t('social.visibility_public')}</option>

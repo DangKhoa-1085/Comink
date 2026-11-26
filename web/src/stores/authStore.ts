@@ -7,6 +7,7 @@ import { authApi } from '../api/auth'
 import { usersApi } from '../api/users'
 import type { AuthUser, LoginPayload, RegisterPayload } from '../api/types'
 import { ApiError } from '../lib/http'
+import { queryClient } from '../lib/queryClient'
 import { session } from '../lib/session'
 
 interface AuthState {
@@ -45,6 +46,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const auth = await authApi.login(payload)
       session.set(auth)
+      // Xóa toàn bộ cache truy vấn cũ để tránh hiển thị dữ liệu của tài khoản trước khi chuyển tài khoản.
+      await queryClient.cancelQueries()
+      queryClient.clear()
       set({ user: auth.user, loading: false })
       return true
     } catch (error) {
@@ -63,6 +67,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const auth = await authApi.register(payload)
       session.set(auth)
+      // Xóa toàn bộ cache truy vấn cũ khi đăng ký tài khoản mới trên cùng phiên trình duyệt.
+      await queryClient.cancelQueries()
+      queryClient.clear()
       set({ user: auth.user, loading: false })
       return true
     } catch (error) {
@@ -87,6 +94,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
     }
     session.clear()
+    // Hủy các truy vấn đang chạy và xóa cache TanStack Query của phiên vừa đăng xuất.
+    await queryClient.cancelQueries()
+    queryClient.clear()
     set({ user: null, errorCode: null, fieldErrors: {} })
   },
 
@@ -94,6 +104,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     // Không gọi /api/auth/logout: tài khoản đã bị khóa thì mọi refresh token đã bị thu hồi
     // phía server (Giai đoạn 5). Chỉ cần xóa phiên cục bộ; route bảo vệ sẽ đưa về trang đăng nhập.
     session.clear()
+    void queryClient.cancelQueries()
+    queryClient.clear()
     set({ user: null, errorCode: null, fieldErrors: {} })
   },
 
@@ -118,6 +130,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch {
       // Refresh token hết hiệu lực hoặc tài khoản bị khóa → coi như chưa đăng nhập.
       session.clear()
+      await queryClient.cancelQueries()
+      queryClient.clear()
       set({ user: null, initialized: true })
     }
   },
