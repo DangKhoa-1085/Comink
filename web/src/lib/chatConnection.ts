@@ -13,6 +13,7 @@ import {
   LogLevel,
   type HubConnection,
 } from '@microsoft/signalr'
+import { API_BASE_URL } from '../config/env'
 import { session } from './session'
 
 /** Tên sự kiện — phải khớp hằng số `ChatEvents` ở backend. */
@@ -26,7 +27,7 @@ export const MESSAGE_UPDATED_EVENT = 'MessageUpdated'
 export const PINNED_MESSAGES_CHANGED_EVENT = 'PinnedMessagesChanged'
 export function createChatConnection(): HubConnection {
   return new HubConnectionBuilder()
-    .withUrl('/hub/chat', {
+    .withUrl(`${API_BASE_URL}/hub/chat`, {
       accessTokenFactory: () => session.getAccessToken() ?? '',
     })
     .withAutomaticReconnect()

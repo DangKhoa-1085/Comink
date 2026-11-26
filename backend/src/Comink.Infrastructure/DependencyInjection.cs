@@ -42,10 +42,13 @@ public static class DependencyInjection
         services.TryAddTimeProvider();
 
         // --- PostgreSQL + EF Core ---
+        var postgresConnectionString = ConnectionStringNormalizer.NormalizePostgres(
+            configuration.GetConnectionString("Postgres"));
+
         services.AddDbContext<ApplicationDbContext>(options =>
         {
             options.UseNpgsql(
-                configuration.GetConnectionString("Postgres"),
+                postgresConnectionString,
                 npgsql => npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName));
 
             // Tự động chuyển PascalCase C# → snake_case PostgreSQL
@@ -219,9 +222,10 @@ public static class DependencyInjection
         // --- Redis ---
         var redisConnectionString = configuration.GetConnectionString("Redis")
             ?? throw new InvalidOperationException("Redis connection string is not configured.");
+        var redisOptions = ConnectionStringNormalizer.ParseRedis(redisConnectionString);
 
         services.AddSingleton<IConnectionMultiplexer>(_ =>
-            ConnectionMultiplexer.Connect(redisConnectionString));
+            ConnectionMultiplexer.Connect(redisOptions));
 
         // Presence (NC Giai đoạn 7): singleton vì chỉ giữ kết nối Redis + clock, không giữ state theo request.
         services.AddSingleton<IPresenceService, Messaging.RedisPresenceService>();
