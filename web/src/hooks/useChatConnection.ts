@@ -251,8 +251,10 @@ export function useChatConnection(enabled: boolean): ChatConnectionState {
         }
 
         queryClient.invalidateQueries({ queryKey: ['call', ended.callId] })
-        queryClient.invalidateQueries({ queryKey: ['calls'] })
-        queryClient.invalidateQueries({ queryKey: ['notifications'] })
+        queryClient.invalidateQueries({ queryKey: ['calls'], refetchType: 'all' })
+        queryClient.invalidateQueries({ queryKey: ['messages'], refetchType: 'all' })
+        queryClient.invalidateQueries({ queryKey: ['conversations'], refetchType: 'all' })
+        queryClient.invalidateQueries({ queryKey: ['notifications'], refetchType: 'all' })
       },
     )
 

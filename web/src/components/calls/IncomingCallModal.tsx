@@ -51,7 +51,12 @@ function IncomingCallDialog({ call }: { call: CallDto }) {
 
   const declineMutation = useMutation({
     mutationFn: () => callsApi.decline(call.id),
-    onSettled: () => clearIncoming()
+    onSettled: () => {
+      clearIncoming()
+      void queryClient.invalidateQueries({ queryKey: ['messages', call.conversationId], refetchType: 'all' })
+      void queryClient.invalidateQueries({ queryKey: ['conversations'], refetchType: 'all' })
+      void queryClient.invalidateQueries({ queryKey: ['calls'], refetchType: 'all' })
+    },
   })
 
   // Đếm ngược 30 giây. Quyết định D8 (Ưu tiên 3): KHÔNG tự gọi `decline` khi hết giờ —

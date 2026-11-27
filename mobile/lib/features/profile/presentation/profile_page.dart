@@ -477,11 +477,6 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
             children: [
               _InfoRow(icon: Icons.mail_outline, label: l10n.t('profile_email'), value: profile.email),
               _InfoRow(
-                icon: Icons.verified_user_outlined,
-                label: l10n.t('profile_roles'),
-                value: profile.roles.join(', '),
-              ),
-              _InfoRow(
                 icon: Icons.calendar_month_outlined,
                 label: l10n.t('profile_joined'),
                 value: joinedDate,

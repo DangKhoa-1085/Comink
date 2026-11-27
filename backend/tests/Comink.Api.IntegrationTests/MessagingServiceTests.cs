@@ -324,4 +324,78 @@ public class MessagingServiceTests : IntegrationTestBase
         Assert.Contains(conversationId, aliceIds);
         Assert.Empty(outsiderIds);
     }
+
+    [Fact]
+    public async Task GroupManagement_AddKickAvatarAndOwnerTransferOnLeave()
+    {
+        var db = await CreateDbContextAsync();
+        var owner = NewUser("owner", "Nhóm trưởng");
+        var memberA = NewUser("member_a", "Thành viên A");
+        var memberB = NewUser("member_b", "Thành viên B");
+        var memberC = NewUser("member_c", "Thành viên C");
+        db.Users.AddRange(owner, memberA, memberB, memberC);
+
+        foreach (var target in new[] { memberA, memberB, memberC })
+        {
+            db.Friendships.Add(new Friendship
+            {
+                RequesterId = owner.Id,
+                AddresseeId = target.Id,
+                Status = FriendshipStatus.Accepted,
+                CreatedAt = DateTimeOffset.UtcNow
+            });
+        }
+        await db.SaveChangesAsync();
+
+        var service = Conversations(db);
+        var created = await service.CreateGroupAsync(
+            owner.Id,
+            new CreateGroupConversationRequest("Nhóm đồ án", [memberA.Id, memberB.Id]));
+        Assert.True(created.Succeeded);
+        var groupId = created.Value!.Id;
+        Assert.Contains(created.Value.Members, m => m.UserId == owner.Id && m.Role == "Owner");
+
+        // 1) Cập nhật avatar và tên nhóm
+        var updated = await service.UpdateGroupAsync(
+            memberA.Id,
+            groupId,
+            new UpdateGroupConversationRequest("Nhóm KTPM", "https://cdn.example/group.png"));
+        Assert.True(updated.Succeeded);
+        Assert.Equal("Nhóm KTPM", updated.Value!.Title);
+        Assert.Equal("https://cdn.example/group.png", updated.Value.AvatarUrl);
+
+        // 2) Thêm thành viên mới sau khi tạo nhóm
+        var added = await service.AddGroupMembersAsync(
+            owner.Id,
+            groupId,
+            new AddGroupMembersRequest([memberC.Id]));
+        Assert.True(added.Succeeded);
+        Assert.Equal(4, added.Value!.Members.Count);
+
+        // 3) Thành viên thường không được phép kick → Forbidden; nhóm trưởng kick được
+        var nonOwnerKick = await service.RemoveGroupMemberAsync(memberA.Id, groupId, memberB.Id);
+        Assert.False(nonOwnerKick.Succeeded);
+        Assert.Equal(ErrorCodes.Forbidden, nonOwnerKick.ErrorCode);
+
+        var ownerKick = await service.RemoveGroupMemberAsync(owner.Id, groupId, memberB.Id);
+        Assert.True(ownerKick.Succeeded);
+        Assert.DoesNotContain(ownerKick.Value!.Members, m => m.UserId == memberB.Id);
+
+        // 4) Thêm lại người vừa bị kick → kích hoạt lại dòng thành viên cũ
+        var readded = await service.AddGroupMembersAsync(
+            owner.Id,
+            groupId,
+            new AddGroupMembersRequest([memberB.Id]));
+        Assert.True(readded.Succeeded);
+        Assert.Equal(4, readded.Value!.Members.Count);
+
+        // 5) Nhóm trưởng rời nhóm → tự chuyển quyền Owner cho thành viên tiếp theo
+        var left = await service.LeaveGroupAsync(owner.Id, groupId);
+        Assert.True(left.Succeeded);
+
+        var afterLeave = await service.GetByIdAsync(memberA.Id, groupId);
+        Assert.True(afterLeave.Succeeded);
+        Assert.DoesNotContain(afterLeave.Value!.Members, m => m.UserId == owner.Id);
+        Assert.Contains(afterLeave.Value.Members, m => m.UserId == memberA.Id && m.Role == "Owner");
+    }
 }

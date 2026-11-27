@@ -242,6 +242,7 @@ public class ConversationService : IConversationService
                 c.Id,
                 c.Type,
                 c.Title,
+                c.AvatarUrl,
                 c.LastMessageId,
                 c.LastMessageAt,
                 c.CreatedAt
@@ -360,7 +361,8 @@ public class ConversationService : IConversationService
                 unreadByConversation.GetValueOrDefault(row.Id),
                 memberCount,
                 MuteRules.IsMuted(mutedUntil, now),
-                mutedUntil);
+                mutedUntil,
+                row.AvatarUrl);
         }).ToList();
 
         var nextCursor = hasMore && pageRows.Count > 0
@@ -396,14 +398,18 @@ public class ConversationService : IConversationService
             return OperationResult<ConversationDto>.Failure(ErrorCodes.ConversationNotFound);
         }
 
-        // Trạng thái online của các thành viên (một lượt hỏi Redis) + mốc đọc của từng người
-        // để client hiển thị "Đã đọc"/"Đã xem bởi N" (NC Giai đoạn 7).
+        // Chỉ hiển thị thành viên còn trong nhóm (LeftAt == null), ưu tiên nhóm trưởng lên đầu.
+        var activeMembers = conversation.Members
+            .Where(m => m.LeftAt is null)
+            .OrderBy(m => m.Role)
+            .ThenBy(m => m.JoinedAt)
+            .ToList();
+
         var presenceByUser = await _presence.GetStatusesAsync(
-            conversation.Members.Where(m => m.LeftAt is null).Select(m => m.UserId).ToList(),
+            activeMembers.Select(m => m.UserId).ToList(),
             cancellationToken);
 
-        var members = conversation.Members
-            .OrderBy(m => m.JoinedAt)
+        var members = activeMembers
             .Select(m =>
             {
                 var presence = presenceByUser.GetValueOrDefault(m.UserId);
@@ -415,7 +421,8 @@ public class ConversationService : IConversationService
                     presence?.IsOnline ?? false,
                     presence?.LastSeenAt,
                     m.LastReadMessageId,
-                    m.LastReadAt);
+                    m.LastReadAt,
+                    m.Role.ToString());
             })
             .ToList();
 
@@ -596,6 +603,213 @@ public class ConversationService : IConversationService
 
         return OperationResult<MuteStateDto>.Success(
             new MuteStateDto(MuteRules.IsMuted(member.MutedUntil, now), member.MutedUntil));
+    }
+
+    /// <inheritdoc />
+    public async Task<OperationResult<ConversationDto>> UpdateGroupAsync(
+        Guid currentUserId,
+        Guid conversationId,
+        UpdateGroupConversationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var conversation = await _db.Conversations
+            .Include(c => c.Members)
+            .FirstOrDefaultAsync(c => c.Id == conversationId, cancellationToken);
+
+        if (conversation is null ||
+            conversation.Members.All(m => m.UserId != currentUserId || m.LeftAt is not null))
+        {
+            return OperationResult<ConversationDto>.Failure(ErrorCodes.ConversationNotFound);
+        }
+
+        if (conversation.Type != ConversationType.Group)
+        {
+            return OperationResult<ConversationDto>.Failure(ErrorCodes.ValidationFailed);
+        }
+
+        if (request.Title is not null)
+        {
+            conversation.Title = request.Title.Trim();
+        }
+
+        if (request.AvatarUrl is not null)
+        {
+            conversation.AvatarUrl = string.IsNullOrWhiteSpace(request.AvatarUrl)
+                ? null
+                : request.AvatarUrl.Trim();
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return await GetByIdAsync(currentUserId, conversationId, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<OperationResult<ConversationDto>> AddGroupMembersAsync(
+        Guid currentUserId,
+        Guid conversationId,
+        AddGroupMembersRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var conversation = await _db.Conversations
+            .Include(c => c.Members)
+            .FirstOrDefaultAsync(c => c.Id == conversationId, cancellationToken);
+
+        if (conversation is null ||
+            conversation.Members.All(m => m.UserId != currentUserId || m.LeftAt is not null))
+        {
+            return OperationResult<ConversationDto>.Failure(ErrorCodes.ConversationNotFound);
+        }
+
+        if (conversation.Type != ConversationType.Group)
+        {
+            return OperationResult<ConversationDto>.Failure(ErrorCodes.ValidationFailed);
+        }
+
+        var activeIds = conversation.Members
+            .Where(m => m.LeftAt is null)
+            .Select(m => m.UserId)
+            .ToHashSet();
+
+        var newMemberIds = request.MemberIds
+            .Distinct()
+            .Where(id => !activeIds.Contains(id))
+            .ToList();
+
+        if (newMemberIds.Count == 0)
+        {
+            return await GetByIdAsync(currentUserId, conversationId, cancellationToken);
+        }
+
+        if (activeIds.Count + newMemberIds.Count > ConversationRules.MaxGroupMembers)
+        {
+            return OperationResult<ConversationDto>.Failure(ErrorCodes.MessagingGroupTooMany);
+        }
+
+        foreach (var memberId in newMemberIds)
+        {
+            if (!await AdminAccounts.IsActiveAndInteractableAsync(_db, currentUserId, memberId, cancellationToken))
+            {
+                return OperationResult<ConversationDto>.Failure(ErrorCodes.NotFound);
+            }
+
+            if (!await SocialLookup.AreFriendsAsync(_db, currentUserId, memberId, cancellationToken))
+            {
+                return OperationResult<ConversationDto>.Failure(ErrorCodes.MessagingNotFriends);
+            }
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        foreach (var memberId in newMemberIds)
+        {
+            // Nếu người này từng ở trong nhóm (đã rời / bị xoá), kích hoạt lại dòng cũ để không trùng PK kép.
+            var existing = conversation.Members.FirstOrDefault(m => m.UserId == memberId);
+            if (existing is not null)
+            {
+                existing.LeftAt = null;
+                existing.JoinedAt = now;
+                existing.Role = MemberRole.Member;
+            }
+            else
+            {
+                conversation.Members.Add(new ConversationMember
+                {
+                    ConversationId = conversationId,
+                    UserId = memberId,
+                    Role = MemberRole.Member,
+                    JoinedAt = now
+                });
+            }
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return await GetByIdAsync(currentUserId, conversationId, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<OperationResult<ConversationDto>> RemoveGroupMemberAsync(
+        Guid currentUserId,
+        Guid conversationId,
+        Guid targetUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var conversation = await _db.Conversations
+            .Include(c => c.Members)
+            .FirstOrDefaultAsync(c => c.Id == conversationId, cancellationToken);
+
+        var caller = conversation?.Members.FirstOrDefault(m => m.UserId == currentUserId && m.LeftAt is null);
+        if (conversation is null || caller is null)
+        {
+            return OperationResult<ConversationDto>.Failure(ErrorCodes.ConversationNotFound);
+        }
+
+        if (conversation.Type != ConversationType.Group)
+        {
+            return OperationResult<ConversationDto>.Failure(ErrorCodes.ValidationFailed);
+        }
+
+        // Chỉ nhóm trưởng (Owner) mới được quyền xoá thành viên khác.
+        if (caller.Role != MemberRole.Owner)
+        {
+            return OperationResult<ConversationDto>.Failure(ErrorCodes.Forbidden);
+        }
+
+        if (targetUserId == currentUserId)
+        {
+            return OperationResult<ConversationDto>.Failure(ErrorCodes.ValidationFailed);
+        }
+
+        var target = conversation.Members.FirstOrDefault(m => m.UserId == targetUserId && m.LeftAt is null);
+        if (target is null)
+        {
+            return OperationResult<ConversationDto>.Failure(ErrorCodes.UserNotFound);
+        }
+
+        target.LeftAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return await GetByIdAsync(currentUserId, conversationId, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<OperationResult<bool>> LeaveGroupAsync(
+        Guid currentUserId,
+        Guid conversationId,
+        CancellationToken cancellationToken = default)
+    {
+        var conversation = await _db.Conversations
+            .Include(c => c.Members)
+            .FirstOrDefaultAsync(c => c.Id == conversationId, cancellationToken);
+
+        var caller = conversation?.Members.FirstOrDefault(m => m.UserId == currentUserId && m.LeftAt is null);
+        if (conversation is null || caller is null)
+        {
+            return OperationResult<bool>.Failure(ErrorCodes.ConversationNotFound);
+        }
+
+        if (conversation.Type != ConversationType.Group)
+        {
+            return OperationResult<bool>.Failure(ErrorCodes.ValidationFailed);
+        }
+
+        caller.LeftAt = DateTimeOffset.UtcNow;
+
+        // Nhóm trưởng rời nhóm → tự động chuyển quyền Owner cho thành viên vào sớm nhất còn ở lại.
+        if (caller.Role == MemberRole.Owner)
+        {
+            var nextOwner = conversation.Members
+                .Where(m => m.UserId != currentUserId && m.LeftAt is null)
+                .OrderBy(m => m.JoinedAt)
+                .FirstOrDefault();
+
+            if (nextOwner is not null)
+            {
+                nextOwner.Role = MemberRole.Owner;
+                caller.Role = MemberRole.Member;
+            }
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return OperationResult<bool>.Success(true);
     }
 
     /// <summary>Lỗi vi phạm ràng buộc duy nhất của PostgreSQL (SqlState 23505).</summary>

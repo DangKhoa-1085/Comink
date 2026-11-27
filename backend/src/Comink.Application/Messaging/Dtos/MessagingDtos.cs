@@ -10,6 +10,12 @@ public record CreateDirectConversationRequest(Guid UserId);
 /// </summary>
 public record CreateGroupConversationRequest(string Name, IReadOnlyList<Guid> ParticipantIds);
 
+/// <summary>Yêu cầu cập nhật thông tin nhóm chat (tên nhóm và/hoặc ảnh đại diện).</summary>
+public record UpdateGroupConversationRequest(string? Title, string? AvatarUrl);
+
+/// <summary>Yêu cầu thêm thành viên mới (phải là bạn bè) vào nhóm chat đã tạo.</summary>
+public record AddGroupMembersRequest(IReadOnlyList<Guid> MemberIds);
+
 /// <summary>
 /// Yêu cầu gửi tin nhắn. <c>ClientMessageId</c> do client sinh để chống gửi trùng.
 /// <c>ReplyToMessageId</c> (NC Giai đoạn 7) trỏ tới tin được phản hồi trong cùng hội thoại.
@@ -73,7 +79,7 @@ public record ReadReceiptDto(Guid ConversationId, Guid UserId, Guid MessageId, D
 /// </summary>
 public record TypingSignalDto(Guid ConversationId, Guid UserId, bool IsTyping);
 
-/// <summary>Một thành viên hội thoại (thông tin hiển thị + trạng thái online + mốc đọc).</summary>
+/// <summary>Một thành viên hội thoại (thông tin hiển thị + trạng thái online + mốc đọc + vai trò).</summary>
 public record ConversationMemberDto(
     Guid UserId,
     string UserName,
@@ -82,7 +88,8 @@ public record ConversationMemberDto(
     bool IsOnline,
     DateTimeOffset? LastSeenAt,
     Guid? LastReadMessageId,
-    DateTimeOffset? LastReadAt);
+    DateTimeOffset? LastReadAt,
+    string Role = "Member");
 
 /// <summary>Tệp đính kèm của tin nhắn.</summary>
 public record MessageAttachmentDto(Guid MediaId, string Url, string? ThumbnailUrl, int? Width, int? Height);
@@ -171,4 +178,5 @@ public record ConversationSummaryDto(
     int UnreadCount,
     int MemberCount,
     bool IsMuted,
-    DateTimeOffset? MutedUntil);
+    DateTimeOffset? MutedUntil,
+    string? AvatarUrl = null);

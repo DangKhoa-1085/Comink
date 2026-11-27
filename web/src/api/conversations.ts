@@ -16,6 +16,8 @@ export interface ConversationMember extends ConversationPeer {
   /** Mốc đã đọc của chính thành viên này (dùng hiển thị "Đã đọc"/"Đã xem bởi N"). */
   lastReadMessageId: string | null
   lastReadAt: string | null
+  /** Vai trò trong nhóm: nhóm trưởng (`Owner`) hoặc thành viên (`Member`). */
+  role?: 'Owner' | 'Admin' | 'Member'
 }
 
 export interface MessageAttachment {
@@ -89,6 +91,7 @@ export interface ConversationSummary {
   /** NC Ưu tiên 2: tôi đang tắt thông báo hội thoại này. */
   isMuted: boolean
   mutedUntil: string | null
+  avatarUrl?: string | null
 }
 
 export interface Conversation {
@@ -350,5 +353,38 @@ export const conversationsApi = {
    */
   async markRead(conversationId: string, messageId: string): Promise<void> {
     await http.post(`/api/conversations/${conversationId}/read`, { messageId })
+  },
+
+  /** Cập nhật tên hoặc ảnh đại diện nhóm chat. */
+  async updateGroup(
+    conversationId: string,
+    payload: { title?: string; avatarUrl?: string | null },
+  ): Promise<Conversation> {
+    const { data } = await http.patch<Conversation>(
+      `/api/conversations/${conversationId}/group`,
+      payload,
+    )
+    return data
+  },
+
+  /** Thêm bạn bè vào nhóm chat đã tạo. */
+  async addGroupMembers(conversationId: string, memberIds: string[]): Promise<Conversation> {
+    const { data } = await http.post<Conversation>(`/api/conversations/${conversationId}/members`, {
+      memberIds,
+    })
+    return data
+  },
+
+  /** Nhóm trưởng xóa thành viên khỏi nhóm. */
+  async removeGroupMember(conversationId: string, userId: string): Promise<Conversation> {
+    const { data } = await http.delete<Conversation>(
+      `/api/conversations/${conversationId}/members/${userId}`,
+    )
+    return data
+  },
+
+  /** Thành viên tự rời khỏi nhóm chat. */
+  async leaveGroup(conversationId: string): Promise<void> {
+    await http.post(`/api/conversations/${conversationId}/leave`)
   },
 }

@@ -32,7 +32,10 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
   }
 
   void _submitSearch() {
-    final value = _searchController.text.trim();
+    final raw = _searchController.text.trim();
+    // Chỉ nhập '@' không có ký tự theo sau → coi như chưa có từ khoá tìm kiếm.
+    final cleaned = raw.replaceFirst(RegExp(r'^@+'), '').trim();
+    final value = cleaned.isEmpty ? '' : raw;
     if (value == _query) {
       return;
     }

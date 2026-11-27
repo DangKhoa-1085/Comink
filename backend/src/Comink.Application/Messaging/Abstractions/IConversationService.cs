@@ -33,6 +33,33 @@ public interface IConversationService
         CreateGroupConversationRequest request,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Cập nhật tên hoặc ảnh đại diện của nhóm chat.</summary>
+    Task<OperationResult<ConversationDto>> UpdateGroupAsync(
+        Guid currentUserId,
+        Guid conversationId,
+        UpdateGroupConversationRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Thêm bạn bè vào nhóm chat đã tạo (tối đa 10 thành viên).</summary>
+    Task<OperationResult<ConversationDto>> AddGroupMembersAsync(
+        Guid currentUserId,
+        Guid conversationId,
+        AddGroupMembersRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Nhóm trưởng (<c>Owner</c>) xoá một thành viên khỏi nhóm.</summary>
+    Task<OperationResult<ConversationDto>> RemoveGroupMemberAsync(
+        Guid currentUserId,
+        Guid conversationId,
+        Guid targetUserId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Thành viên tự rời nhóm; nếu nhóm trưởng rời thì tự chuyển quyền cho người tiếp theo.</summary>
+    Task<OperationResult<bool>> LeaveGroupAsync(
+        Guid currentUserId,
+        Guid conversationId,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Chi tiết một hội thoại; không phải thành viên thì trả CONVERSATION_NOT_FOUND.</summary>
     Task<OperationResult<ConversationDto>> GetByIdAsync(
         Guid currentUserId,

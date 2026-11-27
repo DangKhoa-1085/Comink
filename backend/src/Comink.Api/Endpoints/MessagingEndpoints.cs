@@ -128,6 +128,33 @@ public static class MessagingEndpoints
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        // Quản lý nhóm chat: sửa tên/avatar, thêm thành viên, kick thành viên, rời nhóm.
+        conversations.MapPatch("/{id:guid}/group", UpdateGroupAsync)
+            .WithName("UpdateGroupConversation")
+            .Produces<ConversationDto>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        conversations.MapPost("/{id:guid}/members", AddGroupMembersAsync)
+            .WithName("AddGroupMembers")
+            .Produces<ConversationDto>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        conversations.MapDelete("/{id:guid}/members/{userId:guid}", RemoveGroupMemberAsync)
+            .WithName("RemoveGroupMember")
+            .Produces<ConversationDto>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        conversations.MapPost("/{id:guid}/leave", LeaveGroupAsync)
+            .WithName("LeaveGroupConversation")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         // Tìm trong MỌI hội thoại người dùng còn là thành viên (yêu cầu roadmap GĐ 7).
         app.MapGet("/api/messages/search", SearchAllMessagesAsync)
             .WithTags("Messaging")
@@ -580,5 +607,89 @@ public static class MessagingEndpoints
 
         var result = await conversationService.MuteAsync(userId.Value, id, request, cancellationToken);
         return ApiResults.FromResult(result, state => Results.Ok(state));
+    }
+
+    private static async Task<IResult> UpdateGroupAsync(
+        Guid id,
+        UpdateGroupConversationRequest request,
+        IValidator<UpdateGroupConversationRequest> validator,
+        IConversationService conversationService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var userId = CurrentUser.GetUserId(httpContext.User);
+        if (userId is null)
+        {
+            return ApiResults.Problem(ErrorCodes.Unauthorized);
+        }
+
+        var (isValid, errorResult, _) = await ApiResults.ValidateAsync(validator, request, cancellationToken);
+        if (!isValid)
+        {
+            return errorResult!;
+        }
+
+        var result = await conversationService.UpdateGroupAsync(userId.Value, id, request, cancellationToken);
+        return ApiResults.FromResult(result, conversation => Results.Ok(conversation));
+    }
+
+    private static async Task<IResult> AddGroupMembersAsync(
+        Guid id,
+        AddGroupMembersRequest request,
+        IValidator<AddGroupMembersRequest> validator,
+        IConversationService conversationService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var userId = CurrentUser.GetUserId(httpContext.User);
+        if (userId is null)
+        {
+            return ApiResults.Problem(ErrorCodes.Unauthorized);
+        }
+
+        var (isValid, errorResult, _) = await ApiResults.ValidateAsync(validator, request, cancellationToken);
+        if (!isValid)
+        {
+            return errorResult!;
+        }
+
+        var result = await conversationService.AddGroupMembersAsync(userId.Value, id, request, cancellationToken);
+        return ApiResults.FromResult(result, conversation => Results.Ok(conversation));
+    }
+
+    private static async Task<IResult> RemoveGroupMemberAsync(
+        Guid id,
+        Guid userId,
+        IConversationService conversationService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var currentUserId = CurrentUser.GetUserId(httpContext.User);
+        if (currentUserId is null)
+        {
+            return ApiResults.Problem(ErrorCodes.Unauthorized);
+        }
+
+        var result = await conversationService.RemoveGroupMemberAsync(
+            currentUserId.Value, id, userId, cancellationToken);
+        return ApiResults.FromResult(result, conversation => Results.Ok(conversation));
+    }
+
+    private static async Task<IResult> LeaveGroupAsync(
+        Guid id,
+        IConversationService conversationService,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var currentUserId = CurrentUser.GetUserId(httpContext.User);
+        if (currentUserId is null)
+        {
+            return ApiResults.Problem(ErrorCodes.Unauthorized);
+        }
+
+        var result = await conversationService.LeaveGroupAsync(currentUserId.Value, id, cancellationToken);
+        return result.Succeeded
+            ? Results.NoContent()
+            : ApiResults.Problem(result.ErrorCode ?? ErrorCodes.InternalError);
     }
 }
