@@ -9,6 +9,8 @@ using Comink.Domain.Messaging;
 using Comink.Infrastructure.Persistence;
 using Comink.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Comink.Infrastructure.Messaging;
 
@@ -18,15 +20,21 @@ public class MessageService : IMessageService
     private readonly ApplicationDbContext _db;
     private readonly IChatNotifier _notifier;
     private readonly INotificationService? _notifications;
+    private readonly IServiceScopeFactory? _scopeFactory;
+    private readonly ILogger<MessageService>? _logger;
 
     public MessageService(
         ApplicationDbContext db,
         IChatNotifier notifier,
-        INotificationService? notifications = null)
+        INotificationService? notifications = null,
+        IServiceScopeFactory? scopeFactory = null,
+        ILogger<MessageService>? logger = null)
     {
         _db = db;
         _notifier = notifier;
         _notifications = notifications;
+        _scopeFactory = scopeFactory;
+        _logger = logger;
     }
 
     /// <inheritdoc />
@@ -36,29 +44,30 @@ public class MessageService : IMessageService
         SendMessageRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (!await IsMemberAsync(currentUserId, conversationId, cancellationToken))
+        // 1) Một truy vấn duy nhất lấy toàn bộ thành viên còn hiệu lực (dùng để kiểm tra quyền,
+        //    tên người gửi, phát SignalR và lọc người tắt thông báo khi đẩy FCM).
+        var members = await _db.ConversationMembers
+            .AsNoTracking()
+            .Where(m => m.ConversationId == conversationId && m.LeftAt == null)
+            .Select(m => new
+            {
+                m.UserId,
+                m.MutedUntil,
+                DisplayName = m.UserId == currentUserId
+                    ? (m.User.Profile != null ? m.User.Profile.DisplayName : m.User.UserName)
+                    : null
+            })
+            .ToListAsync(cancellationToken);
+
+        var currentMember = members.FirstOrDefault(m => m.UserId == currentUserId);
+        if (currentMember is null)
         {
             return OperationResult<MessageSendResult>.Failure(ErrorCodes.ConversationNotFound);
         }
 
-        // 1) Đã gửi trước đó với cùng client_message_id → trả lại tin cũ (idempotent).
-        var existingId = await _db.Messages
-            .AsNoTracking()
-            .Where(m => m.SenderId == currentUserId && m.ClientMessageId == request.ClientMessageId)
-            .Select(m => (Guid?)m.Id)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (existingId is not null)
-        {
-            var existingMessage = await MessageEnrichment.LoadAsync(_db, existingId.Value, currentUserId, cancellationToken);
-            return existingMessage is null
-                ? OperationResult<MessageSendResult>.Failure(ErrorCodes.InternalError)
-                : OperationResult<MessageSendResult>.Success(new MessageSendResult(existingMessage, false));
-        }
-
         var mediaIds = request.MediaIds?.Distinct().ToList() ?? [];
 
-        // 2) Kiểm tra nội dung: phải có chữ hoặc ảnh.
+        // 2) Kiểm tra dữ liệu đầu vào trong bộ nhớ trước khi chạm thêm vào DB.
         if (!MessageRules.HasPayload(request.Content, mediaIds.Count))
         {
             return OperationResult<MessageSendResult>.Failure(ErrorCodes.MessageContentRequired);
@@ -74,14 +83,15 @@ public class MessageService : IMessageService
             return OperationResult<MessageSendResult>.Failure(ErrorCodes.ValidationFailed);
         }
 
-        // 3) Tin được phản hồi phải thuộc ĐÚNG hội thoại này và còn hiệu lực (NC Ưu tiên 2).
+        // 3) Tin được phản hồi phải thuộc ĐÚNG hội thoại này và còn hiệu lực (nạp sẵn Sender/Profile để dựng DTO).
+        MessageQuoteDto? replyToDto = null;
         if (request.ReplyToMessageId is not null)
         {
             var replyTarget = await _db.Messages
                 .AsNoTracking()
-                .Where(m => m.Id == request.ReplyToMessageId.Value)
-                .Select(m => new { m.ConversationId, m.DeletedAt })
-                .FirstOrDefaultAsync(cancellationToken);
+                .Include(m => m.Sender)
+                .ThenInclude(u => u.Profile)
+                .FirstOrDefaultAsync(m => m.Id == request.ReplyToMessageId.Value, cancellationToken);
 
             if (replyTarget is null || replyTarget.ConversationId != conversationId)
             {
@@ -92,24 +102,28 @@ public class MessageService : IMessageService
             {
                 return OperationResult<MessageSendResult>.Failure(ErrorCodes.MessageAlreadyDeleted);
             }
+
+            replyToDto = MessagingMapping.ToQuoteDto(replyTarget);
         }
 
-        // 4) Ảnh phải do chính người gửi tải lên với context = Message.
+        // 4) Ảnh phải do chính người gửi tải lên với context = Message (giữ metadata để dựng DTO ngay).
+        var assetById = new Dictionary<Guid, MediaAsset>();
         if (mediaIds.Count > 0)
         {
-            var ownedCount = await _db.MediaAssets
+            var ownedAssets = await _db.MediaAssets
                 .AsNoTracking()
-                .CountAsync(
-                    m => mediaIds.Contains(m.Id) &&
-                         m.OwnerId == currentUserId &&
-                         m.Context == MediaContext.Message &&
-                         m.DeletedAt == null,
-                    cancellationToken);
+                .Where(m => mediaIds.Contains(m.Id) &&
+                            m.OwnerId == currentUserId &&
+                            m.Context == MediaContext.Message &&
+                            m.DeletedAt == null)
+                .ToListAsync(cancellationToken);
 
-            if (ownedCount != mediaIds.Count)
+            if (ownedAssets.Count != mediaIds.Count)
             {
                 return OperationResult<MessageSendResult>.Failure(ErrorCodes.MediaNotOwned);
             }
+
+            assetById = ownedAssets.ToDictionary(asset => asset.Id);
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -136,17 +150,19 @@ public class MessageService : IMessageService
 
         _db.Messages.Add(message);
 
-        // 5) Cập nhật con trỏ tin cuối của hội thoại trong cùng transaction.
-        var conversation = await _db.Conversations
-            .FirstOrDefaultAsync(c => c.Id == conversationId, cancellationToken);
+        // 5) Cập nhật con trỏ tin cuối của hội thoại trong cùng batch SaveChanges mà không phải SELECT lại Conversation.
+        var trackedConversation = _db.ChangeTracker
+            .Entries<Conversation>()
+            .FirstOrDefault(entry => entry.Entity.Id == conversationId)?.Entity;
 
-        if (conversation is null)
+        if (trackedConversation is null)
         {
-            return OperationResult<MessageSendResult>.Failure(ErrorCodes.ConversationNotFound);
+            trackedConversation = new Conversation { Id = conversationId };
+            _db.Conversations.Attach(trackedConversation);
         }
 
-        conversation.LastMessageId = message.Id;
-        conversation.LastMessageAt = now;
+        trackedConversation.LastMessageId = message.Id;
+        trackedConversation.LastMessageAt = now;
 
         try
         {
@@ -154,7 +170,7 @@ public class MessageService : IMessageService
         }
         catch (DbUpdateException ex) when (IsUniqueViolation(ex))
         {
-            // Hai lần gửi đồng thời cùng client_message_id → bên thua trả tin đã lưu.
+            // Gửi lại cùng client_message_id (idempotent / retry) → trả tin đã lưu.
             _db.ChangeTracker.Clear();
             var concurrentId = await _db.Messages
                 .AsNoTracking()
@@ -174,19 +190,52 @@ public class MessageService : IMessageService
                 : OperationResult<MessageSendResult>.Success(new MessageSendResult(concurrentMessage, false));
         }
 
-        var dto = await MessageEnrichment.LoadAsync(_db, message.Id, currentUserId, cancellationToken);
-        if (dto is null)
-        {
-            return OperationResult<MessageSendResult>.Failure(ErrorCodes.InternalError);
-        }
+        // Dựng DTO trực tiếp từ bộ nhớ (tin vừa tạo chắc chắn chưa có reactions hay forwardedFrom).
+        var attachmentDtos = mediaIds
+            .Select(mediaId => assetById[mediaId])
+            .Select(asset => new MessageAttachmentDto(
+                asset.Id,
+                asset.Url,
+                asset.ThumbnailUrl,
+                asset.Width,
+                asset.Height))
+            .ToList();
+
+        var dto = new MessageDto(
+            message.Id,
+            message.ConversationId,
+            message.SenderId,
+            message.Type.ToString(),
+            message.Content,
+            attachmentDtos,
+            message.ClientMessageId,
+            message.CreatedAt,
+            replyToDto,
+            ForwardedFrom: null,
+            message.EditedAt,
+            message.DeletedAt,
+            Reactions: []);
 
         // 6) Phát sự kiện thời gian thực tới từng thành viên của hội thoại.
-        var memberUserIds = await GetMemberUserIdsAsync(conversationId, cancellationToken);
+        var memberUserIds = members.Select(m => m.UserId).ToList();
         await _notifier.MessageCreatedAsync(conversationId, memberUserIds, dto, cancellationToken);
 
-        // Push cho người nhận khi họ không mở app; không tạo dòng notifications (docs/03 mục 3.7).
-        // Người đang tắt thông báo hội thoại (muted_until) bị loại khỏi danh sách push.
-        await PushNewMessageAsync(conversationId, currentUserId, dto, cancellationToken);
+        // 7) Push cho người nhận khi không mở app; không chặn phản hồi HTTP ở runtime thật.
+        var recipientIds = members
+            .Where(m => m.UserId != currentUserId && !MuteRules.IsMuted(m.MutedUntil, now))
+            .Select(m => m.UserId)
+            .ToList();
+
+        if (recipientIds.Count > 0)
+        {
+            await SendPushForMessageAsync(
+                conversationId,
+                currentUserId,
+                currentMember.DisplayName,
+                recipientIds,
+                dto,
+                cancellationToken);
+        }
 
         return OperationResult<MessageSendResult>.Success(new MessageSendResult(dto, true));
     }
@@ -939,9 +988,7 @@ public class MessageService : IMessageService
     }
 
     /// <summary>
-    /// Gửi push cho người nhận khi họ không mở app. Người đang **tắt thông báo** hội thoại
-    /// (<c>muted_until</c>) bị loại khỏi danh sách; số tin chưa đọc trên giao diện không đổi
-    /// (quyết định D7).
+    /// Gửi push cho người nhận khi chuyển tiếp tin nhắn (tải danh sách thành viên chưa tắt thông báo).
     /// </summary>
     private async Task PushNewMessageAsync(
         Guid conversationId,
@@ -949,7 +996,7 @@ public class MessageService : IMessageService
         MessageDto dto,
         CancellationToken cancellationToken)
     {
-        if (_notifications is null)
+        if (_notifications is null && _scopeFactory is null)
         {
             return;
         }
@@ -971,28 +1018,97 @@ public class MessageService : IMessageService
             return;
         }
 
-        var senderName = await _db.UserProfiles
+        var senderDisplayName = await _db.UserProfiles
             .AsNoTracking()
             .Where(p => p.UserId == senderId)
             .Select(p => p.DisplayName)
-            .FirstOrDefaultAsync(cancellationToken) ?? "Comink";
+            .FirstOrDefaultAsync(cancellationToken);
+
+        await SendPushForMessageAsync(
+            conversationId,
+            senderId,
+            senderDisplayName,
+            recipientIds,
+            dto,
+            cancellationToken);
+    }
+
+    private async Task SendPushForMessageAsync(
+        Guid conversationId,
+        Guid senderId,
+        string? senderDisplayName,
+        IReadOnlyCollection<Guid> recipientIds,
+        MessageDto dto,
+        CancellationToken cancellationToken)
+    {
+        if (_notifications is null && _scopeFactory is null)
+        {
+            return;
+        }
+
+        var senderName = string.IsNullOrWhiteSpace(senderDisplayName) ? "Comink" : senderDisplayName!;
         var preview = string.IsNullOrWhiteSpace(dto.Content)
             ? (dto.Attachments.Count > 0 ? "Ảnh" : "Tin nhắn mới")
             : dto.Content!;
+        var pushBody = $"{senderName}: {preview}";
+        var pushData = new Dictionary<string, string>
+        {
+            ["type"] = "Message",
+            ["conversationId"] = conversationId.ToString(),
+            ["messageId"] = dto.Id.ToString(),
+            ["senderId"] = senderId.ToString(),
+        };
 
-        await _notifications.PushToUsersAsync(
-            recipientIds,
-            "Tin nhắn mới",
-            $"{senderName}: {preview}",
-            new Dictionary<string, string>
+        if (_scopeFactory is not null)
+        {
+            _ = DispatchPushInBackgroundAsync(recipientIds, pushBody, pushData);
+        }
+        else if (_notifications is not null)
+        {
+            await _notifications.PushToUsersAsync(
+                recipientIds,
+                "Tin nhắn mới",
+                pushBody,
+                pushData,
+                highPriority: true,
+                cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Gửi push trên scope DI độc lập để không chặn phản hồi HTTP gửi tin nhắn.
+    /// </summary>
+    private async Task DispatchPushInBackgroundAsync(
+        IReadOnlyCollection<Guid> recipientIds,
+        string body,
+        IReadOnlyDictionary<string, string> data)
+    {
+        if (_scopeFactory is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var notifications = scope.ServiceProvider.GetService<INotificationService>();
+            if (notifications is null)
             {
-                ["type"] = "Message",
-                ["conversationId"] = conversationId.ToString(),
-                ["messageId"] = dto.Id.ToString(),
-                ["senderId"] = senderId.ToString(),
-            },
-            highPriority: true,
-            cancellationToken);
+                return;
+            }
+
+            await notifications.PushToUsersAsync(
+                recipientIds,
+                "Tin nhắn mới",
+                body,
+                data,
+                highPriority: true,
+                CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            _logger?.LogWarning(exception, "Không gửi được push nền cho tin nhắn mới");
+        }
     }
 
     /// <summary>Lỗi vi phạm ràng buộc duy nhất của PostgreSQL (SqlState 23505).</summary>

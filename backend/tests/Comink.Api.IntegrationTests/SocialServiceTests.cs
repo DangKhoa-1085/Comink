@@ -65,6 +65,41 @@ public class SocialServiceTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task Search_FindsUser_WithLeadingAtSymbol()
+    {
+        var (db, first, _) = await CreateTwoUsersAsync();
+        var service = new UserDirectoryService(db);
+
+        var result = await service.SearchAsync(Guid.CreateVersion7(), "@first.user", null, 20);
+
+        Assert.True(result.Succeeded);
+        var matched = Assert.Single(result.Value!.Items);
+        Assert.Equal(first.Id, matched.Id);
+    }
+
+    [Fact]
+    public async Task Search_PrioritizesUsernameOverDisplayName()
+    {
+        var db = await CreateDbContextAsync();
+        var olderByUserName = NewUser("khoa_dev", "Trần Anh");
+        olderByUserName.CreatedAt = DateTimeOffset.UtcNow.AddDays(-2);
+
+        var newerByDisplayName = NewUser("anh_tran", "Khoa Nguyễn");
+        newerByDisplayName.CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-1);
+
+        db.Users.AddRange(olderByUserName, newerByDisplayName);
+        await db.SaveChangesAsync();
+
+        var service = new UserDirectoryService(db);
+        var result = await service.SearchAsync(Guid.CreateVersion7(), "khoa", null, 20);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(2, result.Value!.Items.Count);
+        Assert.Equal(olderByUserName.Id, result.Value.Items[0].Id);
+        Assert.Equal(newerByDisplayName.Id, result.Value.Items[1].Id);
+    }
+
+    [Fact]
     public async Task SendRequest_ToSelf_IsRejected()
     {
         var (db, first, _) = await CreateTwoUsersAsync();

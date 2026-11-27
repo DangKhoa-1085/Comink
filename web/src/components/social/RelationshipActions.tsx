@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { UserCheck, UserMinus, UserPlus, UserRoundPlus } from 'lucide-react'
 import { friendshipsApi } from '../../api/friendships'
 import { followsApi } from '../../api/follows'
-import type { Relationship } from '../../api/types'
+import type { Friendship, PagedResult, PublicProfile, Relationship, UserSummary } from '../../api/types'
 import { Button } from '../ui/Button'
 import { toast } from '../../stores/toastStore'
 import { ApiError } from '../../lib/http'
@@ -24,11 +24,65 @@ export function RelationshipActions({
   const { t } = useTranslation()
   const queryClient = useQueryClient()
 
+  /** Cập nhật tức thì quan hệ trong cache Tìm kiếm, Hồ sơ công khai và Danh sách bạn bè. */
+  const patchRelationshipInCaches = (updater: (current: Relationship) => Relationship) => {
+    queryClient.setQueriesData<PagedResult<UserSummary>>({ queryKey: ['search-users'] }, (old) => {
+      if (!old) return old
+      return {
+        ...old,
+        items: old.items.map((item) =>
+          item.id === userId ? { ...item, relationship: updater(item.relationship) } : item,
+        ),
+      }
+    })
+
+    queryClient.setQueryData<PublicProfile>(['public-profile', userId], (old) =>
+      old ? { ...old, relationship: updater(old.relationship) } : old,
+    )
+
+    queryClient.setQueriesData<PagedResult<Friendship>>({ queryKey: ['friendships'] }, (old) => {
+      if (!old) return old
+      return {
+        ...old,
+        items: old.items.map((item) =>
+          item.user.id === userId
+            ? { ...item, user: { ...item.user, relationship: updater(item.user.relationship) } }
+            : item,
+        ),
+      }
+    })
+  }
+
+  const prependFriendshipIfMissing = (key: readonly string[], friendship: Friendship) => {
+    queryClient.setQueryData<PagedResult<Friendship>>(key, (old) => {
+      if (!old) return old
+      const exists = old.items.some(
+        (item) => item.id === friendship.id || item.user.id === friendship.user.id,
+      )
+      if (exists) {
+        return {
+          ...old,
+          items: old.items.map((item) =>
+            item.id === friendship.id || item.user.id === friendship.user.id ? friendship : item,
+          ),
+        }
+      }
+      return { ...old, items: [friendship, ...old.items] }
+    })
+  }
+
+  const removeUserFromFriendshipCache = (key: readonly string[]) => {
+    queryClient.setQueryData<PagedResult<Friendship>>(key, (old) => {
+      if (!old) return old
+      return { ...old, items: old.items.filter((item) => item.user.id !== userId) }
+    })
+  }
+
   const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['search-users'] })
-    queryClient.invalidateQueries({ queryKey: ['friendships'] })
-    queryClient.invalidateQueries({ queryKey: ['public-profile'] })
-    queryClient.invalidateQueries({ queryKey: ['feed'] })
+    void queryClient.invalidateQueries({ queryKey: ['search-users'], refetchType: 'all' })
+    void queryClient.invalidateQueries({ queryKey: ['friendships'], refetchType: 'all' })
+    void queryClient.invalidateQueries({ queryKey: ['public-profile', userId], refetchType: 'all' })
+    void queryClient.invalidateQueries({ queryKey: ['feed'] })
     onChange?.()
   }
 
@@ -39,7 +93,19 @@ export function RelationshipActions({
 
   const sendRequest = useMutation({
     mutationFn: () => friendshipsApi.sendRequest(userId),
-    onSuccess: () => {
+    onSuccess: (friendship) => {
+      const nextRelation: Relationship['friendship'] =
+        friendship.status === 'Accepted' ? 'Friends' : 'OutgoingPending'
+      patchRelationshipInCaches((current) => ({ ...current, friendship: nextRelation }))
+
+      if (friendship.status === 'Accepted') {
+        removeUserFromFriendshipCache(['friendships', 'incoming'])
+        removeUserFromFriendshipCache(['friendships', 'outgoing'])
+        prependFriendshipIfMissing(['friendships', 'list'], friendship)
+      } else {
+        prependFriendshipIfMissing(['friendships', 'outgoing'], friendship)
+      }
+
       toast.success(t('social.request_sent'))
       refresh()
     },
@@ -48,7 +114,10 @@ export function RelationshipActions({
 
   const acceptRequest = useMutation({
     mutationFn: () => friendshipsApi.accept(incomingRequestId ?? ''),
-    onSuccess: () => {
+    onSuccess: (friendship) => {
+      patchRelationshipInCaches((current) => ({ ...current, friendship: 'Friends' }))
+      removeUserFromFriendshipCache(['friendships', 'incoming'])
+      prependFriendshipIfMissing(['friendships', 'list'], friendship)
       toast.success(t('social.request_accepted'))
       refresh()
     },
@@ -58,6 +127,8 @@ export function RelationshipActions({
   const removeFriend = useMutation({
     mutationFn: () => friendshipsApi.removeFriend(userId),
     onSuccess: () => {
+      patchRelationshipInCaches((current) => ({ ...current, friendship: 'None' }))
+      removeUserFromFriendshipCache(['friendships', 'list'])
       toast.success(t('social.friend_removed'))
       refresh()
     },
@@ -67,6 +138,8 @@ export function RelationshipActions({
   const toggleFollow = useMutation({
     mutationFn: () => (relationship.following ? followsApi.unfollow(userId) : followsApi.follow(userId)),
     onSuccess: () => {
+      const nextFollowing = !relationship.following
+      patchRelationshipInCaches((current) => ({ ...current, following: nextFollowing }))
       toast.success(relationship.following ? t('social.unfollowed_toast') : t('social.following_toast'))
       refresh()
     },

@@ -8,8 +8,10 @@ type MessagesCache = InfiniteData<PagedResult<ChatMessage>>
 
 /**
  * Chèn tin mới vào **trang đầu** của cache tin nhắn (trang đầu là mới nhất và sắp DESC,
- * nên chèn ở đầu mảng). Bỏ qua nếu tin đã có (chống trùng khi vừa setQueryData vừa nhận
- * sự kiện SignalR).
+ * nên chèn ở đầu mảng).
+ * - Nếu trùng `id`: bỏ qua (tin đã được xác nhận).
+ * - Nếu trùng `clientMessageId` (tin tạm Optimistic): thay thế tại chỗ bằng bản thật từ server
+ *   để không bao giờ hiện trùng 2 bong bóng dù HTTP hay SignalR về trước.
  */
 export function appendMessageToCache(queryClient: QueryClient, message: ChatMessage): void {
   queryClient.setQueryData<MessagesCache>(['messages', message.conversationId], (old) => {
@@ -21,8 +23,49 @@ export function appendMessageToCache(queryClient: QueryClient, message: ChatMess
       return old
     }
 
+    if (
+      message.clientMessageId &&
+      old.pages.some((page) =>
+        page.items.some((item) => item.clientMessageId === message.clientMessageId),
+      )
+    ) {
+      return {
+        ...old,
+        pages: old.pages.map((page) => ({
+          ...page,
+          items: page.items.map((item) =>
+            item.clientMessageId === message.clientMessageId ? message : item,
+          ),
+        })),
+      }
+    }
+
     const [first, ...rest] = old.pages
     return { ...old, pages: [{ ...first, items: [message, ...first.items] }, ...rest] }
+  })
+}
+
+/** Xoá tin nhắn tạm (Optimistic UI) nếu gửi lên máy chủ thất bại. */
+export function removeOptimisticMessageFromCache(
+  queryClient: QueryClient,
+  conversationId: string,
+  clientMessageId: string,
+): void {
+  const optimisticId = `optimistic-${clientMessageId}`
+  queryClient.setQueryData<MessagesCache>(['messages', conversationId], (old) => {
+    if (!old) {
+      return old
+    }
+
+    return {
+      ...old,
+      pages: old.pages.map((page) => ({
+        ...page,
+        items: page.items.filter(
+          (item) => item.id !== optimisticId && item.clientMessageId !== clientMessageId,
+        ),
+      })),
+    }
   })
 }
 

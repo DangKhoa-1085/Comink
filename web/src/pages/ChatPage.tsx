@@ -41,7 +41,7 @@ import { toast } from '../stores/toastStore'
 import { ApiError } from '../lib/http'
 import { translateErrorCode } from '../lib/errorMessages'
 import { timeAgo } from '../lib/format'
-import { appendMessageToCache, replaceMessageInCache } from '../lib/messageCache'
+import { appendMessageToCache, removeOptimisticMessageFromCache, replaceMessageInCache } from '../lib/messageCache'
 import { sendTyping } from '../lib/chatConnection'
 import { generateUuid } from '../lib/uuid'
 import { useAuthStore } from '../stores/authStore'
@@ -284,7 +284,11 @@ function ChatPageView() {
 
   const markRead = useCallback(
     async (messageId: string) => {
-      if (!conversationId || lastMarkedReadRef.current === messageId) {
+      if (
+        !conversationId ||
+        messageId.startsWith('optimistic-') ||
+        lastMarkedReadRef.current === messageId
+      ) {
         return
       }
 
@@ -329,25 +333,93 @@ function ChatPageView() {
     : null
 
   const sendMutation = useMutation({
-    mutationFn: (payload: { content: string; mediaIds: string[] }) =>
+    mutationFn: (payload: {
+      clientMessageId: string
+      content: string
+      mediaIds: string[]
+      imageUrl?: string | null
+      replySnapshot?: ChatMessage | null
+    }) =>
       conversationsApi.send(conversationId!, {
         // clientMessageId sinh ở client để chống trùng khi mất mạng (idempotent phía server).
-        clientMessageId: generateUuid(),
+        clientMessageId: payload.clientMessageId,
         content: payload.content.length > 0 ? payload.content : null,
         mediaIds: payload.mediaIds,
-        replyToMessageId: replyTo?.id ?? null,
+        replyToMessageId: payload.replySnapshot?.id ?? null,
       }),
-    onSuccess: (message) => {
+    onMutate: (variables) => {
+      const prevDraft = draft
+      const prevImage = pendingImage
+      const prevReply = replyTo
+
+      // Xoá ô nhập và hiện tin tạm ngay lập tức (Optimistic UI) để người dùng nhắn tiếp không phải chờ.
       setDraft('')
       setPendingImage(null)
       setReplyTo(null)
-      // Hiện tin của chính mình ngay lập tức (không phụ thuộc lần tải lại danh sách),
-      // rồi đồng bộ lại để lấy dữ liệu chuẩn từ server.
+
+      const replyMember = variables.replySnapshot
+        ? conversationQuery.data?.members.find((m) => m.userId === variables.replySnapshot!.senderId)
+        : undefined
+
+      const optimisticMessage: ChatMessage = {
+        id: `optimistic-${variables.clientMessageId}`,
+        conversationId: conversationId!,
+        senderId: me?.id ?? '',
+        type:
+          variables.mediaIds.length > 0
+            ? variables.content.length > 0
+              ? 'Mixed'
+              : 'Image'
+            : 'Text',
+        content: variables.content.length > 0 ? variables.content : null,
+        attachments:
+          variables.mediaIds.length > 0 && variables.imageUrl
+            ? [
+                {
+                  mediaId: variables.mediaIds[0],
+                  url: variables.imageUrl,
+                  thumbnailUrl: variables.imageUrl,
+                  width: null,
+                  height: null,
+                },
+              ]
+            : [],
+        clientMessageId: variables.clientMessageId,
+        createdAt: new Date().toISOString(),
+        replyTo: variables.replySnapshot
+          ? {
+              messageId: variables.replySnapshot.id,
+              senderId: variables.replySnapshot.senderId,
+              senderDisplayName: replyMember?.displayName || replyMember?.userName || '',
+              contentPreview:
+                variables.replySnapshot.content?.trim().replace(/\r?\n/g, ' ').slice(0, 120) ?? null,
+              type: variables.replySnapshot.type,
+              isDeleted: variables.replySnapshot.deletedAt !== null,
+            }
+          : null,
+        forwardedFrom: null,
+        editedAt: null,
+        deletedAt: null,
+        reactions: [],
+      }
+
+      appendMessageToCache(queryClient, optimisticMessage)
+      return { prevDraft, prevImage, prevReply }
+    },
+    onSuccess: (message) => {
+      // Thay thế tin tạm bằng dữ liệu chuẩn từ server (bỏ refetch lại cả trang messages).
       appendMessageToCache(queryClient, message)
-      queryClient.invalidateQueries({ queryKey: ['messages', conversationId] })
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
     },
-    onError: (error) => {
+    onError: (error, variables, context) => {
+      if (conversationId) {
+        removeOptimisticMessageFromCache(queryClient, conversationId, variables.clientMessageId)
+      }
+      if (context) {
+        setDraft((current) => (current.length === 0 ? context.prevDraft : current))
+        setPendingImage((current) => current ?? context.prevImage)
+        setReplyTo((current) => current ?? context.prevReply)
+      }
       const code = error instanceof ApiError ? error.code : 'INTERNAL_ERROR'
       toast.error(translateErrorCode(t, code))
     },
@@ -529,7 +601,13 @@ function ChatPageView() {
       return
     }
 
-    sendMutation.mutate({ content, mediaIds })
+    sendMutation.mutate({
+      clientMessageId: generateUuid(),
+      content,
+      mediaIds,
+      imageUrl: pendingImage?.url ?? null,
+      replySnapshot: replyTo,
+    })
   }
 
   if (conversationQuery.isLoading) {
@@ -615,17 +693,19 @@ function ChatPageView() {
 
   const lastOwnStatus = !lastOwnMessage
     ? null
-    : isGroup
-      ? groupSeenNames.length === 0
-        ? t('chat.sent')
-        : `${t('chat.seen_by')} ${groupSeenNames.slice(0, 3).join(', ')}${
-            groupSeenNames.length > 3
-              ? ` ${t('chat.and_more', { count: groupSeenNames.length - 3 })}`
-              : ''
-          }`
-      : peerHasRead
-        ? t('chat.read')
-        : t('chat.sent')
+    : lastOwnMessage.id.startsWith('optimistic-')
+      ? t('chat.sending')
+      : isGroup
+        ? groupSeenNames.length === 0
+          ? t('chat.sent')
+          : `${t('chat.seen_by')} ${groupSeenNames.slice(0, 3).join(', ')}${
+              groupSeenNames.length > 3
+                ? ` ${t('chat.and_more', { count: groupSeenNames.length - 3 })}`
+                : ''
+            }`
+        : peerHasRead
+          ? t('chat.read')
+          : t('chat.sent')
 
   // Khi danh sách bị rút gọn, rê chuột vào thấy đầy đủ tên.
   const lastOwnStatusTitle =
@@ -925,7 +1005,7 @@ function ChatPageView() {
             variant="ghost"
             size="sm"
             onClick={() => fileInputRef.current?.click()}
-            disabled={uploading || sendMutation.isPending || activeEditing !== null}
+            disabled={uploading || activeEditing !== null}
             aria-label={t('chat.add_image')}
           >
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
@@ -958,13 +1038,12 @@ function ChatPageView() {
             size="sm"
             onClick={submit}
             disabled={
-              sendMutation.isPending ||
               editMutation.isPending ||
               uploading ||
               (draft.trim().length === 0 && !pendingImage)
             }
           >
-            {sendMutation.isPending || editMutation.isPending ? (
+            {editMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Send className="h-4 w-4" />
