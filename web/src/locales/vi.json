@@ -457,6 +457,16 @@
     "MESSAGE_ALREADY_DELETED": "Tin nhắn này đã bị thu hồi.",
     "MESSAGE_NOT_EDITABLE": "Không thể sửa loại tin nhắn này.",
     "MESSAGE_PIN_LIMIT_REACHED": "Mỗi hội thoại chỉ ghim tối đa 10 tin.",
-    "MESSAGE_REACTION_INVALID": "Cảm xúc không hợp lệ."
+    "MESSAGE_REACTION_INVALID": "Cảm xúc không hợp lệ.",
+    "MESSAGING_NOT_FRIENDS": "Hai bạn chưa phải là bạn bè.",
+    "MEDIA_UNSUPPORTED_TYPE": "Định dạng tệp không được hỗ trợ.",
+    "MEDIA_TOO_LARGE": "Tệp vượt quá dung lượng cho phép.",
+    "MEDIA_NOT_FOUND": "Không tìm thấy tệp đã tải lên.",
+    "MEDIA_NOT_OWNED": "Tệp này không thuộc quyền sở hữu của bạn.",
+    "CALL_PROVIDER_UNAVAILABLE": "Dịch vụ cuộc gọi hiện chưa sẵn sàng. Kiểm tra cấu hình LiveKit trên máy chủ và thử lại.",
+    "CALL_ALREADY_ACTIVE": "Hội thoại này đang có một cuộc gọi đang diễn ra.",
+    "CALL_NOT_FOUND": "Không tìm thấy cuộc gọi.",
+    "CALL_ALREADY_ENDED": "Cuộc gọi đã kết thúc.",
+    "CALL_NOT_RINGING": "Cuộc gọi không còn ở trạng thái đổ chuông."
   }
 }

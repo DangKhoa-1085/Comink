@@ -1,6 +1,7 @@
 // Kiểm thử cấu hình triển khai (chuỗi kết nối URI Neon/Railway, CORS nhiều origin, seed Production).
 using Comink.Api.Common;
 using Comink.Infrastructure;
+using Comink.Infrastructure.Calls;
 using Comink.Infrastructure.Identity;
 using Comink.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -121,6 +122,55 @@ public class DeploymentConfigUnitTests
     {
         var actual = CorsOriginsParser.Parse(raw);
         Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void LiveKitOptions_GiuNguyenLocalDevVaLanMobile()
+    {
+        var defaultDev = new LiveKitOptions();
+        Assert.Equal("http://localhost:7880", defaultDev.ServerUrl);
+        Assert.Equal("ws://localhost:7880", defaultDev.ClientUrl);
+
+        var lanMobileDev = new LiveKitOptions
+        {
+            Host = "http://localhost:7880",
+            PublicUrl = "ws://192.168.1.3:7880"
+        };
+        Assert.Equal("http://localhost:7880", lanMobileDev.ServerUrl);
+        Assert.Equal("ws://192.168.1.3:7880", lanMobileDev.ClientUrl);
+    }
+
+    [Fact]
+    public void LiveKitOptions_ChuanHoaWssVaHttpsChoLiveKitCloud()
+    {
+        var cloudFromWssHost = new LiveKitOptions
+        {
+            Host = " wss://demo.livekit.cloud/ ",
+            PublicUrl = string.Empty
+        };
+        Assert.Equal("https://demo.livekit.cloud", cloudFromWssHost.ServerUrl);
+        Assert.Equal("wss://demo.livekit.cloud", cloudFromWssHost.ClientUrl);
+
+        var cloudFromPublicUrlOnly = new LiveKitOptions
+        {
+            PublicUrl = " wss://demo.livekit.cloud/ "
+        };
+        Assert.Equal("https://demo.livekit.cloud", cloudFromPublicUrlOnly.ServerUrl);
+        Assert.Equal("wss://demo.livekit.cloud", cloudFromPublicUrlOnly.ClientUrl);
+    }
+
+    [Fact]
+    public void LiveKitOptions_CatKhoangTrangThuaChoApiKeyVaSecret()
+    {
+        var options = new LiveKitOptions
+        {
+            ApiKey = "  APIkey123  ",
+            ApiSecret = "\nsecret456\t"
+        };
+
+        Assert.True(options.IsConfigured);
+        Assert.Equal("APIkey123", options.TrimmedApiKey);
+        Assert.Equal("secret456", options.TrimmedApiSecret);
     }
 }
 
