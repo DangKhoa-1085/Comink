@@ -72,6 +72,21 @@
     "theme_dark": "Dark",
     "language": "Language"
   },
+  "apk": {
+    "title": "Comink Android",
+    "subtitle": "Smoother chat & calls",
+    "badge": "APK",
+    "download_cta": "Download APK",
+    "download_direct": "Download .apk directly",
+    "qr_button_label": "Show QR code to download app",
+    "compact_label": "Download Comink Android (.apk) / QR",
+    "qr_title": "Scan to install Comink",
+    "qr_subtitle": "Android · .apk installer",
+    "qr_hint": "Point your phone camera at the code to download the installer directly.",
+    "not_configured": "APK download link is not configured yet (VITE_APK_DOWNLOAD_URL).",
+    "qr_not_configured": "VITE_APK_DOWNLOAD_URL is not configured on the web host yet.",
+    "mobile_menu_item": "Download Android app (.apk)"
+  },
   "auth": {
     "login_title": "Sign in",
     "login_subtitle": "Sign in to continue using Comink",

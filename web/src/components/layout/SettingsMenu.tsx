@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Globe, LogOut, Moon, Settings, Sun, UserCog, X } from 'lucide-react'
+import { Download, Globe, LogOut, Moon, Settings, Smartphone, Sun, UserCog, X } from 'lucide-react'
+import { APK_DOWNLOAD_URL } from '../../config/env'
 import { useAuthStore } from '../../stores/authStore'
 import { useTheme } from '../../hooks/useTheme'
 import { useLanguage, type SupportedLanguage } from '../../hooks/useLanguage'
@@ -179,6 +180,39 @@ export function SettingsMenu({ placement, compact = false }: SettingsMenuProps) 
             <UserCog className="h-4 w-4 text-slate-500 dark:text-slate-400" />
             <span>{t('nav.account_settings')}</span>
           </button>
+
+          {placement === 'mobile-top' &&
+            (APK_DOWNLOAD_URL ? (
+              <a
+                href={APK_DOWNLOAD_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                download
+                onClick={() => setOpen(false)}
+                className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 font-semibold text-sky-700 transition-colors hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-sky-500/15"
+              >
+                <span className="flex items-center gap-2">
+                  <Smartphone className="h-4 w-4 shrink-0" />
+                  <span>{t('apk.mobile_menu_item')}</span>
+                </span>
+                <Download className="h-3.5 w-3.5 shrink-0" />
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false)
+                  toast.info(t('apk.not_configured'))
+                }}
+                className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 font-semibold text-sky-700 transition-colors hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-sky-500/15"
+              >
+                <span className="flex items-center gap-2">
+                  <Smartphone className="h-4 w-4 shrink-0" />
+                  <span>{t('apk.mobile_menu_item')}</span>
+                </span>
+                <Download className="h-3.5 w-3.5 shrink-0" />
+              </button>
+            ))}
 
           <div className="border-t border-slate-100 pt-1 dark:border-slate-800">
             <button
