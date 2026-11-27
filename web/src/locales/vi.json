@@ -198,6 +198,8 @@
     "camera_on": "Tắt camera",
     "camera_off": "Bật camera",
     "hangup": "Kết thúc",
+    "you": "Bạn",
+    "participants_count": "{{count}} người tham gia",
     "ended": "Cuộc gọi đã kết thúc",
     "ended_detail": "Thời lượng {{duration}} · {{reason}}",
     "reason_completed": "Hoàn tất",

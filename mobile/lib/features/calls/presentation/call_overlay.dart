@@ -272,26 +272,76 @@ class _ParticipantGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (participants.length == 1) {
-      return _ParticipantTile(
-        participant: participants.first,
-        call: call,
-        isVideo: isVideo,
+      return Padding(
+        padding: const EdgeInsets.all(8),
+        child: _ParticipantTile(
+          participant: participants.first,
+          call: call,
+          isVideo: isVideo,
+        ),
       );
     }
 
-    return GridView.builder(
-      padding: const EdgeInsets.all(8),
-      itemCount: participants.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-      ),
-      itemBuilder: (context, index) => _ParticipantTile(
-        participant: participants[index],
-        call: call,
-        isVideo: isVideo,
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const padding = 8.0;
+        const spacing = 8.0;
+        final isLandscape = constraints.maxWidth > constraints.maxHeight;
+
+        if (participants.length == 2) {
+          final first = Expanded(
+            child: _ParticipantTile(
+              participant: participants[0],
+              call: call,
+              isVideo: isVideo,
+            ),
+          );
+          final second = Expanded(
+            child: _ParticipantTile(
+              participant: participants[1],
+              call: call,
+              isVideo: isVideo,
+            ),
+          );
+          return Padding(
+            padding: const EdgeInsets.all(padding),
+            child: isLandscape
+                ? Row(children: [first, const SizedBox(width: spacing), second])
+                : Column(children: [first, const SizedBox(height: spacing), second]),
+          );
+        }
+
+        // 3–6 người: tự tính tỉ lệ ô theo chiều cao thực tế để vừa khít khung hình, không cần cuộn.
+        final fitAll = participants.length <= 6;
+        final crossAxisCount = isLandscape ? 3 : 2;
+        final rowCount = (participants.length / crossAxisCount).ceil();
+        final availableWidth =
+            (constraints.maxWidth - padding * 2 - spacing * (crossAxisCount - 1))
+                .clamp(80.0, double.infinity);
+        final availableHeight =
+            (constraints.maxHeight - padding * 2 - spacing * (rowCount - 1))
+                .clamp(80.0, double.infinity);
+        final tileWidth = availableWidth / crossAxisCount;
+        final tileHeight = fitAll ? (availableHeight / rowCount) : tileWidth;
+        final aspectRatio = (tileWidth / tileHeight).clamp(0.5, 2.2);
+
+        return GridView.builder(
+          padding: const EdgeInsets.all(padding),
+          physics: fitAll ? const NeverScrollableScrollPhysics() : null,
+          itemCount: participants.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            mainAxisSpacing: spacing,
+            crossAxisSpacing: spacing,
+            childAspectRatio: aspectRatio,
+          ),
+          itemBuilder: (context, index) => _ParticipantTile(
+            participant: participants[index],
+            call: call,
+            isVideo: isVideo,
+          ),
+        );
+      },
     );
   }
 }
