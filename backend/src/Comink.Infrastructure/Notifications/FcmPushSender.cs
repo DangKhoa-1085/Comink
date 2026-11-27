@@ -50,7 +50,7 @@ public class FcmPushSender : IPushSender, IDisposable
     {
         _options = options.Value;
         _logger = logger;
-        _http = httpClient ?? new HttpClient();
+        _http = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         _ownsHttpClient = httpClient is null;
     }
 
@@ -85,15 +85,18 @@ public class FcmPushSender : IPushSender, IDisposable
             return;
         }
 
-        foreach (var deviceToken in deviceTokens.Distinct())
-        {
-            if (string.IsNullOrWhiteSpace(deviceToken))
-            {
-                continue;
-            }
+        var validTokens = deviceTokens
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Distinct()
+            .ToList();
 
-            await SendOneAsync(account.ProjectId, token, deviceToken, notification, cancellationToken);
+        if (validTokens.Count == 0)
+        {
+            return;
         }
+
+        await Task.WhenAll(validTokens.Select(deviceToken =>
+            SendOneAsync(account.ProjectId, token, deviceToken, notification, cancellationToken)));
     }
 
     private async Task SendOneAsync(

@@ -28,19 +28,11 @@ public class SignalRChatNotifier : IChatNotifier
     {
         try
         {
-            // 1) Group của hội thoại (chỉ chứa client đã kết nối khi hội thoại đã tồn tại).
+            // Gom group hội thoại + group từng thành viên thành một lần phát sóng qua backplane/SignalR.
+            var groups = BuildTargetGroups(conversationId, memberUserIds);
             await _hub.Clients
-                .Group(ChatEvents.ConversationGroup(conversationId))
+                .Groups(groups)
                 .SendAsync(ChatEvents.MessageCreated, message, cancellationToken);
-
-            // 2) Group riêng của từng thành viên — đường phát CHÍNH, luôn đúng kể cả khi hội thoại
-            //    vừa được tạo sau lúc client kết nối. Thiếu bước này thì phải tải lại trang mới thấy tin.
-            foreach (var userId in memberUserIds.Distinct())
-            {
-                await _hub.Clients
-                    .Group(ChatEvents.UserGroup(userId))
-                    .SendAsync(ChatEvents.MessageCreated, message, cancellationToken);
-            }
         }
         catch (Exception exception)
         {
@@ -59,18 +51,10 @@ public class SignalRChatNotifier : IChatNotifier
     {
         try
         {
-            // Cùng chiến lược với MessageCreated: group hội thoại + user:{id} của từng thành viên,
-            // để hội thoại tạo sau lúc kết nối vẫn tới được người gửi.
+            var groups = BuildTargetGroups(conversationId, memberUserIds);
             await _hub.Clients
-                .Group(ChatEvents.ConversationGroup(conversationId))
+                .Groups(groups)
                 .SendAsync(ChatEvents.MessagesRead, receipt, cancellationToken);
-
-            foreach (var userId in memberUserIds.Distinct())
-            {
-                await _hub.Clients
-                    .Group(ChatEvents.UserGroup(userId))
-                    .SendAsync(ChatEvents.MessagesRead, receipt, cancellationToken);
-            }
         }
         catch (Exception exception)
         {
@@ -89,18 +73,10 @@ public class SignalRChatNotifier : IChatNotifier
     {
         try
         {
-            // Cùng chiến lược MessageCreated: group hội thoại + user:{id} của từng thành viên,
-            // để hội thoại tạo sau lúc kết nối vẫn nhận được cập nhật.
+            var groups = BuildTargetGroups(conversationId, memberUserIds);
             await _hub.Clients
-                .Group(ChatEvents.ConversationGroup(conversationId))
+                .Groups(groups)
                 .SendAsync(ChatEvents.MessageUpdated, message, cancellationToken);
-
-            foreach (var userId in memberUserIds.Distinct())
-            {
-                await _hub.Clients
-                    .Group(ChatEvents.UserGroup(userId))
-                    .SendAsync(ChatEvents.MessageUpdated, message, cancellationToken);
-            }
         }
         catch (Exception exception)
         {
@@ -119,22 +95,30 @@ public class SignalRChatNotifier : IChatNotifier
     {
         try
         {
+            var groups = BuildTargetGroups(conversationId, memberUserIds);
             await _hub.Clients
-                .Group(ChatEvents.ConversationGroup(conversationId))
+                .Groups(groups)
                 .SendAsync(ChatEvents.PinnedMessagesChanged, pinned, cancellationToken);
-
-            foreach (var userId in memberUserIds.Distinct())
-            {
-                await _hub.Clients
-                    .Group(ChatEvents.UserGroup(userId))
-                    .SendAsync(ChatEvents.PinnedMessagesChanged, pinned, cancellationToken);
-            }
         }
         catch (Exception exception)
         {
             _logger.LogError(exception, "Không phát được sự kiện {Event} cho hội thoại {ConversationId}",
                 ChatEvents.PinnedMessagesChanged, conversationId);
         }
+    }
+
+    private static List<string> BuildTargetGroups(Guid conversationId, IReadOnlyList<Guid> memberUserIds)
+    {
+        var groups = new List<string>(1 + memberUserIds.Count)
+        {
+            ChatEvents.ConversationGroup(conversationId)
+        };
+        foreach (var userId in memberUserIds.Distinct())
+        {
+            groups.Add(ChatEvents.UserGroup(userId));
+        }
+
+        return groups;
     }
 
     /// <inheritdoc />

@@ -11,7 +11,7 @@ import { toast } from '../stores/toastStore'
 import { ApiError } from '../lib/http'
 import { translateErrorCode } from '../lib/errorMessages'
 import { cn } from '../lib/utils'
-import type { Friendship } from '../api/types'
+import type { Friendship, PagedResult } from '../api/types'
 
 type FriendsTab = 'incoming' | 'outgoing' | 'list'
 
@@ -24,20 +24,30 @@ export function FriendsPage() {
   const incomingQuery = useQuery({
     queryKey: ['friendships', 'incoming'],
     queryFn: () => friendshipsApi.incoming(),
+    refetchOnMount: 'always',
   })
   const outgoingQuery = useQuery({
     queryKey: ['friendships', 'outgoing'],
     queryFn: () => friendshipsApi.outgoing(),
+    refetchOnMount: 'always',
   })
   const friendsQuery = useQuery({
     queryKey: ['friendships', 'list'],
     queryFn: () => friendshipsApi.list(),
+    refetchOnMount: 'always',
   })
 
   const invalidate = () => {
-    void queryClient.invalidateQueries({ queryKey: ['friendships'] })
+    void queryClient.invalidateQueries({ queryKey: ['friendships'], refetchType: 'all' })
+    void queryClient.invalidateQueries({ queryKey: ['search-users'], refetchType: 'all' })
     void queryClient.invalidateQueries({ queryKey: ['feed'] })
-    void queryClient.invalidateQueries({ queryKey: ['public-profile'] })
+    void queryClient.invalidateQueries({ queryKey: ['public-profile'], refetchType: 'all' })
+  }
+
+  const removeRequestFromCache = (key: readonly string[], requestId: string) => {
+    queryClient.setQueryData<PagedResult<Friendship>>(key, (old) =>
+      old ? { ...old, items: old.items.filter((item) => item.id !== requestId) } : old,
+    )
   }
 
   const showError = (error: unknown) => {
@@ -47,7 +57,13 @@ export function FriendsPage() {
 
   const acceptMutation = useMutation({
     mutationFn: (id: string) => friendshipsApi.accept(id),
-    onSuccess: () => {
+    onSuccess: (friendship, id) => {
+      removeRequestFromCache(['friendships', 'incoming'], id)
+      queryClient.setQueryData<PagedResult<Friendship>>(['friendships', 'list'], (old) =>
+        old && !old.items.some((item) => item.id === friendship.id)
+          ? { ...old, items: [friendship, ...old.items] }
+          : old,
+      )
       toast.success(t('social.request_accepted'))
       invalidate()
     },
@@ -56,7 +72,8 @@ export function FriendsPage() {
 
   const declineMutation = useMutation({
     mutationFn: (id: string) => friendshipsApi.removeRequest(id),
-    onSuccess: () => {
+    onSuccess: (_, id) => {
+      removeRequestFromCache(['friendships', 'incoming'], id)
       toast.success(t('social.request_declined'))
       invalidate()
     },
@@ -65,7 +82,8 @@ export function FriendsPage() {
 
   const cancelMutation = useMutation({
     mutationFn: (id: string) => friendshipsApi.removeRequest(id),
-    onSuccess: () => {
+    onSuccess: (_, id) => {
+      removeRequestFromCache(['friendships', 'outgoing'], id)
       toast.success(t('social.request_cancelled'))
       invalidate()
     },

@@ -80,12 +80,13 @@ export function MessageBubble({
   const [mountedAt] = useState(() => Date.now())
   const rootRef = useRef<HTMLLIElement | null>(null)
 
+  const isOptimistic = message.id.startsWith('optimistic-')
   const isDeleted = message.deletedAt !== null
   const withinWindow = mountedAt - Date.parse(message.createdAt) <= ACTION_WINDOW_MS
   const isUserContent = message.type !== 'System' && message.type !== 'Call'
-  const canModify = isMine && !isDeleted && withinWindow && isUserContent
+  const canModify = !isOptimistic && isMine && !isDeleted && withinWindow && isUserContent
   // Tin cuộc gọi là bản ghi hệ thống, không phản hồi/ghim/thả cảm xúc được.
-  const canInteract = !isDeleted && message.type !== 'System' && message.type !== 'Call'
+  const canInteract = !isOptimistic && !isDeleted && message.type !== 'System' && message.type !== 'Call'
   const canCopy = !isDeleted && (message.content ?? '').length > 0
   const replyTo = message.replyTo
 
@@ -157,9 +158,9 @@ export function MessageBubble({
 
         <div className={isMine ? 'flex flex-row-reverse items-end gap-1' : 'flex items-end gap-1'}>
           <div
-            className={`${bubbleTone} transition-shadow ${
+            className={`${bubbleTone} transition-all ${
               highlighted ? 'ring-2 ring-amber-400 ring-offset-2 dark:ring-offset-slate-900' : ''
-            }`}
+            } ${isOptimistic ? 'opacity-80' : ''}`}
           >
             {replyTo && (
               <button

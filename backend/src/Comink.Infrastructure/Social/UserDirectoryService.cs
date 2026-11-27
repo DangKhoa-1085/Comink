@@ -28,50 +28,75 @@ public class UserDirectoryService : IUserDirectoryService
         int limit,
         CancellationToken cancellationToken = default)
     {
-        var term = search.Trim().ToLowerInvariant();
+        // Chấp nhận cả `@username` lẫn `username`; gõ chỉ `@` hoặc rỗng thì báo lỗi validate.
+        var term = UserSearchHelper.NormalizeKeyword(search);
         if (term.Length == 0)
         {
             return OperationResult<PagedList<UserSummaryDto>>.Failure(ErrorCodes.ValidationFailed);
         }
 
         var pageSize = SocialPaging.Normalize(limit);
-        var pattern = $"%{term}%";
-        var decoded = CursorCodec.TryDecode(cursor);
 
-        var query = from u in _db.Users.AsNoTracking()
-                    join p in _db.UserProfiles.AsNoTracking() on u.Id equals p.UserId
-                    where u.AccountStatus == ActiveAccountStatus
-                          && u.Id != currentUserId
-                          // Tài khoản Admin là tài khoản ẩn: không xuất hiện trong danh bạ với bất kỳ ai
-                          // (kể cả admin khác) — quản lý ở /api/admin/users.
-                          && !AdminAccounts.Ids(_db).Contains(u.Id)
-                    select new
-                    {
-                        u.Id,
-                        u.UserName,
-                        u.CreatedAt,
-                        p.DisplayName,
-                        p.AvatarUrl,
-                        p.Bio
-                    };
+        // Chuẩn bị sẵn pattern trong C# (escape `_`, `%`, `\`) để EF dịch thành SQL LIKE thuần.
+        var escapedUserTerm = UserSearchHelper.EscapeLike(term);
+        var userPrefixPattern = $"{escapedUserTerm}%";
+        var userContainsPattern = $"%{escapedUserTerm}%";
 
-        // So khớp không dấu: bỏ dấu tên hiển thị rồi LIKE (dùng chỉ mục trigram ở M1).
-        query = query.Where(x =>
-            EF.Functions.Like(CominkDbFunctions.ImmutableUnaccent(x.DisplayName.ToLower()), pattern) ||
-            EF.Functions.Like(x.UserName!.ToLower(), pattern));
+        var unaccentedDisplayTerm = UserSearchHelper.RemoveVietnameseDiacritics(term);
+        var escapedDisplayTerm = UserSearchHelper.EscapeLike(unaccentedDisplayTerm);
+        var displayPrefixPattern = $"{escapedDisplayTerm}%";
+        var displayContainsPattern = $"%{escapedDisplayTerm}%";
 
-        // Phân trang con trỏ (created_at, id) giảm dần — không dùng OFFSET.
+        var decoded = UserSearchHelper.TryDecodeCursor(cursor);
+
+        var baseQuery = from u in _db.Users.AsNoTracking()
+                        join p in _db.UserProfiles.AsNoTracking() on u.Id equals p.UserId
+                        where u.AccountStatus == ActiveAccountStatus
+                              && u.Id != currentUserId
+                              // Tài khoản Admin là tài khoản ẩn: không xuất hiện trong danh bạ với bất kỳ ai
+                              // (kể cả admin khác) — quản lý ở /api/admin/users.
+                              && !AdminAccounts.Ids(_db).Contains(u.Id)
+                              && (EF.Functions.Like(u.UserName!.ToLower(), userContainsPattern, "\\") ||
+                                  EF.Functions.Like(
+                                      CominkDbFunctions.ImmutableUnaccent(p.DisplayName.ToLower()),
+                                      displayContainsPattern,
+                                      "\\"))
+                        select new
+                        {
+                            u.Id,
+                            u.UserName,
+                            u.CreatedAt,
+                            p.DisplayName,
+                            p.AvatarUrl,
+                            p.Bio,
+                            // Ưu tiên khớp `@username` (0: khớp đúng → 1: bắt đầu → 2: chứa)
+                            // rồi mới tới tên hiển thị không dấu (3: bắt đầu → 4: chứa).
+                            MatchRank =
+                                u.UserName!.ToLower() == term ? 0 :
+                                EF.Functions.Like(u.UserName!.ToLower(), userPrefixPattern, "\\") ? 1 :
+                                EF.Functions.Like(u.UserName!.ToLower(), userContainsPattern, "\\") ? 2 :
+                                EF.Functions.Like(
+                                    CominkDbFunctions.ImmutableUnaccent(p.DisplayName.ToLower()),
+                                    displayPrefixPattern,
+                                    "\\") ? 3 : 4
+                        };
+
+        // Phân trang con trỏ giữ nguyên thứ tự ưu tiên: (MatchRank tăng dần, CreatedAt giảm dần, Id giảm dần).
         if (decoded is not null)
         {
+            var cursorRank = decoded.Value.MatchRank;
             var cursorCreatedAt = decoded.Value.CreatedAt;
             var cursorId = decoded.Value.Id;
-            query = query.Where(x =>
-                x.CreatedAt < cursorCreatedAt ||
-                (x.CreatedAt == cursorCreatedAt && x.Id.CompareTo(cursorId) < 0));
+            baseQuery = baseQuery.Where(x =>
+                x.MatchRank > cursorRank ||
+                (x.MatchRank == cursorRank &&
+                 (x.CreatedAt < cursorCreatedAt ||
+                  (x.CreatedAt == cursorCreatedAt && x.Id.CompareTo(cursorId) < 0))));
         }
 
-        var rows = await query
-            .OrderByDescending(x => x.CreatedAt)
+        var rows = await baseQuery
+            .OrderBy(x => x.MatchRank)
+            .ThenByDescending(x => x.CreatedAt)
             .ThenByDescending(x => x.Id)
             .Take(pageSize + 1)
             .ToListAsync(cancellationToken);
@@ -95,7 +120,7 @@ public class UserDirectoryService : IUserDirectoryService
             .ToList();
 
         var nextCursor = hasMore && pageRows.Count > 0
-            ? CursorCodec.Encode(pageRows[^1].CreatedAt, pageRows[^1].Id)
+            ? UserSearchHelper.EncodeCursor(pageRows[^1].MatchRank, pageRows[^1].CreatedAt, pageRows[^1].Id)
             : null;
 
         return OperationResult<PagedList<UserSummaryDto>>.Success(

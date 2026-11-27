@@ -19,10 +19,12 @@ export function SearchPage() {
     return () => clearTimeout(timer)
   }, [term])
 
+  const effectiveTerm = debounced.replace(/^@+/, '').trim()
+
   const searchQuery = useQuery({
     queryKey: ['search-users', debounced],
     queryFn: () => usersApi.search(debounced),
-    enabled: debounced.length > 0,
+    enabled: effectiveTerm.length > 0,
   })
 
   return (
@@ -48,7 +50,7 @@ export function SearchPage() {
         {searchQuery.isFetching && <Spinner className="text-sky-600 dark:text-sky-400" />}
       </div>
 
-      {debounced.length === 0 ? (
+      {effectiveTerm.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-[#121826]/60 dark:text-slate-400">
           {t('social.search_hint')}
         </p>
@@ -83,7 +85,6 @@ export function SearchPage() {
               <UserCard
                 user={user}
                 incomingRequestId={incomingRequests.get(user.id)}
-                onChange={() => void searchQuery.refetch()}
               />
             </li>
           ))}
