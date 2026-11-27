@@ -32,6 +32,54 @@ public class CreateGroupConversationRequestValidator : AbstractValidator<CreateG
     }
 }
 
+/// <summary>Kiểm tra yêu cầu cập nhật tên/avatar nhóm chat.</summary>
+public class UpdateGroupConversationRequestValidator : AbstractValidator<UpdateGroupConversationRequest>
+{
+    public UpdateGroupConversationRequestValidator()
+    {
+        RuleFor(x => x.Title)
+            .Must(title => !string.IsNullOrWhiteSpace(title) && title.Trim().Length <= ConversationRules.MaxGroupTitleLength)
+            .When(x => x.Title is not null)
+            .WithMessage($"Tên nhóm không được rỗng và tối đa {ConversationRules.MaxGroupTitleLength} ký tự.");
+
+        RuleFor(x => x.AvatarUrl)
+            .MaximumLength(500)
+            .WithMessage("URL ảnh đại diện tối đa 500 ký tự.")
+            .Must(IsValidAvatarUrl)
+            .When(x => !string.IsNullOrEmpty(x.AvatarUrl))
+            .WithMessage("URL ảnh đại diện nhóm không hợp lệ.");
+    }
+
+    private static bool IsValidAvatarUrl(string? url)
+    {
+        if (string.IsNullOrEmpty(url))
+        {
+            return true;
+        }
+
+        if (url.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+               (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+    }
+}
+
+/// <summary>Kiểm tra danh sách thành viên muốn thêm vào nhóm.</summary>
+public class AddGroupMembersRequestValidator : AbstractValidator<AddGroupMembersRequest>
+{
+    public AddGroupMembersRequestValidator()
+    {
+        RuleFor(x => x.MemberIds)
+            .NotEmpty()
+            .WithMessage("Phải chọn ít nhất 1 thành viên để thêm vào nhóm.")
+            .Must(ids => ids.Count <= ConversationRules.MaxGroupMembers)
+            .WithMessage($"Mỗi nhóm tối đa {ConversationRules.MaxGroupMembers} thành viên.");
+    }
+}
+
 /// <summary>Kiểm tra yêu cầu gửi tin nhắn (giới hạn độ dài và số tệp).</summary>
 public class SendMessageRequestValidator : AbstractValidator<SendMessageRequest>
 {

@@ -22,6 +22,7 @@ import '../../media/data/media_service.dart';
 import '../data/chat_providers.dart';
 import '../data/chat_realtime.dart';
 import '../domain/chat_models.dart';
+import 'group_info_sheet.dart';
 import 'message_search_page.dart';
 
 /// Một cảm xúc hiển thị trong menu tin nhắn — khoá phải khớp `ReactionCatalog` ở backend.
@@ -940,6 +941,23 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return material.formatShortDate(time);
   }
 
+  Future<void> _openGroupInfo() async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final left = await showGroupInfoSheet(
+      context,
+      conversationId: widget.conversationId,
+    );
+    if (left == true && mounted) {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.t('chat_group_left'))));
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/chats');
+      }
+    }
+  }
+
   /// Nhãn "Đã gửi"/"Đã đọc"/"Đã xem bởi N" cho tin CUỐI của chính mình (NC GĐ 7).
   String? _readLabel(
     AppLocalizations l10n,
@@ -1023,11 +1041,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final headerContent = Row(
       children: [
         if (detailValue?.isGroup == true)
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: colors.primaryContainer,
-            child: Icon(Icons.groups, size: 20, color: colors.onPrimaryContainer),
-          )
+          (detailValue!.avatarUrl != null && detailValue.avatarUrl!.isNotEmpty
+              ? AppAvatar(
+                  name: title,
+                  url: detailValue.avatarUrl,
+                  radius: 18,
+                )
+              : CircleAvatar(
+                  radius: 18,
+                  backgroundColor: colors.primaryContainer,
+                  child: Icon(Icons.groups, size: 20, color: colors.onPrimaryContainer),
+                ))
         else
           Stack(
             clipBehavior: Clip.none,
@@ -1096,7 +1120,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   child: headerContent,
                 ),
               )
-            : headerContent,
+            : detailValue?.isGroup == true
+                ? InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => unawaited(_openGroupInfo()),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                      child: headerContent,
+                    ),
+                  )
+                : headerContent,
         shape: Border(bottom: BorderSide(color: colors.outlineVariant)),
         actions: [
           IconButton(
@@ -1117,6 +1150,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             tooltip: l10n.t('chat_more'),
             onSelected: (value) {
               switch (value) {
+                case 'group_info':
+                  unawaited(_openGroupInfo());
                 case 'pinned':
                   unawaited(_showPinnedSheet());
                 case 'search':
@@ -1126,6 +1161,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               }
             },
             itemBuilder: (context) => [
+              if (detailValue?.isGroup == true)
+                PopupMenuItem(
+                  value: 'group_info',
+                  child: Text(l10n.t('chat_group_info')),
+                ),
               PopupMenuItem(value: 'pinned', child: Text(l10n.t('chat_pinned'))),
               PopupMenuItem(
                 value: 'search',

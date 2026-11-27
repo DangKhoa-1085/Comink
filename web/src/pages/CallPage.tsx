@@ -212,13 +212,32 @@ export function CallPage() {
     return () => clearInterval(timer)
   }, [callQuery.data?.answeredAt])
 
+  const invalidateAfterCallEnd = useCallback(
+    (conversationId?: string) => {
+      void queryClient.invalidateQueries({ queryKey: ['call', callId] })
+      void queryClient.invalidateQueries({ queryKey: ['calls'], refetchType: 'all' })
+      void queryClient.invalidateQueries({ queryKey: ['conversations'], refetchType: 'all' })
+      void queryClient.invalidateQueries({ queryKey: ['notifications'], refetchType: 'all' })
+      void queryClient.invalidateQueries({
+        queryKey: conversationId ? ['messages', conversationId] : ['messages'],
+        refetchType: 'all',
+      })
+    },
+    [callId, queryClient],
+  )
+
+  useEffect(() => {
+    if (isTerminal) {
+      invalidateAfterCallEnd(callQuery.data?.conversationId)
+    }
+  }, [isTerminal, callQuery.data?.conversationId, invalidateAfterCallEnd])
+
   const endCall = useCallback(async () => {
     await roomRef.current?.disconnect().catch(() => undefined)
-    await callsApi.end(callId!).catch(() => undefined)
-    queryClient.invalidateQueries({ queryKey: ['call', callId] })
-    queryClient.invalidateQueries({ queryKey: ['calls'] })
+    const ended = await callsApi.end(callId!).catch(() => undefined)
+    invalidateAfterCallEnd(ended?.conversationId ?? callQuery.data?.conversationId)
     navigate(-1)
-  }, [callId, navigate, queryClient])
+  }, [callId, callQuery.data?.conversationId, invalidateAfterCallEnd, navigate])
 
   const toggleMic = async () => {
     const room = roomRef.current
@@ -291,7 +310,14 @@ export function CallPage() {
               reason: t(`call.reason_${endReason.toLowerCase()}`, { defaultValue: endReason }),
             })}
           </p>
-          <Button onClick={() => navigate(-1)}>{t('call.back')}</Button>
+          <Button
+            onClick={() => {
+              invalidateAfterCallEnd(callQuery.data?.conversationId)
+              navigate(-1)
+            }}
+          >
+            {t('call.back')}
+          </Button>
         </div>
       </div>
     )

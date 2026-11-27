@@ -1,5 +1,14 @@
+String? _cleanNullable(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  final text = value.toString().trim();
+  return text.isEmpty ? null : text;
+}
+
 /// Người dùng trong hội thoại.
-class ConversationPeer {  const ConversationPeer({
+class ConversationPeer {
+  const ConversationPeer({
     required this.userId,
     required this.displayName,
     this.userName,
@@ -8,6 +17,7 @@ class ConversationPeer {  const ConversationPeer({
     this.lastSeenAt,
     this.lastReadMessageId,
     this.lastReadAt,
+    this.role = 'Member',
   });
 
   final String userId;
@@ -25,15 +35,21 @@ class ConversationPeer {  const ConversationPeer({
   final String? lastReadMessageId;
   final DateTime? lastReadAt;
 
+  /// Vai trò trong hội thoại: `'Owner'` (nhóm trưởng) hoặc `'Member'`.
+  final String role;
+
+  bool get isOwner => role == 'Owner';
+
   factory ConversationPeer.fromJson(Map<String, dynamic> json) => ConversationPeer(
         userId: (json['userId'] ?? json['id'] ?? '').toString(),
         displayName: (json['displayName'] ?? '').toString(),
         userName: _nullable(json['userName']),
-        avatarUrl: _nullable(json['avatarUrl']),
+        avatarUrl: _cleanNullable(json['avatarUrl']),
         isOnline: json['isOnline'] == true,
         lastSeenAt: _dateTime(json['lastSeenAt']),
         lastReadMessageId: _nullable(json['lastReadMessageId']),
         lastReadAt: _dateTime(json['lastReadAt']),
+        role: (json['role'] ?? 'Member').toString(),
       );
 
   static String? _nullable(dynamic value) {
@@ -86,6 +102,7 @@ class ConversationSummary {
     required this.memberCount,
     required this.unreadCount,
     this.title,
+    this.groupAvatarUrl,
     this.peer,
     this.lastMessage,
     this.lastMessageAt,
@@ -96,6 +113,7 @@ class ConversationSummary {
   final String id;
   final String type;
   final String? title;
+  final String? groupAvatarUrl;
   final ConversationPeer? peer;
   final LastMessagePreview? lastMessage;
   final int unreadCount;
@@ -108,12 +126,13 @@ class ConversationSummary {
 
   bool get isGroup => type == 'Group';
   String get displayTitle => isGroup ? (title ?? '') : (peer?.displayName ?? '');
-  String? get avatarUrl => isGroup ? null : peer?.avatarUrl;
+  String? get avatarUrl => isGroup ? groupAvatarUrl : peer?.avatarUrl;
 
   factory ConversationSummary.fromJson(Map<String, dynamic> json) => ConversationSummary(
         id: (json['id'] ?? '').toString(),
         type: (json['type'] ?? 'Direct').toString(),
         title: json['title']?.toString(),
+        groupAvatarUrl: _cleanNullable(json['avatarUrl']),
         peer: json['peer'] is Map
             ? ConversationPeer.fromJson((json['peer'] as Map).cast<String, dynamic>())
             : null,
@@ -170,7 +189,7 @@ class ConversationDetail {
         id: (json['id'] ?? '').toString(),
         type: (json['type'] ?? 'Direct').toString(),
         title: json['title']?.toString(),
-        avatarUrl: json['avatarUrl']?.toString(),
+        avatarUrl: _cleanNullable(json['avatarUrl']),
         members: (json['members'] as List<dynamic>? ?? const [])
             .whereType<Map>()
             .map((item) => ConversationPeer.fromJson(item.cast<String, dynamic>()))

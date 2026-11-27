@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/providers.dart';
+import '../../chats/data/chat_providers.dart';
 import '../../chats/data/chat_realtime.dart';
 import '../domain/call_models.dart';
 
@@ -313,6 +314,8 @@ class CallController extends Notifier<CallState> {
   }
 
   void _finish(String reason) {
+    final conversationId = state.call?.conversationId;
+    _refreshConversationHistory(conversationId);
     unawaited(_disconnectRoom());
     if (state.phase == CallPhase.ended) {
       return;
@@ -323,6 +326,13 @@ class CallController extends Notifier<CallState> {
       endedReason: reason,
     );
     _scheduleReset();
+  }
+
+  void _refreshConversationHistory(String? conversationId) {
+    ref.invalidate(conversationsProvider);
+    if (conversationId != null && conversationId.isNotEmpty) {
+      ref.invalidate(messagesProvider(conversationId));
+    }
   }
 
   void _scheduleReset() {
@@ -361,6 +371,8 @@ class CallController extends Notifier<CallState> {
       await ref.read(apiClientProvider).post('/api/calls/$callId/decline');
     } on ApiException {
       // Bỏ qua.
+    } finally {
+      _refreshConversationHistory(state.call?.conversationId);
     }
   }
 
@@ -369,6 +381,8 @@ class CallController extends Notifier<CallState> {
       await ref.read(apiClientProvider).post('/api/calls/$callId/end');
     } on ApiException {
       // Bỏ qua nếu cuộc gọi đã kết thúc trước đó.
+    } finally {
+      _refreshConversationHistory(state.call?.conversationId);
     }
   }
 

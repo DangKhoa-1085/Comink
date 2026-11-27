@@ -119,4 +119,62 @@ void main() {
     expect(result.conversationLabel, 'Bob');
     expect(result.contentPreview, 'Cuộc họp nhóm');
   });
+
+  test('ConversationPeer parses Owner role and defaults to Member', () {
+    final owner = ConversationPeer.fromJson({
+      'userId': 'u1',
+      'displayName': 'Alice',
+      'userName': 'alice',
+      'avatarUrl': 'https://cdn.example.com/a.jpg',
+      'role': 'Owner',
+    });
+    final member = ConversationPeer.fromJson({
+      'userId': 'u2',
+      'displayName': 'Bob',
+      'avatarUrl': '  ',
+    });
+
+    expect(owner.role, 'Owner');
+    expect(owner.isOwner, isTrue);
+    expect(owner.avatarUrl, 'https://cdn.example.com/a.jpg');
+    expect(member.role, 'Member');
+    expect(member.isOwner, isFalse);
+    expect(member.avatarUrl, isNull);
+  });
+
+  test('ConversationSummary and ConversationDetail parse group avatarUrl and roles', () {
+    final summary = ConversationSummary.fromJson({
+      'id': 'g1',
+      'type': 'Group',
+      'title': 'Nhóm đồ án',
+      'avatarUrl': 'https://cdn.example.com/group.png',
+      'memberCount': 3,
+      'unreadCount': 0,
+    });
+    final summaryEmptyAvatar = ConversationSummary.fromJson({
+      'id': 'g2',
+      'type': 'Group',
+      'title': 'Nhóm 2',
+      'avatarUrl': '',
+      'memberCount': 3,
+      'unreadCount': 0,
+    });
+    final detail = ConversationDetail.fromJson({
+      'id': 'g1',
+      'type': 'Group',
+      'title': 'Nhóm đồ án',
+      'avatarUrl': 'https://cdn.example.com/group.png',
+      'members': [
+        {'userId': 'u1', 'displayName': 'Alice', 'role': 'Owner'},
+        {'userId': 'u2', 'displayName': 'Bob', 'role': 'Member'},
+      ],
+    });
+
+    expect(summary.isGroup, isTrue);
+    expect(summary.avatarUrl, 'https://cdn.example.com/group.png');
+    expect(summaryEmptyAvatar.avatarUrl, isNull);
+    expect(detail.avatarUrl, 'https://cdn.example.com/group.png');
+    expect(detail.members.first.isOwner, isTrue);
+    expect(detail.members.last.isOwner, isFalse);
+  });
 }

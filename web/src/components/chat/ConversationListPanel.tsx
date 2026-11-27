@@ -175,9 +175,13 @@ export function ConversationListPanel({
                     )}
                   >
                     {isGroup ? (
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
-                        <Users className="h-5 w-5" />
-                      </span>
+                      conversation.avatarUrl ? (
+                        <Avatar name={displayName} url={conversation.avatarUrl} size="md" />
+                      ) : (
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
+                          <Users className="h-5 w-5" />
+                        </span>
+                      )
                     ) : (
                       <span className="relative shrink-0">
                         <Avatar

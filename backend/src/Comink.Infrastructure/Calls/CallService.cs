@@ -3,9 +3,11 @@ using Comink.Application.Calls.Abstractions;
 using Comink.Application.Calls.Dtos;
 using Comink.Application.Common;
 using Comink.Application.Common.Interfaces;
+using Comink.Application.Messaging.Abstractions;
 using Comink.Application.Notifications.Abstractions;
 using Comink.Domain.Calls;
 using Comink.Domain.Enums;
+using Comink.Infrastructure.Messaging;
 using Comink.Infrastructure.Persistence;
 using Comink.Infrastructure.Persistence.Entities;
 using Comink.Infrastructure.Social;
@@ -27,6 +29,7 @@ public class CallService : ICallService
     private readonly LiveKitOptions _liveKit;
     private readonly ILogger<CallService> _logger;
     private readonly INotificationService? _notifications;
+    private readonly IChatNotifier? _chatNotifier;
 
     public CallService(
         ApplicationDbContext db,
@@ -34,7 +37,8 @@ public class CallService : ICallService
         ICallNotifier notifier,
         IOptions<LiveKitOptions> liveKit,
         ILogger<CallService> logger,
-        INotificationService? notifications = null)
+        INotificationService? notifications = null,
+        IChatNotifier? chatNotifier = null)
     {
         _db = db;
         _provider = provider;
@@ -42,6 +46,7 @@ public class CallService : ICallService
         _liveKit = liveKit.Value;
         _logger = logger;
         _notifications = notifications;
+        _chatNotifier = chatNotifier;
     }
 
     /// <inheritdoc />
@@ -683,7 +688,7 @@ public class CallService : ICallService
         // Room có thể đã tự xoá; EndRoomAsync không ném ra ngoài.
         await _provider.EndRoomAsync(call.RoomName, cancellationToken);
 
-        await WriteCallMessageAsync(call, cancellationToken);
+        var callMessage = await WriteCallMessageAsync(call, cancellationToken);
 
         if (status == CallStatus.Missed)
         {
@@ -695,6 +700,15 @@ public class CallService : ICallService
         if (notifyMembers)
         {
             var memberIds = call.Participants.Select(p => p.UserId).ToList();
+            if (callMessage is not null && _chatNotifier is not null)
+            {
+                await _chatNotifier.MessageCreatedAsync(
+                    call.ConversationId,
+                    memberIds,
+                    MessagingMapping.ToMessageDto(callMessage),
+                    cancellationToken);
+            }
+
             await _notifier.CallEndedAsync(
                 memberIds,
                 new CallEndedDto(call.Id, call.Status.ToString(), call.EndReason?.ToString(), call.DurationSeconds),
@@ -709,7 +723,7 @@ public class CallService : ICallService
     /// Ghi một tin nhắn loại <c>Call</c> vào hội thoại (quyết định D4). Nội dung có dạng
     /// <c>call:{type}:{duration}:{endReason}</c> — client dịch sang vi/en.
     /// </summary>
-    private async Task WriteCallMessageAsync(Call call, CancellationToken cancellationToken)
+    private async Task<Message?> WriteCallMessageAsync(Call call, CancellationToken cancellationToken)
     {
         var already = await _db.Messages
             .AsNoTracking()
@@ -717,7 +731,7 @@ public class CallService : ICallService
 
         if (already)
         {
-            return;
+            return null;
         }
 
         var content = string.Join(':',
@@ -749,6 +763,7 @@ public class CallService : ICallService
         }
 
         await _db.SaveChangesAsync(cancellationToken);
+        return message;
     }
 
     /// <summary>Cập nhật trạng thái một người theo identity của LiveKit (thường là user id).</summary>

@@ -451,10 +451,9 @@ export function ProfilePage() {
       {tab === 'account' && (
         <Card>
           <h2 className="mb-4 text-base font-bold">{t('profile.account_info')}</h2>
-          <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+          <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
             <InfoRow label={t('auth.email')} value={profile.email} />
             <InfoRow label={t('auth.username')} value={profile.userName} />
-            <InfoRow label={t('profile.roles')} value={profile.roles.join(', ')} />
             <InfoRow
               label={t('profile.joined_at')}
               value={new Date(profile.createdAt).toLocaleDateString()}

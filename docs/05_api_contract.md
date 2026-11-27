@@ -790,6 +790,20 @@ Tin gốc bị thu hồi **sau đó** vẫn trả `replyTo` với `isDeleted = t
 - `ConversationDto` và `ConversationSummaryDto` thêm `isMuted`, `mutedUntil` **của chính người gọi**.
 - Lỗi: `VALIDATION_FAILED` (400 — thời hạn lạ), `CONVERSATION_NOT_FOUND` (404).
 
+### 8.23. Quản lý nhóm chat (NC GĐ 3 — mở rộng)
+
+| Method | Đường dẫn | Body | Kết quả |
+|---|---|---|---|
+| `PATCH` | `/api/conversations/{id}/group` | `{ "title"?: string, "avatarUrl"?: string }` | `200 ConversationDto` |
+| `POST` | `/api/conversations/{id}/members` | `{ "memberIds": uuid[] }` | `200 ConversationDto` |
+| `DELETE` | `/api/conversations/{id}/members/{userId}` | — | `200 ConversationDto` |
+| `POST` | `/api/conversations/{id}/leave` | — | `204 No Content` |
+
+- `ConversationMemberDto` bổ sung `role` (`"Owner"` \| `"Admin"` \| `"Member"`), `ConversationSummaryDto` bổ sung `avatarUrl` (dùng cho nhóm).
+- **Thêm thành viên (`POST .../members`):** mọi thành viên còn hiệu lực đều mời thêm được **bạn bè** của mình vào nhóm; tổng thành viên không vượt quá 10 (`400 MESSAGING_GROUP_TOO_MANY`), người được mời chưa kết bạn → `403 MESSAGING_NOT_FRIENDS`. Nếu thành viên từng rời hoặc bị xoá trước đó, server kích hoạt lại dòng `conversation_members` cũ (`left_at = null`).
+- **Xoá thành viên (`DELETE .../members/{userId}`):** chỉ nhóm trưởng (`Owner`) mới có quyền xoá thành viên khác (`403 FORBIDDEN` nếu không phải `Owner`); không thể tự xoá chính mình (`400 VALIDATION_FAILED`).
+- **Rời nhóm (`POST .../leave`):** thành viên tự đặt `left_at = now`. Nếu nhóm trưởng (`Owner`) rời khi nhóm vẫn còn người ở lại, quyền `Owner` tự chuyển cho thành viên còn lại vào sớm nhất.
+
 ---
 
 ## 9. Gọi trực tuyến (Giai đoạn 4)

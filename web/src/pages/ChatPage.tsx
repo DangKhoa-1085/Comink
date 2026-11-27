@@ -31,6 +31,7 @@ import { mediaApi } from '../api/media'
 import { Avatar } from '../components/social/Avatar'
 import { ConversationListPanel } from '../components/chat/ConversationListPanel'
 import { ForwardDialog } from '../components/chat/ForwardDialog'
+import { GroupInfoModal } from '../components/chat/GroupInfoModal'
 import { MessageBubble } from '../components/chat/MessageBubble'
 import { MessageSearchPanel } from '../components/chat/MessageSearchPanel'
 import { PinnedPanel } from '../components/chat/PinnedPanel'
@@ -118,6 +119,7 @@ function ChatPageView() {
   const [pinnedOpen, setPinnedOpen] = useState(false)
   const [muteOpen, setMuteOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [groupInfoOpen, setGroupInfoOpen] = useState(false)
   /** Từ khoá đang được tô sáng trong nội dung tin (sau khi mở từ kết quả tìm kiếm). */
   const [searchTerm, setSearchTerm] = useState('')
   const [forwarding, setForwarding] = useState<ChatMessage | null>(null)
@@ -746,11 +748,19 @@ function ChatPageView() {
             </div>
           </Link>
         ) : (
-          <div className="flex min-w-0 flex-1 items-center gap-3">
+          <button
+            type="button"
+            onClick={() => isGroup && setGroupInfoOpen(true)}
+            className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-1.5 py-1 text-left transition-colors hover:bg-slate-100/80 dark:hover:bg-slate-800/70"
+          >
             {isGroup ? (
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
-                <Users className="h-4 w-4" />
-              </span>
+              conversation.avatarUrl ? (
+                <Avatar name={peerName} url={conversation.avatarUrl} size="sm" />
+              ) : (
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
+                  <Users className="h-4 w-4" />
+                </span>
+              )
             ) : (
               <Avatar name={peerName} url={null} size="sm" />
             )}
@@ -765,7 +775,7 @@ function ChatPageView() {
                 </p>
               )}
             </div>
-          </div>
+          </button>
         )}
 
         {/* Gọi thoại/video ngay trong hội thoại (docs/05_api_contract.md mục 9.2) */}
@@ -817,6 +827,18 @@ function ChatPageView() {
           >
             <Search className="h-4 w-4" />
           </Button>
+          {isGroup && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setGroupInfoOpen(true)}
+              title={t('chat.group_info')}
+              aria-label={t('chat.group_info')}
+              aria-expanded={groupInfoOpen}
+            >
+              <Users className="h-4 w-4" />
+            </Button>
+          )}
           <div className="relative">
             <Button
               variant="ghost"
@@ -1072,6 +1094,15 @@ function ChatPageView() {
             }
             queryClient.invalidateQueries({ queryKey: ['conversations'] })
           }}
+        />
+      )}
+
+      {isGroup && groupInfoOpen && me && (
+        <GroupInfoModal
+          conversation={conversation}
+          currentUserId={me.id}
+          onClose={() => setGroupInfoOpen(false)}
+          onLeftGroup={() => navigate('/messages')}
         />
       )}
     </div>

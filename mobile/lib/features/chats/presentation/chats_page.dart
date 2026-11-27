@@ -192,11 +192,17 @@ class _ConversationTile extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         onTap: onTap,
         leading: conversation.isGroup
-            ? CircleAvatar(
-                radius: 24,
-                backgroundColor: colors.primaryContainer,
-                child: Icon(Icons.groups, color: colors.onPrimaryContainer),
-              )
+            ? (conversation.avatarUrl != null && conversation.avatarUrl!.isNotEmpty
+                ? AppAvatar(
+                    name: title,
+                    url: conversation.avatarUrl,
+                    radius: 24,
+                  )
+                : CircleAvatar(
+                    radius: 24,
+                    backgroundColor: colors.primaryContainer,
+                    child: Icon(Icons.groups, color: colors.onPrimaryContainer),
+                  ))
             : Stack(
                 clipBehavior: Clip.none,
                 children: [

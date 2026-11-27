@@ -123,6 +123,25 @@ public class ChatHubTests
         public Task<OperationResult<ConversationDto>> CreateGroupAsync(
             Guid currentUserId, CreateGroupConversationRequest request, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task<OperationResult<ConversationDto>> UpdateGroupAsync(
+            Guid currentUserId, Guid conversationId, UpdateGroupConversationRequest request,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<OperationResult<ConversationDto>> AddGroupMembersAsync(
+            Guid currentUserId, Guid conversationId, AddGroupMembersRequest request,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<OperationResult<ConversationDto>> RemoveGroupMemberAsync(
+            Guid currentUserId, Guid conversationId, Guid targetUserId,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<OperationResult<bool>> LeaveGroupAsync(
+            Guid currentUserId, Guid conversationId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class AlwaysAllowedTypingThrottle : ITypingThrottle
