@@ -49,16 +49,18 @@ export function AppLayout() {
 
   if (isCallScreen) {
     return (
-      <div className="min-h-screen bg-[#080B14] text-slate-100">
+      <div className="flex h-dvh flex-col overflow-hidden bg-[#080B14] text-slate-100">
         {showOfflineBanner && (
           <div
             role="status"
-            className="border-b border-amber-800 bg-amber-950/90 px-4 py-2 text-center text-xs text-amber-200"
+            className="shrink-0 border-b border-amber-800 bg-amber-950/90 px-4 py-2 text-center text-xs text-amber-200"
           >
             {t('chat.connection_lost')}
           </div>
         )}
-        <Outlet />
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <Outlet />
+        </div>
         <IncomingCallModal />
         <ToastContainer />
       </div>

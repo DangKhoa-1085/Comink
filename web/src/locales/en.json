@@ -199,6 +199,8 @@
     "camera_on": "Turn camera off",
     "camera_off": "Turn camera on",
     "hangup": "End call",
+    "you": "You",
+    "participants_count": "{{count}} participants",
     "ended": "Call ended",
     "ended_detail": "Duration {{duration}} · {{reason}}",
     "reason_completed": "Completed",
