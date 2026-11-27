@@ -1,4 +1,6 @@
 // Cấu hình nhà cung cấp gọi LiveKit (đọc từ section "LiveKit").
+using Microsoft.Extensions.Configuration;
+
 namespace Comink.Infrastructure.Calls;
 
 /// <summary>
@@ -90,4 +92,42 @@ public class LiveKitOptions
             : url.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
                 ? $"ws://{url[7..]}"
                 : url;
+
+    /// <summary>
+    /// Bổ sung giá trị từ bộ biến môi trường chuẩn của LiveKit Cloud
+    /// (<c>LIVEKIT_URL</c>, <c>LIVEKIT_API_KEY</c>, <c>LIVEKIT_API_SECRET</c>)
+    /// nếu section <c>LiveKit:*</c> chưa khai báo.
+    /// </summary>
+    public void ApplyEnvironmentFallbacks(IConfiguration configuration)
+    {
+        if (string.IsNullOrWhiteSpace(ApiKey))
+        {
+            var envKey = configuration["LIVEKIT_API_KEY"];
+            if (!string.IsNullOrWhiteSpace(envKey))
+            {
+                ApiKey = envKey;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(ApiSecret))
+        {
+            var envSecret = configuration["LIVEKIT_API_SECRET"];
+            if (!string.IsNullOrWhiteSpace(envSecret))
+            {
+                ApiSecret = envSecret;
+            }
+        }
+
+        var isHostUnsetOrDefault = string.IsNullOrWhiteSpace(Host) ||
+            Host.Trim().TrimEnd('/').Equals(DefaultHost, StringComparison.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(PublicUrl) && isHostUnsetOrDefault)
+        {
+            var envUrl = configuration["LIVEKIT_URL"];
+            if (!string.IsNullOrWhiteSpace(envUrl))
+            {
+                Host = envUrl;
+                PublicUrl = envUrl;
+            }
+        }
+    }
 }

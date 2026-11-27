@@ -172,6 +172,55 @@ public class DeploymentConfigUnitTests
         Assert.Equal("APIkey123", options.TrimmedApiKey);
         Assert.Equal("secret456", options.TrimmedApiSecret);
     }
+
+    [Fact]
+    public void LiveKitOptions_TuDongLayBienChuanLiveKitCloudKhiThieuSectionLiveKit()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["LIVEKIT_URL"] = "wss://my-project.livekit.cloud/",
+                ["LIVEKIT_API_KEY"] = "APICloudKey",
+                ["LIVEKIT_API_SECRET"] = "CloudSecretValue"
+            })
+            .Build();
+
+        var options = new LiveKitOptions();
+        options.ApplyEnvironmentFallbacks(configuration);
+
+        Assert.True(options.IsConfigured);
+        Assert.Equal("https://my-project.livekit.cloud", options.ServerUrl);
+        Assert.Equal("wss://my-project.livekit.cloud", options.ClientUrl);
+        Assert.Equal("APICloudKey", options.TrimmedApiKey);
+        Assert.Equal("CloudSecretValue", options.TrimmedApiSecret);
+    }
+
+    [Fact]
+    public void LiveKitOptions_UuTienSectionLiveKitKhiCoCaHaiBoBien()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["LIVEKIT_URL"] = "wss://fallback.livekit.cloud",
+                ["LIVEKIT_API_KEY"] = "FallbackKey",
+                ["LIVEKIT_API_SECRET"] = "FallbackSecret"
+            })
+            .Build();
+
+        var options = new LiveKitOptions
+        {
+            Host = "http://localhost:7880",
+            PublicUrl = "ws://192.168.1.3:7880",
+            ApiKey = "ExplicitKey",
+            ApiSecret = "ExplicitSecret"
+        };
+        options.ApplyEnvironmentFallbacks(configuration);
+
+        Assert.Equal("http://localhost:7880", options.ServerUrl);
+        Assert.Equal("ws://192.168.1.3:7880", options.ClientUrl);
+        Assert.Equal("ExplicitKey", options.TrimmedApiKey);
+        Assert.Equal("ExplicitSecret", options.TrimmedApiSecret);
+    }
 }
 
 /// <summary>Integration test cho seed role/admin ở Production trên PostgreSQL thật.</summary>

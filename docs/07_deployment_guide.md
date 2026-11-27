@@ -67,7 +67,10 @@ dotnet ef database update --project src/Comink.Infrastructure --startup-project 
 | `AdminSeed__DisplayName` | `Administrator` | Tuỳ chọn |
 | `Firebase__ServiceAccountJson` | Chuỗi JSON 1 dòng của Firebase Service Account | Tuỳ chọn |
 
-> **Lưu ý về LiveKit Cloud:** `LiveKit__Host` chấp nhận cả dạng `https://<project>.livekit.cloud` lẫn `wss://<project>.livekit.cloud` (backend tự chuẩn hoá `wss://` → `https://` khi gọi Twirp API và `https://` → `wss://` cho client). Sau khi deploy, kiểm tra **Deploy Logs** trên Railway tìm dòng `Calls.LiveKit` (`LiveKit: BẬT (ServerUrl=..., ClientUrl=...)`) để xác nhận cấu hình đã nhận đúng.
+> **Lưu ý về LiveKit Cloud:**
+> - `LiveKit__Host` chấp nhận cả dạng `https://<project>.livekit.cloud` lẫn `wss://<project>.livekit.cloud` (backend tự chuẩn hoá `wss://` → `https://` khi gọi Twirp API và `https://` → `wss://` cho client).
+> - Nếu không khai báo các biến `LiveKit__*`, backend cũng tự đọc bộ biến mặc định của LiveKit Cloud (`LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`) khi dán trực tiếp từ dashboard LiveKit Cloud.
+> - Sau khi deploy, kiểm tra **Deploy Logs** trên Railway tìm dòng `Calls.LiveKit` (`LiveKit: BẬT (ServerUrl=..., ClientUrl=...)`) để xác nhận cấu hình đã nhận đúng.
 
 ---
 

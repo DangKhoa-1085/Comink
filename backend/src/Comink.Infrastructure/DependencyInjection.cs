@@ -200,6 +200,7 @@ public static class DependencyInjection
 
         // --- Cuộc gọi (Giai đoạn 4) ---
         services.Configure<Calls.LiveKitOptions>(configuration.GetSection(Calls.LiveKitOptions.SectionName));
+        services.PostConfigure<Calls.LiveKitOptions>(options => options.ApplyEnvironmentFallbacks(configuration));
         services.AddSingleton<ICallProvider, Calls.LiveKitCallProvider>();
         services.AddScoped<ICallService, Calls.CallService>();
 
