@@ -2,7 +2,6 @@
 // Tài liệu: https://docs.livekit.io/home/server/generating-tokens/ và /server/room-service/
 using System.Globalization;
 using System.Net.Http.Headers;
-using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -87,7 +86,8 @@ public class LiveKitCallProvider : ICallProvider, IDisposable
             ["iss"] = _options.TrimmedApiKey,
             ["sub"] = userId,
             ["name"] = displayName,
-            ["nbf"] = now,
+            // Trừ 5s để tránh lệch đồng hồ nhỏ giữa Railway và LiveKit Cloud.
+            ["nbf"] = now - 5,
             // Token NGẮN HẠN: chỉ đủ để vào room, không dùng cho thao tác quản trị.
             ["exp"] = now + Domain.Calls.CallRules.JoinTokenTtlSeconds,
             ["video"] = new Dictionary<string, object?>
@@ -112,7 +112,7 @@ public class LiveKitCallProvider : ICallProvider, IDisposable
         {
             ["iss"] = _options.TrimmedApiKey,
             ["sub"] = "comink-backend",
-            ["nbf"] = now,
+            ["nbf"] = now - 5,
             ["exp"] = now + AdminTokenTtlSeconds,
             ["video"] = new Dictionary<string, object?>
             {
@@ -146,9 +146,15 @@ public class LiveKitCallProvider : ICallProvider, IDisposable
         CancellationToken cancellationToken)
     {
         var url = $"{_options.ServerUrl}/twirp/livekit.{method}";
+        // Dùng Content-Type đúng chuẩn `application/json` (không kèm `; charset=utf-8`),
+        // vì Twirp strict có thể từ chối header có tham số charset bằng lỗi bad_route.
+        var jsonBytes = JsonSerializer.SerializeToUtf8Bytes(body);
+        var content = new ByteArrayContent(jsonBytes);
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+
         using var request = new HttpRequestMessage(HttpMethod.Post, url)
         {
-            Content = JsonContent.Create(body)
+            Content = content
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
