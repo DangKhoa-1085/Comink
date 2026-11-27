@@ -459,6 +459,16 @@
     "MESSAGE_ALREADY_DELETED": "This message has already been recalled.",
     "MESSAGE_NOT_EDITABLE": "This message type cannot be edited.",
     "MESSAGE_PIN_LIMIT_REACHED": "You can pin up to 10 messages per conversation.",
-    "MESSAGE_REACTION_INVALID": "Invalid reaction."
+    "MESSAGE_REACTION_INVALID": "Invalid reaction.",
+    "MESSAGING_NOT_FRIENDS": "You need to be friends to do that.",
+    "MEDIA_UNSUPPORTED_TYPE": "Unsupported media type.",
+    "MEDIA_TOO_LARGE": "Media file exceeds the allowed size.",
+    "MEDIA_NOT_FOUND": "Uploaded media was not found.",
+    "MEDIA_NOT_OWNED": "You do not own this media file.",
+    "CALL_PROVIDER_UNAVAILABLE": "Call service is currently unavailable. Check the server LiveKit configuration and try again.",
+    "CALL_ALREADY_ACTIVE": "There is already an active call in this conversation.",
+    "CALL_NOT_FOUND": "Call not found.",
+    "CALL_ALREADY_ENDED": "The call has already ended.",
+    "CALL_NOT_RINGING": "The call is no longer ringing."
   }
 }

@@ -84,7 +84,7 @@ public class LiveKitCallProvider : ICallProvider, IDisposable
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var payload = new Dictionary<string, object?>
         {
-            ["iss"] = _options.ApiKey,
+            ["iss"] = _options.TrimmedApiKey,
             ["sub"] = userId,
             ["name"] = displayName,
             ["nbf"] = now,
@@ -110,7 +110,7 @@ public class LiveKitCallProvider : ICallProvider, IDisposable
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         return SignJwt(new Dictionary<string, object?>
         {
-            ["iss"] = _options.ApiKey,
+            ["iss"] = _options.TrimmedApiKey,
             ["sub"] = "comink-backend",
             ["nbf"] = now,
             ["exp"] = now + AdminTokenTtlSeconds,
@@ -130,7 +130,7 @@ public class LiveKitCallProvider : ICallProvider, IDisposable
         var body = Base64Url(JsonSerializer.SerializeToUtf8Bytes(payload));
         var unsigned = $"{header}.{body}";
         var signature = Base64Url(
-            HMACSHA256.HashData(Encoding.UTF8.GetBytes(_options.ApiSecret), Encoding.UTF8.GetBytes(unsigned)));
+            HMACSHA256.HashData(Encoding.UTF8.GetBytes(_options.TrimmedApiSecret), Encoding.UTF8.GetBytes(unsigned)));
 
         return $"{unsigned}.{signature}";
     }
@@ -145,7 +145,7 @@ public class LiveKitCallProvider : ICallProvider, IDisposable
         string token,
         CancellationToken cancellationToken)
     {
-        var url = $"{_options.Host.TrimEnd('/')}/twirp/livekit.{method}";
+        var url = $"{_options.ServerUrl}/twirp/livekit.{method}";
         using var request = new HttpRequestMessage(HttpMethod.Post, url)
         {
             Content = JsonContent.Create(body)
@@ -158,7 +158,7 @@ public class LiveKitCallProvider : ICallProvider, IDisposable
             var error = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException(
                 string.Create(CultureInfo.InvariantCulture,
-                    $"LiveKit {method} lỗi {(int)response.StatusCode}: {error}"));
+                    $"LiveKit {method} ({_options.ServerUrl}) lỗi {(int)response.StatusCode}: {error}"));
         }
     }
 

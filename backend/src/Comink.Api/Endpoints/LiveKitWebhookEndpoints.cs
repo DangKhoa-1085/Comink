@@ -46,7 +46,7 @@ public static class LiveKitWebhookEndpoints
             ? authorization[bearerPrefix.Length..].Trim()
             : authorization;
 
-        if (!LiveKitWebhookVerifier.IsValid(token, body, liveKitOptions.Value.ApiSecret))
+        if (!LiveKitWebhookVerifier.IsValid(token, body, liveKitOptions.Value.TrimmedApiSecret))
         {
             // Chữ ký sai → không xử lý; trả mã chẩn đoán (không lộ token/secret) để dễ điều tra.
             logger.LogWarning("Webhook LiveKit có chữ ký không hợp lệ (body {Length} ký tự)", body.Length);

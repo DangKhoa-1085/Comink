@@ -231,6 +231,47 @@ try
         }
     }
 
+    // --- Trạng thái LiveKit (Giai đoạn 4) ---
+    // Ghi log cấu hình khi khởi động (không ghi ApiKey/ApiSecret) để phát hiện ngay
+    // thiếu biến môi trường hoặc trỏ nhầm localhost trên Production.
+    using (var liveKitScope = app.Services.CreateScope())
+    {
+        var liveKitOptions = liveKitScope.ServiceProvider
+            .GetRequiredService<Microsoft.Extensions.Options.IOptions<
+                Comink.Infrastructure.Calls.LiveKitOptions>>()
+            .Value;
+        var liveKitLogger = liveKitScope.ServiceProvider
+            .GetRequiredService<ILoggerFactory>()
+            .CreateLogger("Calls.LiveKit");
+
+        if (!liveKitOptions.IsConfigured)
+        {
+            liveKitLogger.LogWarning(
+                "LiveKit: TẮT — thiếu LiveKit__ApiKey hoặc LiveKit__ApiSecret; "
+                + "cuộc gọi sẽ trả về CALL_PROVIDER_UNAVAILABLE (503).");
+        }
+        else if (!app.Environment.IsDevelopment()
+                 && (liveKitOptions.ServerUrl.Contains("localhost", StringComparison.OrdinalIgnoreCase)
+                     || liveKitOptions.ServerUrl.Contains("127.0.0.1", StringComparison.OrdinalIgnoreCase)
+                     || liveKitOptions.ClientUrl.Contains("localhost", StringComparison.OrdinalIgnoreCase)
+                     || liveKitOptions.ClientUrl.Contains("127.0.0.1", StringComparison.OrdinalIgnoreCase)))
+        {
+            liveKitLogger.LogWarning(
+                "LiveKit: BẬT nhưng đang trỏ về localhost (ServerUrl={ServerUrl}, ClientUrl={ClientUrl}) "
+                + "ở môi trường {Environment} — kiểm tra LiveKit__Host và LiveKit__PublicUrl.",
+                liveKitOptions.ServerUrl,
+                liveKitOptions.ClientUrl,
+                app.Environment.EnvironmentName);
+        }
+        else
+        {
+            liveKitLogger.LogInformation(
+                "LiveKit: BẬT (ServerUrl={ServerUrl}, ClientUrl={ClientUrl})",
+                liveKitOptions.ServerUrl,
+                liveKitOptions.ClientUrl);
+        }
+    }
+
     if (app.Environment.IsDevelopment())
     {
         app.MapOpenApi();
