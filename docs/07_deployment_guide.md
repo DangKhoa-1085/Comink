@@ -84,6 +84,7 @@ dotnet ef database update --project src/Comink.Infrastructure --startup-project 
    - **Output Directory:** `dist`
 3. Thêm biến môi trường:
    - `VITE_API_BASE_URL` = `https://<backend-domain>.up.railway.app` (không cần dấu `/` cuối; code tự cắt nếu có).
+   - `VITE_APK_DOWNLOAD_URL` *(tuỳ chọn)* = đường dẫn tải trực tiếp file `app-release.apk` (khuyến nghị upload lên **GitHub Releases** rồi đặt `https://github.com/<owner>/<repo>/releases/latest/download/app-release.apk`) để hiện link tải & mã QR trong sidebar và menu Cài đặt trên điện thoại.
 4. Deploy và sao chép URL Vercel vừa tạo.
 
 ---

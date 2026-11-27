@@ -4,6 +4,7 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import { Home, MessageSquare, Search, ShieldCheck, User, Users } from 'lucide-react'
 import { conversationsApi } from '../../api/conversations'
 import { AppHeader } from './AppHeader'
+import { ApkDownloadBanner } from './ApkDownloadBanner'
 import { SettingsMenu } from './SettingsMenu'
 import { NotificationMenu } from '../notifications/NotificationMenu'
 import { CominkLogo } from '../brand/CominkLogo'
@@ -237,30 +238,34 @@ function AuthenticatedShell({
           </nav>
         </div>
 
-        <div className="space-y-2 border-t border-slate-200/80 pt-3 dark:border-slate-800">
-          <SettingsMenu placement="sidebar-bottom" compact={isMessagesRoute} />
+        <div className="space-y-3">
+          <ApkDownloadBanner compact={isMessagesRoute} />
 
-          <Link
-            to="/profile"
-            title={user.displayName}
-            className={cn(
-              'flex items-center rounded-xl transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/80',
-              isMessagesRoute ? 'justify-center p-1.5' : 'gap-2.5 p-2',
-            )}
-          >
-            <Avatar name={user.displayName} url={user.avatarUrl} size="sm" />
-            {!isMessagesRoute && (
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">
-                  {user.displayName}
-                </p>
-                <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                  @{user.userName}
-                  {isAdmin ? ' · Admin' : ''}
-                </p>
-              </div>
-            )}
-          </Link>
+          <div className="space-y-2 border-t border-slate-200/80 pt-3 dark:border-slate-800">
+            <SettingsMenu placement="sidebar-bottom" compact={isMessagesRoute} />
+
+            <Link
+              to="/profile"
+              title={user.displayName}
+              className={cn(
+                'flex items-center rounded-xl transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/80',
+                isMessagesRoute ? 'justify-center p-1.5' : 'gap-2.5 p-2',
+              )}
+            >
+              <Avatar name={user.displayName} url={user.avatarUrl} size="sm" />
+              {!isMessagesRoute && (
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">
+                    {user.displayName}
+                  </p>
+                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                    @{user.userName}
+                    {isAdmin ? ' · Admin' : ''}
+                  </p>
+                </div>
+              )}
+            </Link>
+          </div>
         </div>
       </aside>
 

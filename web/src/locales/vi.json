@@ -72,6 +72,21 @@
     "theme_dark": "Tối",
     "language": "Ngôn ngữ"
   },
+  "apk": {
+    "title": "Comink Android",
+    "subtitle": "Gọi & nhắn mượt hơn",
+    "badge": "APK",
+    "download_cta": "Tải APK",
+    "download_direct": "Tải file .apk trực tiếp",
+    "qr_button_label": "Hiện mã QR tải ứng dụng",
+    "compact_label": "Tải Comink Android (.apk) / Mã QR",
+    "qr_title": "Quét để cài Comink",
+    "qr_subtitle": "Android · File cài đặt .apk",
+    "qr_hint": "Mở camera điện thoại quét mã để tải trực tiếp tệp cài đặt.",
+    "not_configured": "Liên kết tải APK chưa được cấu hình (VITE_APK_DOWNLOAD_URL).",
+    "qr_not_configured": "Chưa cấu hình biến VITE_APK_DOWNLOAD_URL trên máy chủ web.",
+    "mobile_menu_item": "Tải app Android (.apk)"
+  },
   "auth": {
     "login_title": "Đăng nhập",
     "login_subtitle": "Đăng nhập để tiếp tục sử dụng Comink",
