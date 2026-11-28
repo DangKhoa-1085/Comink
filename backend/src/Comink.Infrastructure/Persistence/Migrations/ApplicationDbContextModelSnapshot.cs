@@ -675,6 +675,115 @@ namespace Comink.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.LocketMoment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AudienceType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("AllFriends")
+                        .HasColumnName("audience_type");
+
+                    b.Property<Guid>("AuthorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("author_id");
+
+                    b.Property<string>("Caption")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("caption");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("MediaAssetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("media_asset_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_locket_moments");
+
+                    b.HasIndex("MediaAssetId")
+                        .HasDatabaseName("ix_locket_moments_media_asset_id");
+
+                    b.HasIndex("ExpiresAt", "DeletedAt")
+                        .HasDatabaseName("ix_locket_moments_expires_at_deleted_at");
+
+                    b.HasIndex("AuthorId", "CreatedAt", "Id")
+                        .HasDatabaseName("ix_locket_moments_author_id_created_at_id");
+
+                    b.ToTable("locket_moments", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_locket_moments_audience", "audience_type IN ('AllFriends', 'SelectedFriends')");
+
+                            t.HasCheckConstraint("ck_locket_moments_caption_length", "caption IS NULL OR char_length(caption) <= 100");
+
+                            t.HasCheckConstraint("ck_locket_moments_expiry", "expires_at > created_at");
+                        });
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.LocketReaction", b =>
+                {
+                    b.Property<Guid>("MomentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("moment_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Emoji")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("emoji");
+
+                    b.HasKey("MomentId", "UserId")
+                        .HasName("pk_locket_reactions");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_locket_reactions_user_id");
+
+                    b.ToTable("locket_reactions", (string)null);
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.LocketRecipient", b =>
+                {
+                    b.Property<Guid>("MomentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("moment_id");
+
+                    b.Property<Guid>("RecipientUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recipient_user_id");
+
+                    b.HasKey("MomentId", "RecipientUserId")
+                        .HasName("pk_locket_recipients");
+
+                    b.HasIndex("RecipientUserId")
+                        .HasDatabaseName("ix_locket_recipients_recipient_user_id");
+
+                    b.ToTable("locket_recipients", (string)null);
+                });
+
             modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.MediaAsset", b =>
                 {
                     b.Property<Guid>("Id")
@@ -772,7 +881,7 @@ namespace Comink.Infrastructure.Persistence.Migrations
 
                     b.ToTable("media_assets", null, t =>
                         {
-                            t.HasCheckConstraint("ck_media_assets_context", "context IN ('Post', 'Message', 'Avatar', 'Cover', 'Album')");
+                            t.HasCheckConstraint("ck_media_assets_context", "context IN ('Post', 'Message', 'Avatar', 'Cover', 'Album', 'Locket')");
 
                             t.HasCheckConstraint("ck_media_assets_provider", "provider IN ('Cloudinary', 'Firebase', 'Local')");
 
@@ -1634,6 +1743,69 @@ namespace Comink.Infrastructure.Persistence.Migrations
                     b.Navigation("Requester");
                 });
 
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.LocketMoment", b =>
+                {
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "Author")
+                        .WithMany()
+                        .HasForeignKey("AuthorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_locket_moments_users_author_id");
+
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.MediaAsset", "MediaAsset")
+                        .WithMany()
+                        .HasForeignKey("MediaAssetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_locket_moments_media_assets_media_asset_id");
+
+                    b.Navigation("Author");
+
+                    b.Navigation("MediaAsset");
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.LocketReaction", b =>
+                {
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.LocketMoment", "Moment")
+                        .WithMany("Reactions")
+                        .HasForeignKey("MomentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_locket_reactions_locket_moments_moment_id");
+
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_locket_reactions_users_user_id");
+
+                    b.Navigation("Moment");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.LocketRecipient", b =>
+                {
+                    b.HasOne("Comink.Infrastructure.Persistence.Entities.LocketMoment", "Moment")
+                        .WithMany("Recipients")
+                        .HasForeignKey("MomentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_locket_recipients_locket_moments_moment_id");
+
+                    b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "RecipientUser")
+                        .WithMany()
+                        .HasForeignKey("RecipientUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_locket_recipients_users_recipient_user_id");
+
+                    b.Navigation("Moment");
+
+                    b.Navigation("RecipientUser");
+                });
+
             modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.MediaAsset", b =>
                 {
                     b.HasOne("Comink.Infrastructure.Identity.ApplicationUser", "Owner")
@@ -1948,6 +2120,13 @@ namespace Comink.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Conversation", b =>
                 {
                     b.Navigation("Members");
+                });
+
+            modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.LocketMoment", b =>
+                {
+                    b.Navigation("Reactions");
+
+                    b.Navigation("Recipients");
                 });
 
             modelBuilder.Entity("Comink.Infrastructure.Persistence.Entities.Message", b =>

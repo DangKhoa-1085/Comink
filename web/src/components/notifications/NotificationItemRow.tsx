@@ -174,8 +174,10 @@ export function NotificationItemRow({
 
     switch (item.type) {
       case 'FriendRequestReceived':
+        navigate('/friends?tab=incoming')
+        return
       case 'FriendRequestAccepted':
-        navigate('/friends')
+        navigate('/friends?tab=list')
         return
       case 'NewFollower':
         if (item.actorId) {

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -20,6 +21,44 @@ interface NotificationMenuProps {
 
 const RECENT_MS = 24 * 60 * 60 * 1000
 
+/** Tính tọa độ cố định trên viewport để bảng thông báo không bị kẹt dưới stacking context khác. */
+function computePanelStyle(
+  trigger: HTMLElement | null,
+  placement: NotificationMenuProps['placement'],
+): CSSProperties | null {
+  const rect = trigger?.getBoundingClientRect()
+  if (!rect || typeof window === 'undefined') {
+    return null
+  }
+
+  const padding = 12
+  const width = Math.min(384, window.innerWidth - padding * 2)
+  const maxHeight = Math.min(Math.floor(window.innerHeight * 0.8), 560)
+
+  if (placement === 'sidebar') {
+    const left = Math.max(padding, Math.min(rect.right + 8, window.innerWidth - width - padding))
+    const top = Math.max(padding, Math.min(rect.top, window.innerHeight - maxHeight - padding))
+    return { top, left, width, maxHeight }
+  }
+
+  if (window.innerWidth < 640) {
+    return {
+      top: Math.max(rect.bottom + 8, 64),
+      left: padding,
+      right: padding,
+      maxHeight,
+    }
+  }
+
+  const left = Math.max(padding, Math.min(rect.right - width, window.innerWidth - width - padding))
+  return {
+    top: rect.bottom + 8,
+    left,
+    width,
+    maxHeight,
+  }
+}
+
 /**
  * Nút chuông và bảng thả Thông báo kiểu Facebook (Tất cả / Chưa đọc, Mới / Trước đó, Xem tất cả).
  */
@@ -30,7 +69,9 @@ export function NotificationMenu({ placement, compact = false }: NotificationMen
   const [optionsOpen, setOptionsOpen] = useState(false)
   const [filter, setFilter] = useState<FilterMode>('all')
   const [nowMs, setNowMs] = useState(() => Date.now())
-  const rootRef = useRef<HTMLDivElement | null>(null)
+  const [panelStyle, setPanelStyle] = useState<CSSProperties | null>(null)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const panelRef = useRef<HTMLDivElement | null>(null)
 
   const query = useQuery({
     queryKey: ['notifications'],
@@ -57,7 +98,8 @@ export function NotificationMenu({ placement, compact = false }: NotificationMen
     }
 
     const onPointerDown = (event: MouseEvent | TouchEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node
+      if (!triggerRef.current?.contains(target) && !panelRef.current?.contains(target)) {
         setOpen(false)
         setOptionsOpen(false)
       }
@@ -68,16 +110,23 @@ export function NotificationMenu({ placement, compact = false }: NotificationMen
         setOptionsOpen(false)
       }
     }
+    const updatePosition = () => {
+      setPanelStyle(computePanelStyle(triggerRef.current, placement))
+    }
 
     document.addEventListener('mousedown', onPointerDown)
     document.addEventListener('touchstart', onPointerDown)
     document.addEventListener('keydown', onKeyDown)
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
     return () => {
       document.removeEventListener('mousedown', onPointerDown)
       document.removeEventListener('touchstart', onPointerDown)
       document.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
     }
-  }, [open])
+  }, [open, placement])
 
   const toggleMenu = () => {
     setOpen((prev) => {
@@ -86,6 +135,8 @@ export function NotificationMenu({ placement, compact = false }: NotificationMen
         setOptionsOpen(false)
       } else {
         setNowMs(Date.now())
+        setPanelStyle(computePanelStyle(triggerRef.current, placement))
+        void query.refetch()
       }
       return next
     })
@@ -104,9 +155,10 @@ export function NotificationMenu({ placement, compact = false }: NotificationMen
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div className="relative">
       {placement === 'mobile-top' ? (
         <button
+          ref={triggerRef}
           type="button"
           onClick={toggleMenu}
           title={t('notifications.title')}
@@ -128,6 +180,7 @@ export function NotificationMenu({ placement, compact = false }: NotificationMen
         </button>
       ) : (
         <button
+          ref={triggerRef}
           type="button"
           onClick={toggleMenu}
           title={t('notifications.title')}
@@ -156,17 +209,15 @@ export function NotificationMenu({ placement, compact = false }: NotificationMen
         </button>
       )}
 
-      {open && (
-        <div
-          role="dialog"
-          aria-label={t('notifications.title')}
-          className={cn(
-            'z-50 flex max-h-[min(80vh,560px)] flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#121826]',
-            placement === 'mobile-top'
-              ? 'fixed inset-x-3 top-16 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96'
-              : 'absolute left-full top-0 ml-2 w-96',
-          )}
-        >
+      {open &&
+        createPortal(
+          <div
+            ref={panelRef}
+            role="dialog"
+            aria-label={t('notifications.title')}
+            style={panelStyle ?? undefined}
+            className="fixed z-[100] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-[#121826]"
+          >
           {/* Đầu bảng thông báo */}
           <div className="flex items-center justify-between px-4 pt-3.5 pb-2">
             <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-50">
@@ -321,8 +372,9 @@ export function NotificationMenu({ placement, compact = false }: NotificationMen
               </div>
             )}
           </div>
-        </div>
-      )}
+        </div>,
+          document.body,
+        )}
     </div>
   )
 }

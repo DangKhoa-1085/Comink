@@ -1,6 +1,5 @@
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { friendshipsApi } from '../api/friendships'
 import { Avatar } from '../components/social/Avatar'
@@ -19,7 +18,13 @@ type FriendsTab = 'incoming' | 'outgoing' | 'list'
 export function FriendsPage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
-  const [tab, setTab] = useState<FriendsTab>('list')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const rawTab = searchParams.get('tab')
+  const tab: FriendsTab =
+    rawTab === 'incoming' || rawTab === 'outgoing' || rawTab === 'list' ? rawTab : 'list'
+  const setTab = (next: FriendsTab) => {
+    setSearchParams({ tab: next }, { replace: true })
+  }
 
   const incomingQuery = useQuery({
     queryKey: ['friendships', 'incoming'],

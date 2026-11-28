@@ -32,6 +32,9 @@ public class ApplicationDbContext : IdentityDbContext<
     public DbSet<PostMedia> PostMediaLinks => Set<PostMedia>();
     public DbSet<PostLike> PostLikes => Set<PostLike>();
     public DbSet<Comment> Comments => Set<Comment>();
+    public DbSet<LocketMoment> LocketMoments => Set<LocketMoment>();
+    public DbSet<LocketRecipient> LocketRecipients => Set<LocketRecipient>();
+    public DbSet<LocketReaction> LocketReactions => Set<LocketReaction>();
 
     // --- Hình ảnh và tệp (Giai đoạn 2) ---
     public DbSet<MediaAsset> MediaAssets => Set<MediaAsset>();

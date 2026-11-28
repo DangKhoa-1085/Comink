@@ -12,11 +12,17 @@ import {
 } from '../api/conversations'
 import type { PagedResult } from '../api/types'
 import type { CallDto } from '../api/calls'
+import type { NotificationItem } from '../api/notifications'
 import {
   createChatConnection,
+  FRIENDSHIP_CHANGED_EVENT,
+  LOCKET_CREATED_EVENT,
+  LOCKET_DELETED_EVENT,
+  LOCKET_UPDATED_EVENT,
   MESSAGE_CREATED_EVENT,
   MESSAGE_UPDATED_EVENT,
   MESSAGES_READ_EVENT,
+  NOTIFICATION_CREATED_EVENT,
   PINNED_MESSAGES_CHANGED_EVENT,
   PRESENCE_CHANGED_EVENT,
   sendPresencePing,
@@ -103,7 +109,16 @@ export function useChatConnection(enabled: boolean): ChatConnectionState {
       await queryClient.invalidateQueries({ queryKey: ['conversations'] })
       // Trạng thái online có thể đã đổi trong lúc mất kết nối → đọc lại chi tiết đang mở.
       await queryClient.invalidateQueries({ queryKey: ['conversation'] })
-      await queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      await queryClient.invalidateQueries({ queryKey: ['notifications'], refetchType: 'all' })
+      await queryClient.invalidateQueries({ queryKey: ['friendships'], refetchType: 'all' })
+    }
+
+    const invalidateFriendshipQueries = () => {
+      void queryClient.invalidateQueries({ queryKey: ['friendships'], refetchType: 'all' })
+      void queryClient.invalidateQueries({ queryKey: ['search-users'], refetchType: 'all' })
+      void queryClient.invalidateQueries({ queryKey: ['public-profile'], refetchType: 'all' })
+      void queryClient.invalidateQueries({ queryKey: ['feed'], refetchType: 'all' })
+      void queryClient.invalidateQueries({ queryKey: ['lockets'], refetchType: 'all' })
     }
 
     connection.on(MESSAGE_CREATED_EVENT, (message: ChatMessage) => {
@@ -202,6 +217,36 @@ export function useChatConnection(enabled: boolean): ChatConnectionState {
     // --- NC Ưu tiên 2: danh sách ghim thay đổi (ghim/bỏ ghim/thu hồi tin đang ghim) ---
     connection.on(PINNED_MESSAGES_CHANGED_EVENT, (payload: PinnedMessages) => {
       queryClient.setQueryData(['pinned', payload.conversationId], payload)
+    })
+
+    // --- Comink Locket: ảnh mới, cảm xúc hoặc xóa sớm ---
+    const refreshLockets = () => {
+      void queryClient.invalidateQueries({ queryKey: ['lockets'], refetchType: 'all' })
+    }
+    connection.on(LOCKET_CREATED_EVENT, refreshLockets)
+    connection.on(LOCKET_UPDATED_EVENT, refreshLockets)
+    connection.on(LOCKET_DELETED_EVENT, refreshLockets)
+
+    // --- Thông báo & lời mời kết bạn theo thời gian thực ---
+    connection.on(NOTIFICATION_CREATED_EVENT, (notification: NotificationItem) => {
+      queryClient.setQueryData<PagedResult<NotificationItem>>(['notifications'], (old) => {
+        if (!old || old.items.some((item) => item.id === notification.id)) {
+          return old
+        }
+        return { ...old, items: [notification, ...old.items] }
+      })
+      void queryClient.invalidateQueries({ queryKey: ['notifications'], refetchType: 'all' })
+
+      if (
+        notification.type === 'FriendRequestReceived' ||
+        notification.type === 'FriendRequestAccepted'
+      ) {
+        invalidateFriendshipQueries()
+      }
+    })
+
+    connection.on(FRIENDSHIP_CHANGED_EVENT, () => {
+      invalidateFriendshipQueries()
     })
 
     // --- Cuộc gọi: cuộc gọi đến / cập nhật / kết thúc (GĐ 4) ---

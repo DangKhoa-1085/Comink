@@ -25,6 +25,13 @@ export const MESSAGES_READ_EVENT = 'MessagesRead'
 export const MESSAGE_UPDATED_EVENT = 'MessageUpdated'
 /** Danh sách ghim của hội thoại vừa thay đổi (NC Ưu tiên 2). */
 export const PINNED_MESSAGES_CHANGED_EVENT = 'PinnedMessagesChanged'
+/** Sự kiện Comink Locket: có ảnh mới, cập nhật cảm xúc hoặc bị xóa sớm. */
+export const LOCKET_CREATED_EVENT = 'LocketCreated'
+export const LOCKET_UPDATED_EVENT = 'LocketUpdated'
+export const LOCKET_DELETED_EVENT = 'LocketDeleted'
+/** Sự kiện hộp thư thông báo và thay đổi quan hệ bạn bè theo thời gian thực. */
+export const NOTIFICATION_CREATED_EVENT = 'NotificationCreated'
+export const FRIENDSHIP_CHANGED_EVENT = 'FriendshipChanged'
 export function createChatConnection(): HubConnection {
   return new HubConnectionBuilder()
     .withUrl(`${API_BASE_URL}/hub/chat`, {

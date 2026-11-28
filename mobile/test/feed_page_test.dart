@@ -6,11 +6,13 @@ import 'package:comink_mobile/core/i18n/app_localizations.dart';
 import 'package:comink_mobile/features/feed/data/feed_providers.dart';
 import 'package:comink_mobile/features/feed/domain/post.dart';
 import 'package:comink_mobile/features/feed/presentation/feed_page.dart';
+import 'package:comink_mobile/features/locket/data/locket_providers.dart';
 import 'package:comink_mobile/features/notifications/data/notification_providers.dart';
 
 Widget _app(Widget home, FeedHistory feed) => ProviderScope(
       overrides: [
         feedProvider.overrideWith((ref) async => feed),
+        locketsProvider.overrideWith((ref) async => const []),
         notificationsProvider.overrideWith((ref) async => []),
       ],
       child: MaterialApp(
@@ -62,7 +64,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.text('COMINK LOCKET'), findsOneWidget);
     expect(find.text('Nội dung thử'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Tải thêm bài viết'), 200);
+    await tester.pumpAndSettle();
     expect(find.text('Tải thêm bài viết'), findsOneWidget);
   });
 }

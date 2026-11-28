@@ -5,6 +5,10 @@ import 'package:signalr_netcore/signalr_client.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/network/providers.dart';
+import '../../feed/data/feed_providers.dart';
+import '../../friends/data/friends_providers.dart';
+import '../../locket/data/locket_providers.dart';
+import '../../notifications/data/notification_providers.dart';
 import 'chat_providers.dart';
 
 /// Tín hiệu cuộc gọi thô từ SignalR; tầng call tự parse DTO.
@@ -31,6 +35,11 @@ class ChatRealtime {
   static const String callIncomingEvent = 'CallIncoming';
   static const String callUpdatedEvent = 'CallUpdated';
   static const String callEndedEvent = 'CallEnded';
+  static const String locketCreatedEvent = 'LocketCreated';
+  static const String locketUpdatedEvent = 'LocketUpdated';
+  static const String locketDeletedEvent = 'LocketDeleted';
+  static const String notificationCreatedEvent = 'NotificationCreated';
+  static const String friendshipChangedEvent = 'FriendshipChanged';
 
   /// Nhịp làm mới TTL presence (backend TTL 90 giây).
   static const Duration presencePingInterval = Duration(seconds: 30);
@@ -86,6 +95,11 @@ class ChatRealtime {
     connection.on(callIncomingEvent, (args) => _emitCall(callIncomingEvent, args));
     connection.on(callUpdatedEvent, (args) => _emitCall(callUpdatedEvent, args));
     connection.on(callEndedEvent, (args) => _emitCall(callEndedEvent, args));
+    connection.on(locketCreatedEvent, _onLocketsChanged);
+    connection.on(locketUpdatedEvent, _onLocketsChanged);
+    connection.on(locketDeletedEvent, _onLocketsChanged);
+    connection.on(notificationCreatedEvent, _onNotificationCreated);
+    connection.on(friendshipChangedEvent, _onFriendshipChanged);
     connection.onclose(({error}) {
       _connection = null;
       _stopPing();
@@ -96,6 +110,10 @@ class ChatRealtime {
       unawaited(sendPing());
       _ref.invalidate(conversationsProvider);
       _ref.invalidate(conversationDetailProvider);
+      _ref.invalidate(locketsProvider);
+      _ref.invalidate(notificationsProvider);
+      _ref.invalidate(incomingFriendRequestsProvider);
+      _ref.invalidate(friendsProvider);
     });
     connection.onreconnecting(({error}) {
       _clearTyping();
@@ -290,6 +308,29 @@ class ChatRealtime {
 
     _ref.invalidate(conversationsProvider);
     _ref.invalidate(conversationDetailProvider);
+  }
+
+  void _onLocketsChanged(List<Object?>? arguments) {
+    _ref.invalidate(locketsProvider);
+  }
+
+  void _onNotificationCreated(List<Object?>? arguments) {
+    _ref.invalidate(notificationsProvider);
+    final data = _payload(arguments);
+    final type = data?['type']?.toString();
+    if (type == 'FriendRequestReceived' || type == 'FriendRequestAccepted') {
+      _ref.invalidate(incomingFriendRequestsProvider);
+      _ref.invalidate(friendsProvider);
+      _ref.invalidate(feedProvider);
+      _ref.invalidate(locketsProvider);
+    }
+  }
+
+  void _onFriendshipChanged(List<Object?>? arguments) {
+    _ref.invalidate(incomingFriendRequestsProvider);
+    _ref.invalidate(friendsProvider);
+    _ref.invalidate(feedProvider);
+    _ref.invalidate(locketsProvider);
   }
 
   void _onTypingChanged(List<Object?>? arguments) {

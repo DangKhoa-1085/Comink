@@ -75,6 +75,14 @@ try
     builder.Services.AddScoped<Comink.Application.Calls.Abstractions.ICallNotifier,
         Comink.Api.Realtime.SignalRCallNotifier>();
 
+    // --- Phát sự kiện thời gian thực cho Comink Locket ---
+    builder.Services.AddScoped<Comink.Application.Social.Abstractions.ILocketNotifier,
+        Comink.Api.Realtime.SignalRLocketNotifier>();
+
+    // --- Phát sự kiện thời gian thực cho thông báo và trạng thái kết bạn ---
+    builder.Services.AddScoped<Comink.Application.Notifications.Abstractions.INotificationNotifier,
+        Comink.Api.Realtime.SignalRNotificationNotifier>();
+
     // --- Quản trị (Giai đoạn 5): thông báo + ngắt kết nối SignalR khi tài khoản bị khóa ---
     // Sổ đăng ký kết nối phải là singleton: nó sống lâu hơn từng request/hub connection.
     builder.Services.AddSingleton<IUserConnectionRegistry, UserConnectionRegistry>();
@@ -85,6 +93,9 @@ try
 
     // --- Dọn cuộc gọi đổ chuông quá hạn (30s) — bắt buộc phía server, client có thể đóng tab ---
     builder.Services.AddHostedService<Comink.Api.Realtime.CallRingTimeoutService>();
+
+    // --- Dọn các khoảnh khắc Locket hết hạn 24 giờ ---
+    builder.Services.AddHostedService<Comink.Api.Realtime.LocketExpiryCleanupService>();
 
     // --- OpenAPI / Swagger ---
     // Mốc A: hợp đồng phải đủ ổn định để app Flutter sinh client từ đó.
@@ -332,6 +343,7 @@ try
     app.MapPostEndpoints();
     app.MapCommentEndpoints();
     app.MapMediaEndpoints();
+    app.MapLocketEndpoints();
     app.MapMessagingEndpoints();
     app.MapCallEndpoints();
     app.MapLiveKitWebhookEndpoints();

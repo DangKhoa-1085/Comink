@@ -48,7 +48,7 @@ public static class MediaLimits
         ["image/jpeg", "image/png", "image/webp"];
 
     /// <summary>Ngữ cảnh tải lên hợp lệ.</summary>
-    public static readonly string[] AllowedContexts = ["Post", "Message", "Avatar", "Cover", "Album"];
+    public static readonly string[] AllowedContexts = ["Post", "Message", "Avatar", "Cover", "Album", "Locket"];
 
     /// <summary>Tệp có phải ảnh được phép không.</summary>
     public static bool IsAllowedImage(string? mimeType) =>

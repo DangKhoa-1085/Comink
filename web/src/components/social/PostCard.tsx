@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Globe2, Lock, MessageCircle, Pencil, Repeat2, Share2, ThumbsUp, Trash2, Users } from 'lucide-react'
+import { Globe2, Lock, MessageCircle, MoreHorizontal, Pencil, Repeat2, Share2, ThumbsUp, Trash2, Users } from 'lucide-react'
 import { commentsApi } from '../../api/comments'
 import { postsApi } from '../../api/posts'
 import type { Comment, Post, Visibility } from '../../api/types'
@@ -26,8 +26,32 @@ export function PostCard({ post, onChange }: { post: Post; onChange: () => void 
   const queryClient = useQueryClient()
   const [showComments, setShowComments] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [draft, setDraft] = useState(post.content ?? '')
   const [draftVisibility, setDraftVisibility] = useState<Visibility>(post.visibility)
+  const menuRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!menuOpen) {
+      return
+    }
+    const handlePointerDown = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [menuOpen])
 
   const updateMutation = useMutation({
     mutationFn: () =>
@@ -110,20 +134,54 @@ export function PostCard({ post, onChange }: { post: Post; onChange: () => void 
           </p>
         </div>
         {post.isMine && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              if (window.confirm(t('social.confirm_delete_post'))) {
-                deleteMutation.mutate()
-              }
-            }}
-            disabled={deleteMutation.isPending}
-            aria-label="delete-post"
-            title={t('social.delete_post')}
-          >
-            <Trash2 className="h-4 w-4 text-rose-500" />
-          </Button>
+          <div ref={menuRef} className="relative">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setMenuOpen((value) => !value)}
+              aria-label={t('social.post_options')}
+              aria-expanded={menuOpen}
+              title={t('social.post_options')}
+            >
+              <MoreHorizontal className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+            </Button>
+            {menuOpen && (
+              <div
+                role="menu"
+                className="absolute right-0 z-20 mt-1 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg dark:border-slate-700 dark:bg-[#1A2234]"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setDraft(post.content ?? '')
+                    setDraftVisibility(post.visibility)
+                    setEditing(true)
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  <span>{t('social.edit_post')}</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    if (window.confirm(t('social.confirm_delete_post'))) {
+                      deleteMutation.mutate()
+                    }
+                  }}
+                  disabled={deleteMutation.isPending}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>{t('social.delete_post')}</span>
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </header>
 
@@ -241,23 +299,6 @@ export function PostCard({ post, onChange }: { post: Post; onChange: () => void 
           <Repeat2 className="h-4 w-4" />
           {post.shareCount}
         </Button>
-
-        {post.isMine && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setDraft(post.content ?? '')
-              setDraftVisibility(post.visibility)
-              setEditing((value) => !value)
-            }}
-            aria-label="edit-post"
-            title={t('social.edit_post')}
-            className={editing ? 'text-sky-600 dark:text-sky-400' : undefined}
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-        )}
 
         <span className="ml-auto flex items-center gap-1">
           <Share2 className="h-3 w-3" />
