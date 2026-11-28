@@ -17,15 +17,18 @@ public class NotificationService : INotificationService
     private readonly ApplicationDbContext _db;
     private readonly IPushSender _push;
     private readonly ILogger<NotificationService> _logger;
+    private readonly INotificationNotifier? _notifier;
 
     public NotificationService(
         ApplicationDbContext db,
         IPushSender push,
-        ILogger<NotificationService> logger)
+        ILogger<NotificationService> logger,
+        INotificationNotifier? notifier = null)
     {
         _db = db;
         _push = push;
         _logger = logger;
+        _notifier = notifier;
     }
 
     /// <inheritdoc />
@@ -243,6 +246,49 @@ public class NotificationService : INotificationService
 
         _db.Notifications.Add(notification);
         await _db.SaveChangesAsync(cancellationToken);
+
+        // Phát thông báo thời gian thực qua SignalR để web/mobile cập nhật badge và danh sách ngay lập tức.
+        if (_notifier is not null)
+        {
+            try
+            {
+                string? actorDisplayName = null;
+                string? actorAvatarUrl = null;
+                if (actorId.HasValue)
+                {
+                    var actorInfo = await _db.Users
+                        .AsNoTracking()
+                        .Where(u => u.Id == actorId.Value)
+                        .Select(u => new
+                        {
+                            DisplayName = u.Profile != null ? u.Profile.DisplayName : u.UserName,
+                            AvatarUrl = u.Profile != null ? u.Profile.AvatarUrl : null,
+                        })
+                        .FirstOrDefaultAsync(cancellationToken);
+                    actorDisplayName = actorInfo?.DisplayName;
+                    actorAvatarUrl = actorInfo?.AvatarUrl;
+                }
+
+                var dto = new NotificationDto(
+                    notification.Id,
+                    notification.Type.ToString(),
+                    notification.ActorId,
+                    notification.EntityType,
+                    notification.EntityId,
+                    notification.Data,
+                    notification.IsRead,
+                    notification.CreatedAt,
+                    notification.ReadAt,
+                    actorDisplayName,
+                    actorAvatarUrl);
+
+                await _notifier.NotificationCreatedAsync(recipientId, dto, cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Không phát được SignalR cho thông báo {NotificationId}", notification.Id);
+            }
+        }
 
         await PushToUsersAsync([recipientId], title, body, data, false, cancellationToken);
     }

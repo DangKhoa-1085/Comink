@@ -1,11 +1,13 @@
-// Test tích hợp cho module Thông báo: thiết bị, hộp thư và push (docs/05 mục 10).
+// Test tích hợp cho module Thông báo: thiết bị, hộp thư, push và sự kiện SignalR (docs/05 mục 10).
 using Comink.Application.Common.Interfaces;
+using Comink.Application.Notifications.Abstractions;
 using Comink.Application.Notifications.Dtos;
 using Comink.Domain.Enums;
 using Comink.Infrastructure.Identity;
 using Comink.Infrastructure.Notifications;
 using Comink.Infrastructure.Persistence;
 using Comink.Infrastructure.Persistence.Entities;
+using Comink.Infrastructure.Social;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -59,10 +61,45 @@ public class NotificationServiceTests : IntegrationTestBase
         };
     }
 
+    private sealed class FakeNotificationNotifier : INotificationNotifier
+    {
+        public bool ShouldThrow { get; set; }
+        public List<(Guid RecipientId, NotificationDto Notification)> Created { get; } = [];
+        public List<(IReadOnlyCollection<Guid> UserIds, Guid? ActorId, string Action)> FriendshipChanges { get; } = [];
+
+        public Task NotificationCreatedAsync(
+            Guid recipientId,
+            NotificationDto notification,
+            CancellationToken cancellationToken = default)
+        {
+            if (ShouldThrow)
+            {
+                throw new InvalidOperationException("SignalR unavailable");
+            }
+            Created.Add((recipientId, notification));
+            return Task.CompletedTask;
+        }
+
+        public Task FriendshipChangedAsync(
+            IReadOnlyCollection<Guid> userIds,
+            Guid? actorId,
+            string action,
+            CancellationToken cancellationToken = default)
+        {
+            if (ShouldThrow)
+            {
+                throw new InvalidOperationException("SignalR unavailable");
+            }
+            FriendshipChanges.Add((userIds, actorId, action));
+            return Task.CompletedTask;
+        }
+    }
+
     private static NotificationService NewService(
         ApplicationDbContext db,
-        FakePushSender push) =>
-        new(db, push, NullLogger<NotificationService>.Instance);
+        FakePushSender push,
+        INotificationNotifier? notifier = null) =>
+        new(db, push, NullLogger<NotificationService>.Instance, notifier);
 
     [Fact]
     public async Task RegisterDevice_UpsertsTokenAndMovesToCurrentUser()
@@ -179,5 +216,76 @@ public class NotificationServiceTests : IntegrationTestBase
 
         Assert.True(result.Succeeded);
         Assert.False(db.UserDevices.Single().IsActive);
+    }
+
+    [Fact]
+    public async Task CreateAndPush_EmitsRealtimeNotificationWithActorInfo_AndIgnoresNotifierFailure()
+    {
+        var db = await CreateDbContextAsync();
+        var alice = NewUser("alice");
+        alice.Profile!.DisplayName = "Alice Nguyen";
+        alice.Profile.AvatarUrl = "https://cdn.example.test/alice.jpg";
+        var bob = NewUser("bob");
+        db.Users.AddRange(alice, bob);
+        await db.SaveChangesAsync();
+
+        var notifier = new FakeNotificationNotifier();
+        var service = NewService(db, new FakePushSender(), notifier);
+
+        await service.CreateAndPushAsync(
+            bob.Id,
+            alice.Id,
+            NotificationType.FriendRequestReceived,
+            "Friendship",
+            Guid.CreateVersion7(),
+            "Lời mời kết bạn",
+            "Alice Nguyen đã gửi lời mời kết bạn",
+            new Dictionary<string, string> { ["type"] = "FriendRequest" });
+
+        var emitted = Assert.Single(notifier.Created);
+        Assert.Equal(bob.Id, emitted.RecipientId);
+        Assert.Equal("FriendRequestReceived", emitted.Notification.Type);
+        Assert.Equal("Alice Nguyen", emitted.Notification.ActorDisplayName);
+        Assert.Equal("https://cdn.example.test/alice.jpg", emitted.Notification.ActorAvatarUrl);
+
+        notifier.ShouldThrow = true;
+        await service.CreateAndPushAsync(
+            bob.Id,
+            alice.Id,
+            NotificationType.FriendRequestAccepted,
+            "Friendship",
+            Guid.CreateVersion7(),
+            "Đã chấp nhận",
+            "Alice Nguyen đã chấp nhận",
+            null);
+        Assert.Equal(2, db.Notifications.Count());
+    }
+
+    [Fact]
+    public async Task FriendshipService_EmitsNotificationAndFriendshipChangedEvents()
+    {
+        var db = await CreateDbContextAsync();
+        var alice = NewUser("alice");
+        var bob = NewUser("bob");
+        db.Users.AddRange(alice, bob);
+        await db.SaveChangesAsync();
+
+        var notifier = new FakeNotificationNotifier();
+        var notificationService = NewService(db, new FakePushSender(), notifier);
+        var friendships = new FriendshipService(db, notificationService, notifier);
+
+        var sendResult = await friendships.SendRequestAsync(alice.Id, bob.Id);
+        Assert.True(sendResult.Succeeded);
+        Assert.Contains(notifier.Created, c => c.RecipientId == bob.Id && c.Notification.Type == "FriendRequestReceived");
+        Assert.Contains(notifier.FriendshipChanges, c => c.Action == "RequestSent" && c.UserIds.Contains(alice.Id) && c.UserIds.Contains(bob.Id));
+
+        var acceptResult = await friendships.AcceptAsync(bob.Id, sendResult.Value!.Id);
+        Assert.True(acceptResult.Succeeded);
+        Assert.Contains(notifier.Created, c => c.RecipientId == alice.Id && c.Notification.Type == "FriendRequestAccepted");
+        Assert.Contains(notifier.FriendshipChanges, c => c.Action == "RequestAccepted");
+
+        var removeResult = await friendships.RemoveFriendAsync(alice.Id, bob.Id);
+        Assert.True(removeResult.Succeeded);
+        Assert.Contains(notifier.FriendshipChanges, c => c.Action == "FriendRemoved");
     }
 }

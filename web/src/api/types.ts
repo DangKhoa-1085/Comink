@@ -234,5 +234,5 @@ export interface RegisterMediaPayload {
   sizeBytes: number
   width?: number | null
   height?: number | null
-  context: 'Post' | 'Message' | 'Avatar' | 'Cover' | 'Album'
+  context: 'Post' | 'Message' | 'Avatar' | 'Cover' | 'Album' | 'Locket'
 }

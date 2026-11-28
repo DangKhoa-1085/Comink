@@ -12,6 +12,8 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/network/providers.dart';
 import '../../../core/widgets/app_avatar.dart';
 import '../../../core/widgets/states.dart';
+import '../../locket/data/locket_providers.dart';
+import '../../locket/presentation/locket_stage_card.dart';
 import '../../media/data/media_service.dart';
 import '../data/feed_providers.dart';
 import '../domain/post.dart';
@@ -73,6 +75,7 @@ class _FeedPageState extends ConsumerState<FeedPage> {
       _hasMore = false;
     });
     ref.invalidate(feedProvider);
+    ref.invalidate(locketsProvider);
     await ref.read(feedProvider.future);
   }
 
@@ -146,6 +149,7 @@ class _FeedPageState extends ConsumerState<FeedPage> {
               ),
             ),
             const SizedBox(height: 12),
+            const LocketStageCard(),
           ],
         );
 

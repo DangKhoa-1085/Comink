@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -37,6 +39,21 @@ class MediaService {
     }
 
     final bytes = await file.readAsBytes();
+    return uploadBytes(
+      bytes,
+      fileName: file.name,
+      mimeType: mimeType,
+      context: context,
+    );
+  }
+
+  /// Tải dữ liệu ảnh dạng byte (ví dụ ảnh Locket đã cắt/lọc màu) rồi đăng ký asset.
+  Future<MediaAsset> uploadBytes(
+    Uint8List bytes, {
+    required String fileName,
+    required String mimeType,
+    required String context,
+  }) async {
     if (bytes.isEmpty || bytes.length > maxImageBytes) {
       throw const ApiException(code: 'MEDIA_TOO_LARGE');
     }
@@ -52,10 +69,10 @@ class MediaService {
 
     final LocalUploadResult uploaded;
     if (signature.isCloudinary) {
-      uploaded = await _uploadToCloudinary(signature, bytes, file.name, mimeType);
+      uploaded = await _uploadToCloudinary(signature, bytes, fileName, mimeType);
     } else {
       final form = FormData.fromMap({
-        'file': MultipartFile.fromBytes(bytes, filename: file.name),
+        'file': MultipartFile.fromBytes(bytes, filename: fileName),
       });
       final data = await _api.postMultipart(signature.uploadUrl, form);
       if (data is! Map) {

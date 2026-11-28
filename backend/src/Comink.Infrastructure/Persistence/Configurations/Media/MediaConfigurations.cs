@@ -17,7 +17,7 @@ public class MediaAssetConfiguration : IEntityTypeConfiguration<MediaAsset>
             t.HasCheckConstraint("ck_media_assets_resource_type", "resource_type IN ('Image', 'Video', 'File')");
             t.HasCheckConstraint(
                 "ck_media_assets_context",
-                "context IN ('Post', 'Message', 'Avatar', 'Cover', 'Album')");
+                "context IN ('Post', 'Message', 'Avatar', 'Cover', 'Album', 'Locket')");
             t.HasCheckConstraint("ck_media_assets_size", "size_bytes > 0");
         });
 

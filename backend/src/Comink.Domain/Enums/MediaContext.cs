@@ -8,5 +8,6 @@ public enum MediaContext
     Message,
     Avatar,
     Cover,
-    Album
+    Album,
+    Locket
 }

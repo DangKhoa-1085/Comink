@@ -191,7 +191,7 @@ function AuthenticatedShell({
       {/* Desktop Left Sidebar (>= lg) */}
       <aside
         className={cn(
-          'hidden shrink-0 flex-col justify-between border-r border-slate-200/80 bg-white p-3 transition-all dark:border-slate-800 dark:bg-[#121826] lg:sticky lg:top-0 lg:flex lg:h-screen',
+          'hidden shrink-0 flex-col justify-between border-r border-slate-200/80 bg-white p-3 transition-all dark:border-slate-800 dark:bg-[#121826] lg:sticky lg:top-0 lg:z-30 lg:flex lg:h-screen',
           isMessagesRoute ? 'w-[76px]' : 'w-[244px]',
         )}
       >

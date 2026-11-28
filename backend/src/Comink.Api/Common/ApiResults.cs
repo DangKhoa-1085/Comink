@@ -152,6 +152,12 @@ public static class ApiResults
         ErrorCodes.CallProviderUnavailable => "Call provider unavailable",
         ErrorCodes.UserNotFound => "User not found",
         ErrorCodes.AdminCannotLockSelf => "You cannot lock your own account",
+        ErrorCodes.LocketNotFound => "Locket moment not found",
+        ErrorCodes.LocketNotOwned => "You do not own this Locket moment",
+        ErrorCodes.LocketExpired => "This Locket moment has expired",
+        ErrorCodes.LocketReactionInvalid => "Invalid Locket reaction",
+        ErrorCodes.LocketNotFriends => "Only friends can receive Locket moments",
+        ErrorCodes.LocketCannotReplySelf => "Cannot reply to your own Locket moment",
         _ => "Unexpected error"
     };
 
@@ -207,6 +213,12 @@ public static class ApiResults
         ErrorCodes.CallProviderUnavailable => StatusCodes.Status503ServiceUnavailable,
         ErrorCodes.UserNotFound => StatusCodes.Status404NotFound,
         ErrorCodes.AdminCannotLockSelf => StatusCodes.Status400BadRequest,
+        ErrorCodes.LocketNotFound => StatusCodes.Status404NotFound,
+        ErrorCodes.LocketNotOwned => StatusCodes.Status403Forbidden,
+        ErrorCodes.LocketExpired => StatusCodes.Status410Gone,
+        ErrorCodes.LocketReactionInvalid => StatusCodes.Status400BadRequest,
+        ErrorCodes.LocketNotFriends => StatusCodes.Status403Forbidden,
+        ErrorCodes.LocketCannotReplySelf => StatusCodes.Status400BadRequest,
         _ => StatusCodes.Status500InternalServerError
     };
 

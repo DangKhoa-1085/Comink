@@ -88,6 +88,14 @@ public static class ErrorCodes
     public const string CallNotRinging = "CALL_NOT_RINGING";
     public const string CallProviderUnavailable = "CALL_PROVIDER_UNAVAILABLE";
 
+    // --- Comink Locket ---
+    public const string LocketNotFound = "LOCKET_NOT_FOUND";
+    public const string LocketNotOwned = "LOCKET_NOT_OWNED";
+    public const string LocketExpired = "LOCKET_EXPIRED";
+    public const string LocketReactionInvalid = "LOCKET_REACTION_INVALID";
+    public const string LocketNotFriends = "LOCKET_NOT_FRIENDS";
+    public const string LocketCannotReplySelf = "LOCKET_CANNOT_REPLY_SELF";
+
     // --- Quản trị (Giai đoạn 5) — docs/05_api_contract.md mục 4 ---
     public const string UserNotFound = "USER_NOT_FOUND";
     public const string AdminCannotLockSelf = "ADMIN_CANNOT_LOCK_SELF";

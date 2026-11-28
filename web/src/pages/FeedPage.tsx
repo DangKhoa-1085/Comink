@@ -7,6 +7,7 @@ import { friendshipsApi } from '../api/friendships'
 import { postsApi } from '../api/posts'
 import { PresenceDot } from '../components/chat/PresenceDot'
 import { Avatar } from '../components/social/Avatar'
+import { LocketWidget } from '../components/social/LocketWidget'
 import { PostCard } from '../components/social/PostCard'
 import { PostComposer } from '../components/social/PostComposer'
 import { Button } from '../components/ui/Button'
@@ -100,13 +101,8 @@ export function FeedPage() {
   return (
     <div className="flex items-start justify-center gap-6">
       <div className="w-full max-w-2xl">
-        <div className="mb-4">
-          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-            {t('social.feed')}
-          </h1>
-          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-            {t('social.feed_subtitle')}
-          </p>
+        <div className="mb-4 xl:hidden">
+          <LocketWidget />
         </div>
 
         <PostComposer onPosted={refresh} />
@@ -164,8 +160,10 @@ export function FeedPage() {
         )}
       </div>
 
-      {/* Cột phải (Desktop >= xl): Bạn bè đang hoạt động + Lời mời kết bạn */}
+      {/* Cột phải (Desktop >= xl): Comink Locket trên đầu + Bạn bè đang hoạt động + Lời mời kết bạn */}
       <aside className="sticky top-6 hidden w-[300px] shrink-0 space-y-4 xl:block">
+        <LocketWidget />
+
         <section className="space-y-3 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#121826]">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">

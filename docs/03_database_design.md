@@ -499,6 +499,35 @@ Khi chặn, backend xóa `friendships` và `follows` giữa hai người trong c
 | `post_id` | uuid | PK (2), FK→posts `CASCADE` |
 | `created_at` | timestamptz | NN |
 
+#### `locket_moments` (Comink Locket — hiệu lực 24h)
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| `id` | uuid | PK (UUIDv7) |
+| `author_id` | uuid | NN, FK→users `RESTRICT` |
+| `media_asset_id` | uuid | NN, FK→media_assets `RESTRICT` (`context = 'Locket'`) |
+| `caption` | varchar(100) | Tùy chọn, `CHECK (caption IS NULL OR char_length(caption) <= 100)` |
+| `audience_type` | varchar(20) | NN, mặc định `AllFriends` (`AllFriends`, `SelectedFriends`) |
+| `created_at` | timestamptz | NN |
+| `expires_at` | timestamptz | NN (`created_at + 24h`, `CHECK (expires_at > created_at)`) |
+| `deleted_at` | timestamptz | Xóa mềm khi chủ sở hữu xóa sớm hoặc job nền dọn sau 24h |
+
+#### `locket_recipients`
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| `moment_id` | uuid | PK (1), FK→locket_moments `CASCADE` |
+| `recipient_user_id` | uuid | PK (2), FK→users `CASCADE` |
+
+#### `locket_reactions`
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| `moment_id` | uuid | PK (1), FK→locket_moments `CASCADE` |
+| `user_id` | uuid | PK (2), FK→users `CASCADE` |
+| `emoji` | varchar(16) | NN (`❤️`, `😂`, `😮`, `🔥`, `🥹`) |
+| `created_at` | timestamptz | NN |
+
 ### 3.3. Module Nhắn tin
 
 #### `conversations`
@@ -635,7 +664,7 @@ Lịch sử cuộc gọi của một người = truy vấn `call_participants` t
 | `size_bytes` | bigint | NN, `CHECK (size_bytes > 0)` |
 | `width`, `height` | int | Ảnh/video |
 | `duration_seconds` | numeric(10,2) | Video/âm thanh |
-| `context` | varchar(16) | NN (`Post`, `Message`, `Avatar`, `Cover`, `Album`). Nơi tệp được tải lên cho |
+| `context` | varchar(16) | NN (`Post`, `Message`, `Avatar`, `Cover`, `Album`, `Locket`). Nơi tệp được tải lên cho |
 | `created_at` | timestamptz | NN |
 | `deleted_at` | timestamptz | Xóa mềm; job nền xóa tệp thật trên cloud rồi mới xóa dòng |
 
@@ -777,7 +806,8 @@ Mỗi enum tương ứng một `enum` trong C#, lưu **chuỗi** trong DB và c�
 | `CallParticipantStatus` | `call_participants.status` | `Invited`, `Joined`, `Declined`, `Missed`, `Left` | Trạng thái từng người |
 | `CallEndReason` | `calls.end_reason` | `Completed`, `NoAnswer`, `Declined`, `Cancelled`, `Failed` | Lý do kết thúc |
 | `MediaResourceType` | `media_assets.resource_type` | `Image`, `Video`, `File` | Loại tệp |
-| `MediaContext` | `media_assets.context` | `Post`, `Message`, `Avatar`, `Cover`, `Album` | Mục đích tải lên |
+| `MediaContext` | `media_assets.context` | `Post`, `Message`, `Avatar`, `Cover`, `Album`, `Locket` | Mục đích tải lên |
+| `LocketAudience` | `locket_moments.audience_type` | `AllFriends`, `SelectedFriends` | Phạm vi nhận ảnh Locket |
 | `MediaProvider` | `media_assets.provider` | `Cloudinary`, `Firebase`, `Local` | Nơi lưu. `Local` **chỉ dùng khi chạy dev** chưa có khoá Cloudinary (phương án B của GĐ 2, xem `docs/tasks/phase2_social.md` mục 3.9) |
 | `DevicePlatform` | `user_devices.platform` | `Web`, `Android`, `iOS` | |
 | `ReportTargetType` | `reports.target_type` | `Post`, `Comment`, `Message`, `User` | Đối tượng bị báo cáo |

@@ -474,6 +474,27 @@ Tệp lưu cục bộ được phục vụ tại `/uploads/...` **chỉ khi** ch
 | `MEDIA_UNSUPPORTED_TYPE` | 400 | Định dạng tệp không hỗ trợ *(7.6)* |
 | `MEDIA_TOO_LARGE` | 400 | Tệp vượt dung lượng *(7.6)* |
 | `MEDIA_NOT_FOUND` | 404 | Không tìm thấy tài sản media *(7.6)* |
+| `LOCKET_NOT_FOUND` | 404 | Locket không tồn tại hoặc không có quyền xem *(7.8)* |
+| `LOCKET_NOT_OWNED` | 403 | Không phải tác giả Locket *(7.8)* |
+| `LOCKET_EXPIRED` | 410 | Locket đã hết hạn 24 giờ *(7.8)* |
+| `LOCKET_REACTION_INVALID` | 400 | Emoji cảm xúc Locket không hợp lệ *(7.8)* |
+| `LOCKET_NOT_FRIENDS` | 403 | Người nhận chưa phải là bạn bè *(7.8)* |
+| `LOCKET_CANNOT_REPLY_SELF` | 400 | Không thể trả lời vào chat cho Locket của chính mình *(7.8)* |
+
+### 7.8. Comink Locket — `/api/lockets` (hiệu lực 24 giờ) — ✅ đã cài đặt
+
+- Upload ảnh bằng `/api/media/signature` với `context = "Locket"` và đăng ký `/api/media` trước khi tạo Locket.
+- Mỗi Locket tự động hết hạn sau **24 giờ** (`expiresAt = createdAt + 24h`); job nền quét mỗi 10 phút đánh dấu `deleted_at`, hoặc tác giả tự xóa sớm qua `DELETE`.
+
+| Method | Đường dẫn | Mục đích |
+|---|---|---|
+| `POST` | `/api/lockets` | Tạo Locket mới (`mediaAssetId`, `caption` ≤ 100, `audienceType`: `AllFriends \| SelectedFriends`, `recipientIds?`) → `201 LocketDto` |
+| `GET` | `/api/lockets?authorId=&cursor=&limit=20` | Lấy danh sách Locket còn hạn 24h của bản thân và bạn bè → `PagedList<LocketDto>` |
+| `POST` | `/api/lockets/{id}/reactions` | Thả / đổi / gỡ cảm xúc (`{ emoji }` thuộc `❤️, 😂, 😮, 🔥, 🥹`) → `200 LocketDto` |
+| `POST` | `/api/lockets/{id}/reply` | Trả lời nhanh vào đoạn chat 1–1 với tác giả (`{ content }` ≤ 1000) → `200 { conversationId, messageId }` |
+| `DELETE` | `/api/lockets/{id}` | Tác giả xóa Locket sớm trước 24h → `204` |
+
+- **Sự kiện SignalR (`/hub/chat`):** `LocketCreated` (`LocketDto`), `LocketUpdated` (`{ momentId }`), `LocketDeleted` (`{ momentId }`) phát tới nhóm `user:{id}` của các bạn bè được phép xem.
 
 ---
 
@@ -992,6 +1013,13 @@ Tin gốc bị thu hồi **sau đó** vẫn trả `replyTo` với `isDeleted = t
   - **cuộc gọi nhỡ** (`type=CallMissed`, `callId`, `conversationId`, `callType`; có dòng `notifications` loại `MissedCall`).
 - App Flutter đăng ký token khi đăng nhập, xin quyền thông báo, bấm notification để mở chat/cuộc gọi/lịch sử cuộc gọi. FCM là kênh **bổ sung** cho SignalR; quyền mic/camera vẫn xin khi vào cuộc gọi.
 
+### 10.4. Sự kiện SignalR thời gian thực (hub `/hub/chat`)
+
+| Sự kiện | Gửi tới | Payload | Ý nghĩa |
+|---|---|---|---|
+| `NotificationCreated` | `user:{recipientId}` | `NotificationDto` (mục 10.2) | Đẩy ngay hộp thư thông báo mới (`FriendRequestReceived`, `FriendRequestAccepted`, `MissedCall`, ...) để web/mobile cập nhật badge và danh sách mà không cần reload |
+| `FriendshipChanged` | `user:{id}` của cả 2 người | `{ actorId, action }` (`RequestSent` \| `RequestAccepted` \| `RequestRemoved` \| `FriendRemoved`) | Đồng bộ ngay danh sách lời mời kết bạn, danh sách bạn bè, bảng tin và Locket trên mọi client đang mở |
+
 ---
 
 ## 11. Lịch sử thay đổi
@@ -1018,3 +1046,4 @@ Tin gốc bị thu hồi **sau đó** vẫn trả `replyTo` với `isDeleted = t
 | 2026-11-21 | **GĐ 7 — Ưu tiên 3:** `GET /api/calls?filter=all|missed`; `CallSummaryDto` thêm `myStatus`/`isMissed`/`conversationType`/`conversationTitle`/`peer`/`initiatorDisplayName`/`answeredAt`/`endedAt`; "đã nghe" chỉ tính người **không phải** người gọi vào room; cuộc gọi nhỡ tạo notification `MissedCall` + push `type=CallMissed`; không đổi schema |
 | 2026-11-26 | `NotificationDto` bổ sung 2 trường mở rộng tuỳ chọn `actorDisplayName` và `actorAvatarUrl` (từ `Actor.Profile`) để hiển thị avatar + tên người gửi trực tiếp trong hộp thư thông báo web/mobile; không đổi schema |
 | 2026-11-26 | `PATCH /api/users/me/profile` bổ sung `avatarUrl` và `coverUrl` tuỳ chọn để người dùng đổi/gỡ ảnh đại diện và ảnh bìa trên web/mobile |
+| 2026-11-28 | Bổ sung sự kiện SignalR `NotificationCreated` và `FriendshipChanged` (mục 10.4) trên `/hub/chat` để cập nhật thông báo và lời mời kết bạn theo thời gian thực không cần reload |

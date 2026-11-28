@@ -192,6 +192,7 @@ public static class DependencyInjection
         services.AddScoped<ILikeService, LikeService>();
         services.AddScoped<ICommentService, CommentService>();
         services.AddScoped<IMediaService, MediaService>();
+        services.AddScoped<ILocketService, LocketService>();
 
         // --- Nhắn tin (Giai đoạn 3) ---
         services.AddScoped<IConversationService, Messaging.ConversationService>();

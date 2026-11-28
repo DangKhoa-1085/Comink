@@ -21,11 +21,16 @@ public class FriendshipService : IFriendshipService
 
     private readonly ApplicationDbContext _db;
     private readonly INotificationService? _notifications;
+    private readonly INotificationNotifier? _notifier;
 
-    public FriendshipService(ApplicationDbContext db, INotificationService? notifications = null)
+    public FriendshipService(
+        ApplicationDbContext db,
+        INotificationService? notifications = null,
+        INotificationNotifier? notifier = null)
     {
         _db = db;
         _notifications = notifications;
+        _notifier = notifier;
     }
 
     /// <inheritdoc />
@@ -68,6 +73,11 @@ public class FriendshipService : IFriendshipService
             await AdjustFriendCountsAsync(existing.RequesterId, existing.AddresseeId, +1, cancellationToken);
             await _db.SaveChangesAsync(cancellationToken);
             await NotifyFriendAcceptedAsync(currentUserId, existing.RequesterId, existing.Id, cancellationToken);
+            await NotifyFriendshipChangedAsync(
+                [existing.RequesterId, existing.AddresseeId],
+                currentUserId,
+                "RequestAccepted",
+                cancellationToken);
 
             return OperationResult<FriendshipDto>.Success(
                 await ToDtoAsync(existing, currentUserId, cancellationToken));
@@ -103,6 +113,11 @@ public class FriendshipService : IFriendshipService
         }
 
         await NotifyFriendRequestAsync(currentUserId, addresseeId, friendship.Id, cancellationToken);
+        await NotifyFriendshipChangedAsync(
+            [currentUserId, addresseeId],
+            currentUserId,
+            "RequestSent",
+            cancellationToken);
 
         return OperationResult<FriendshipDto>.Success(
             await ToDtoAsync(friendship, currentUserId, cancellationToken));
@@ -144,6 +159,11 @@ public class FriendshipService : IFriendshipService
         await AdjustFriendCountsAsync(friendship.RequesterId, friendship.AddresseeId, +1, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
         await NotifyFriendAcceptedAsync(currentUserId, friendship.RequesterId, friendship.Id, cancellationToken);
+        await NotifyFriendshipChangedAsync(
+            [friendship.RequesterId, friendship.AddresseeId],
+            currentUserId,
+            "RequestAccepted",
+            cancellationToken);
 
         return OperationResult<FriendshipDto>.Success(
             await ToDtoAsync(friendship, currentUserId, cancellationToken));
@@ -174,8 +194,10 @@ public class FriendshipService : IFriendshipService
             return OperationResult<bool>.Failure(ErrorCodes.SocialFriendRequestNotFound);
         }
 
+        var participants = new[] { friendship.RequesterId, friendship.AddresseeId };
         _db.Friendships.Remove(friendship);
         await _db.SaveChangesAsync(cancellationToken);
+        await NotifyFriendshipChangedAsync(participants, currentUserId, "RequestRemoved", cancellationToken);
         return OperationResult<bool>.Success(true);
     }
 
@@ -201,6 +223,11 @@ public class FriendshipService : IFriendshipService
         _db.Friendships.Remove(friendship);
         await AdjustFriendCountsAsync(currentUserId, friendUserId, -1, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
+        await NotifyFriendshipChangedAsync(
+            [currentUserId, friendUserId],
+            currentUserId,
+            "FriendRemoved",
+            cancellationToken);
         return OperationResult<bool>.Success(true);
     }
 
@@ -407,6 +434,27 @@ public class FriendshipService : IFriendshipService
         catch
         {
             // Push/thông báo không được làm hỏng thao tác kết bạn.
+        }
+    }
+
+    private async Task NotifyFriendshipChangedAsync(
+        IReadOnlyCollection<Guid> userIds,
+        Guid actorId,
+        string action,
+        CancellationToken cancellationToken)
+    {
+        if (_notifier is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _notifier.FriendshipChangedAsync(userIds, actorId, action, cancellationToken);
+        }
+        catch
+        {
+            // Phát SignalR lỗi không được làm hỏng thao tác kết bạn.
         }
     }
 

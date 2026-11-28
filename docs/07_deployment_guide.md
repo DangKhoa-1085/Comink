@@ -32,6 +32,19 @@ dotnet ef database update --project src/Comink.Infrastructure --startup-project 
 
 > **Lưu ý:** Ở môi trường `Production`, backend **không** tự chạy `Database.MigrateAsync()` khi khởi động (theo [`AGENTS.md`](../AGENTS.md) mục 8.2), nhưng sẽ tự đảm bảo hai role `User`, `Admin` và tài khoản admin ban đầu (nếu có cấu hình `AdminSeed`) tồn tại.
 
+### 2.1. Cập nhật khi có Migration CSDL mới (ví dụ thêm Comink Locket)
+
+Mỗi khi backend có migration mới (như `Social_AddLockets`), chỉ cần chạy lại **3 bước** theo đúng thứ tự:
+
+1. **Áp dụng migration lên Neon PostgreSQL** (từ thư mục `backend/` trên máy cá nhân, dùng **Direct connection** không có `-pooler`):
+   ```powershell
+   $env:ConnectionStrings__Postgres="postgresql://<USER>:<PASSWORD>@<DIRECT_HOST>/<DB>?sslmode=require"
+   dotnet ef database update --project src/Comink.Infrastructure --startup-project src/Comink.Api
+   ```
+   *(Có thể kiểm tra trước danh sách migration chờ bằng `dotnet ef migrations list --project src/Comink.Infrastructure --startup-project src/Comink.Api` hoặc xuất SQL bằng `dotnet ef migrations script --idempotent` để dán chạy trực tiếp trong Neon SQL Editor nếu không muốn chạy từ máy.)*
+2. **Redeploy Backend trên Railway:** push code lên GitHub (hoặc bấm **Deploy / Redeploy** trong dịch vụ Backend trên Railway Dashboard) để Railway build lại container mới khớp với schema vừa cập nhật.
+3. **Redeploy Web trên Vercel:** Vercel tự build lại khi push nhánh chính (hoặc bấm **Redeploy** trong Vercel Dashboard).
+
 ---
 
 ## 3. Bước 2 — Deploy Backend & Redis lên Railway

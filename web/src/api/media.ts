@@ -9,7 +9,7 @@ import { http } from '../lib/http'
 import type { LocalUploadResult, MediaAsset, MediaSignature, RegisterMediaPayload } from './types'
 
 export const mediaApi = {
-  async getSignature(context: 'Post' | 'Message' | 'Avatar' | 'Cover' | 'Album'): Promise<MediaSignature> {
+  async getSignature(context: 'Post' | 'Message' | 'Avatar' | 'Cover' | 'Album' | 'Locket'): Promise<MediaSignature> {
     const { data } = await http.post<MediaSignature>('/api/media/signature', {
       context,
       resourceType: 'Image',
